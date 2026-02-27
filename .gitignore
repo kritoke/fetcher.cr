@@ -9,7 +9,6 @@ node_modules/
 
 # Build artifacts
 bin/
-*.cr
 *.beam
 *.o
 *.so
