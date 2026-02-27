@@ -12,12 +12,25 @@
       pkgs = nixpkgs.legacyPackages.${system};
 
       # Allow developers to provide a private flake override for ticket (not committed).
-      # If ./flake.private.nix exists and defines `ticket`, prefer that; otherwise
-      # build a minimal ticket derivation from the `ticket-src` input.
-      # Load a developer-local private flake that can provide overrides (not committed).
-      # If present, it should expose a `ticket` attribute (a derivation). If absent,
-      # we do not construct a public ticket here — the spoke will operate without it.
-      private = if builtins.pathExists ./flake.private.nix then import ./flake.private.nix { inherit pkgs; } else {};
+      # Developer-provided `flake.private.nix` may be a shell script, a Nix attrset,
+      # or a flake (with `outputs`). Importing blindly can cause evaluation errors
+      # if the file isn't a plain Nix attrset. We attempt a safe import strategy:
+      # 1) If the file looks like a shell script (starts with #!), ignore it.
+      # 2) Try importing with arguments (`{ inherit pkgs; }`). If that succeeds use it.
+      # 3) Try importing without args. If that succeeds and is not a flake (no `outputs`), use it.
+      # 4) Otherwise fall back to an empty set.
+      private =
+        if builtins.pathExists ./flake.private.nix then
+          let
+            content = builtins.readFile ./flake.private.nix;
+            try_with_args = builtins.tryEval (import ./flake.private.nix { inherit pkgs; });
+            try_no_args = builtins.tryEval (import ./flake.private.nix);
+          in
+            if builtins.substring 0 2 content == "#!" then {}
+            else if try_with_args.success then try_with_args.value
+            else if try_no_args.success then (if try_no_args.value ? outputs then {} else try_no_args.value)
+            else {}
+        else {};
 
       # Prefer private.ticket from flake.private.nix; do not create a public ticket derivation here.
       # The developer should provide `ticket` in their local `flake.private.nix` if desired.

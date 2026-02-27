@@ -6,6 +6,8 @@ result-*
 
 # Dependencies
 node_modules/
+lib/
+shard.lock
 
 # Build artifacts
 bin/
