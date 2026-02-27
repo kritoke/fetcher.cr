@@ -1,15 +1,17 @@
 require "json"
 require "xml"
-require "../driver"
-require "../http_client_pool"
+require "./entry"
+require "./result"
+require "./retry"
+require "./http_client"
 
 module Fetcher
-  class SoftwareDriver < Driver
-    def pull(url : String, headers : HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100) : Result
+  module Software
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100) : Result
       provider = detect_provider(url)
-      return build_error_result("Unknown software provider") unless provider
+      return Fetcher.error_result("Unknown software provider") unless provider
 
-      with_retry do
+      Fetcher.with_retry do
         case provider
         when "github"
           pull_github(url, headers, limit)
@@ -18,32 +20,25 @@ module Fetcher
         when "codeberg"
           pull_codeberg(url, headers, limit)
         else
-          build_error_result("Unsupported provider")
+          Fetcher.error_result("Unsupported provider")
         end
       end
-    rescue ex : RetriableError
-      build_error_result("Failed after retries: #{ex.message}")
-    rescue ex
-      build_error_result("#{ex.class}: #{ex.message}")
     end
 
-    private def detect_provider(url : String) : String?
+    private def self.detect_provider(url : String) : String?
       return "github" if url.includes?("github.com") && url.includes?("/releases")
       return "gitlab" if url.includes?("gitlab.com") && url.includes?("/-/releases")
       return "codeberg" if url.includes?("codeberg.org") && url.includes?("/releases")
       nil
     end
 
-    private def pull_github(url : String, headers : HTTP::Headers, limit : Int32) : Result
+    private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
       repo = extract_github_repo(url)
-      return build_error_result("Invalid GitHub repo URL") unless repo
+      return Fetcher.error_result("Invalid GitHub repo URL") unless repo
 
       api_url = "https://api.github.com/repos/#{repo}/releases"
 
-      uri = URI.parse(api_url)
-      client = HTTPClientPool.clientFor(uri)
-
-      response = client.get(uri.request_target, HTTP::Headers{
+      response = HTTPClient.fetch(api_url, ::HTTP::Headers{
         "Accept" => "application/vnd.github.v3+json",
       })
 
@@ -51,7 +46,7 @@ module Fetcher
         raise RetriableError.new("GitHub rate limited")
       end
 
-      return build_error_result("GitHub API error: #{response.status_code}") unless response.status_code == 200
+      return Fetcher.error_result("GitHub API error: #{response.status_code}") unless response.status_code == 200
 
       releases = Array(JSON::Any).from_json(response.body)
       stable_releases = releases.reject do |release|
@@ -88,22 +83,20 @@ module Fetcher
       )
     end
 
-    private def extract_github_repo(url : String) : String?
+    private def self.extract_github_repo(url : String) : String?
       match = url.match(%r{github\.com/([^/]+/[^/]+)/?})
       match ? match[1] : nil
     end
 
-    private def pull_gitlab(url : String, headers : HTTP::Headers, limit : Int32) : Result
+    private def self.pull_gitlab(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
       repo = extract_gitlab_repo(url)
-      return build_error_result("Invalid GitLab repo URL") unless repo
+      return Fetcher.error_result("Invalid GitLab repo URL") unless repo
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
-      uri = URI.parse(atom_url)
-      client = HTTPClientPool.clientFor(uri)
-      response = client.get(uri.request_target)
+      response = HTTPClient.fetch(atom_url, ::HTTP::Headers.new)
 
-      return build_error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200
+      return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "gitlab", limit)
 
@@ -119,22 +112,20 @@ module Fetcher
       )
     end
 
-    private def extract_gitlab_repo(url : String) : String?
+    private def self.extract_gitlab_repo(url : String) : String?
       match = url.match(%r{gitlab\.com/([^/]+/[^/]+)})
       match ? match[1] : nil
     end
 
-    private def pull_codeberg(url : String, headers : HTTP::Headers, limit : Int32) : Result
+    private def self.pull_codeberg(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
       repo = extract_codeberg_repo(url)
-      return build_error_result("Invalid Codeberg repo URL") unless repo
+      return Fetcher.error_result("Invalid Codeberg repo URL") unless repo
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
-      uri = URI.parse(atom_url)
-      client = HTTPClientPool.clientFor(uri)
-      response = client.get(uri.request_target)
+      response = HTTPClient.fetch(atom_url, ::HTTP::Headers.new)
 
-      return build_error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200
+      return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "codeberg", limit)
 
@@ -150,12 +141,12 @@ module Fetcher
       )
     end
 
-    private def extract_codeberg_repo(url : String) : String?
+    private def self.extract_codeberg_repo(url : String) : String?
       match = url.match(%r{codeberg\.org/([^/]+/[^/]+)})
       match ? match[1] : nil
     end
 
-    private def parse_atom_entries(body : String, source : String, limit : Int32) : Array(Entry)
+    private def self.parse_atom_entries(body : String, source : String, limit : Int32) : Array(Entry)
       xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
       entries = [] of Entry
 
@@ -181,8 +172,8 @@ module Fetcher
       entries
     end
 
-    private def parse_time(time_str : String?) : Time?
-      return nil unless time_str
+    private def self.parse_time(time_str : String?) : Time?
+      return unless time_str
 
       formats = [
         "%a, %d %b %Y %H:%M:%S %z",

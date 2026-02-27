@@ -1,34 +1,22 @@
 require "xml"
 require "html"
-require "../driver"
-require "../http_client_pool"
+require "./entry"
+require "./result"
+require "./retry"
+require "./http_client"
 
 module Fetcher
-  class RSSDriver < Driver
+  module RSS
     MAX_FEED_SIZE = 5 * 1024 * 1024
 
-    def pull(url : String, headers : HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100) : Result
-      with_retry do
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100) : Result
+      Fetcher.with_retry do
         perform_fetch(url, headers, limit)
       end
-    rescue ex : RetriableError
-      build_error_result("Failed after retries: #{ex.message}")
-    rescue ex : IO::TimeoutError
-      raise RetriableError.new("Timeout: #{ex.message}")
-    rescue ex
-      if transient_error?(ex)
-        raise RetriableError.new(ex.message || "Unknown error")
-      end
-      build_error_result("#{ex.class}: #{ex.message}")
     end
 
-    private def perform_fetch(url : String, headers : HTTP::Headers, limit : Int32) : Result
-      uri = URI.parse(url)
-      client = HTTPClientPool.clientFor(uri)
-      client.connect_timeout = 10.seconds
-      client.read_timeout = 30.seconds
-
-      response = client.get(uri.request_target, headers: headers)
+    private def self.perform_fetch(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
+      response = HTTPClient.fetch(url, headers)
 
       case response.status_code
       when 304
@@ -41,30 +29,28 @@ module Fetcher
           error_message: nil
         )
       when 200..299
-        parse_feed(response.body_io, url, limit)
+        parse_feed(response.body, url, limit)
       when 500..599
         raise RetriableError.new("Server error: #{response.status_code}")
       else
-        build_error_result("HTTP #{response.status_code}")
+        Fetcher.error_result("HTTP #{response.status_code}")
       end
+    rescue ex : IO::TimeoutError
+      raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex
+      if Fetcher.transient_error?(ex)
+        raise RetriableError.new(ex.message || "Unknown error")
+      end
+      Fetcher.error_result("#{ex.class}: #{ex.message}")
     end
 
-    private def parse_feed(io : IO, url : String, limit : Int32) : Result
-      buffer = IO::Memory.new
-      bytes_copied = IO.copy(io, buffer, limit: MAX_FEED_SIZE)
-
-      if bytes_copied >= MAX_FEED_SIZE
-        return build_error_result("Feed too large (>5MB)")
-      end
-
-      buffer.rewind
+    private def self.parse_feed(body : String, url : String, limit : Int32) : Result
+      return Fetcher.error_result("Feed too large (>5MB)") if body.bytesize > MAX_FEED_SIZE
 
       begin
-        xml = XML.parse(buffer, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
+        xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
 
-        unless xml.root
-          return build_error_result("No root element")
-        end
+        return Fetcher.error_result("No root element") unless xml.root
 
         rss = parse_rss(xml, limit)
         return rss unless rss.entries.empty?
@@ -72,15 +58,15 @@ module Fetcher
         atom = parse_atom(xml, limit)
         return atom unless atom.entries.empty?
 
-        build_error_result("Unsupported feed format")
+        Fetcher.error_result("Unsupported feed format")
       rescue ex : XML::Error
-        build_error_result("XML parsing error: #{ex.message}")
+        Fetcher.error_result("XML parsing error: #{ex.message}")
       rescue ex
-        build_error_result("Error: #{ex.class} - #{ex.message}")
+        Fetcher.error_result("Error: #{ex.class} - #{ex.message}")
       end
     end
 
-    private def parse_rss(xml : XML::Node, limit : Int32) : Result
+    private def self.parse_rss(xml : XML::Node, limit : Int32) : Result
       site_link = "#"
       entries = [] of Entry
 
@@ -116,7 +102,7 @@ module Fetcher
       )
     end
 
-    private def resolve_rss_site_link(channel : XML::Node) : String
+    private def self.resolve_rss_site_link(channel : XML::Node) : String
       links = channel.xpath_nodes("./*[local-name()='link']")
       site_link_node = links.find do |node|
         node["rel"]? != "self" && (node.text.presence || node["href"]?)
@@ -127,7 +113,7 @@ module Fetcher
       link.strip.presence || "#"
     end
 
-    private def parse_rss_item(node : XML::Node) : Entry
+    private def self.parse_rss_item(node : XML::Node) : Entry
       title = node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip)
       title = HTML.unescape(title) if title
       title = "Untitled" if title.nil? || title.empty?
@@ -142,11 +128,11 @@ module Fetcher
       Entry.new(title, link, "", nil, pub_date, "rss", nil)
     end
 
-    private def parse_atom(xml : XML::Node, limit : Int32) : Result
+    private def self.parse_atom(xml : XML::Node, limit : Int32) : Result
       entries = [] of Entry
 
       feed_node = xml.xpath_node("//*[local-name()='feed']")
-      return build_error_result("No feed element") unless feed_node
+      return Fetcher.error_result("No feed element") unless feed_node
 
       alt = feed_node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
             feed_node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
@@ -172,7 +158,7 @@ module Fetcher
       )
     end
 
-    private def parse_atom_entry(node : XML::Node) : Entry
+    private def self.parse_atom_entry(node : XML::Node) : Entry
       title = node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip)
       title = HTML.unescape(title) if title
       title = "Untitled" if title.nil? || title.empty?
@@ -190,8 +176,8 @@ module Fetcher
       Entry.new(title, link, "", nil, pub_date, "atom", nil)
     end
 
-    private def parse_time(time_str : String?) : Time?
-      return nil unless time_str
+    private def self.parse_time(time_str : String?) : Time?
+      return unless time_str
 
       formats = [
         "%a, %d %b %Y %H:%M:%S %z",
@@ -214,11 +200,6 @@ module Fetcher
       end
 
       nil
-    end
-
-    private def transient_error?(ex : Exception) : Bool
-      msg = ex.message.to_s.downcase
-      msg.includes?("timeout") || msg.includes?("connection") || msg.includes?("dns")
     end
   end
 end
