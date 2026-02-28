@@ -4,22 +4,40 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     openspec.url = "github:Fission-AI/OpenSpec";
+    # Ticket task management (non-flake input)
+    ticket-src = {
+      url = "github:wedow/ticket";
+      flake = false;
+    };
   };
 
-  outputs = { self, nixpkgs, openspec }:
+  outputs = { self, nixpkgs, openspec, ticket-src }:
     let
       system = "aarch64-linux";
       pkgs = nixpkgs.legacyPackages.${system};
 
-      # Allow developers to provide a private flake override for ticket (not committed).
-      # Developer-provided `flake.private.nix` may be a shell script, a Nix attrset,
-      # or a flake (with `outputs`). Importing blindly can cause evaluation errors
-      # if the file isn't a plain Nix attrset. We attempt a safe import strategy:
-      # 1) If the file looks like a shell script (starts with #!), ignore it.
-      # 2) Try importing with arguments (`{ inherit pkgs; }`). If that succeeds use it.
-      # 3) Try importing without args. If that succeeds and is not a flake (no `outputs`), use it.
-      # 4) Otherwise fall back to an empty set.
-      private =
+      # Minimal derivation for the ticket bash script (exposed to the devShell)
+      defaultTicket = pkgs.stdenv.mkDerivation {
+        pname = "ticket";
+        version = "latest";
+        src = ticket-src;
+        dontBuild = true;
+        installPhase = ''
+          mkdir -p $out/bin
+          cp ticket $out/bin/ticket
+          chmod +x $out/bin/ticket
+        '';
+      };
+
+      # Use direct crystal_1_18 from nixpkgs (like fetcher.cr approach)
+      # Prefer the nixpkgs-provided Crystal 1.18 package when available.
+      # Fall back to pkgs.crystal if the specific attr is not present.
+      crystal_1_18 = if builtins.hasAttr "crystal_1_18" pkgs then pkgs.crystal_1_18 else pkgs.crystal;
+
+
+      # Read flake.private.nix for per-developer overrides (like fetcher.cr)
+      # This allows developers to provide custom shellHook, ticket, etc.
+      privateConfig =
         if builtins.pathExists ./flake.private.nix then
           let
             content = builtins.readFile ./flake.private.nix;
@@ -32,46 +50,26 @@
             else {}
         else {};
 
-      # Prefer private.ticket from flake.private.nix; do not create a public ticket derivation here.
-      # The developer should provide `ticket` in their local `flake.private.nix` if desired.
-      ticket = if private ? ticket then private.ticket else null;
+      # Get ticket from privateConfig if provided, otherwise use the default ticket derivation
+      ticket = if privateConfig ? ticket then privateConfig.ticket else defaultTicket;
 
-      # Path to add to the shell's PATH; empty string if ticket is not present.
-      ticketPath = if builtins.isNull ticket then "" else "${ticket}/bin";
-
-      # Allow private flake to provide a `shellHook` fragment for local env setup.
-      privateShellHook = if private ? shellHook then private.shellHook else "";
-
-      # Common minimal shellHook and optional private fragment are computed here
-      # so they can be referenced when building the mkShell attributes below.
-      commonShell = ''
-        echo "fetcher.cr DevShell Active"
-        export PATH="$PATH:${ticketPath}"
-      '';
-
-      privateShell = if builtins.stringLength privateShellHook == 0 then "" else privateShellHook;
-
-      # Prefer the nixpkgs-provided Crystal 1.18 package when available.
-      # Many nixpkgs provide `crystal_1_18` for stable older Crystal releases.
-      # Fall back to `pkgs.crystal` if the specific attr is not present.
-      crystal_1_18 = if builtins.hasAttr "crystal_1_18" pkgs then pkgs.crystal_1_18 else pkgs.crystal;
-
-      # System-specific Xorg libraries for Playwright
-      # The `xorg` attribute set is deprecated in nixpkgs; prefer modern attribute names.
-      # Map legacy names (libX...) to modern names (libx...) and try both.
-      getXorg = name:
-        let alt = builtins.replaceStrings [ "libX" ] [ "libx" ] name;
-        in if builtins.hasAttr alt pkgs then builtins.getAttr alt pkgs else if builtins.hasAttr name pkgs then builtins.getAttr name pkgs else null;
-
-      # Playwright libs removed from default spoke; include only when explicitly requested in a module.
-      pwLibs = with pkgs; [];
+      # Get shellHook from privateConfig if provided
+      privateShellHook = if privateConfig ? shellHook then privateConfig.shellHook else "";
+      # No playwright libs needed
+      pwLibs = [];
     in {
       devShells.${system}.default = pkgs.mkShell {
-        buildInputs = [ crystal_1_18 ] ++ pwLibs;
+        buildInputs = with pkgs; [ crystal_1_18 ] ++ [ ] ++ [] ++ pwLibs;
 
-        # Minimal, portable shellHook. Local, developer-specific setup (SSH agent bridging,
-        # HUB_ROOT overrides, etc.) should live in ./flake.private.nix as `shellHook`.
-        shellHook = commonShell + privateShell;
+        shellHook = ''
+          echo "fetcher.cr DevShell Active"
+           export PATH="$PATH:$${ticket}/bin"
+           export TICKET_DIR="$PWD/.tickets"
+           if [ ! -d "$TICKET_DIR" ]; then
+             echo "Initializing local Ticket storage in $TICKET_DIR"
+             mkdir -p "$TICKET_DIR"
+           fi
+           '' + privateShellHook;
       };
     };
 }

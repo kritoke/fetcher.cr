@@ -6,8 +6,6 @@ result-*
 
 # Dependencies
 node_modules/
-lib/
-shard.lock
 
 # Build artifacts
 bin/
@@ -34,6 +32,7 @@ bin/
 # Local developer overrides
 flake.private.nix
 .devshell-private.sh
+lib/
 
 # Local ticket storage
 .tickets/

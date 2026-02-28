@@ -53,7 +53,24 @@
     "root": {
       "inputs": {
         "nixpkgs": "nixpkgs",
-        "openspec": "openspec"
+        "openspec": "openspec",
+        "ticket-src": "ticket-src"
+      }
+    },
+    "ticket-src": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1771728878,
+        "narHash": "sha256-zvt+SbHmQxqTvt2JyFXyYU1k3JM6AEsSIDI0RhpmPPk=",
+        "owner": "wedow",
+        "repo": "ticket",
+        "rev": "b564596e6f9ee5a9bf300600b61e1c681dc26d28",
+        "type": "github"
+      },
+      "original": {
+        "owner": "wedow",
+        "repo": "ticket",
+        "type": "github"
       }
     }
   },
