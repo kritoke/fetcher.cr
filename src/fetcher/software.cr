@@ -4,6 +4,7 @@ require "./entry"
 require "./result"
 require "./retry"
 require "./http_client"
+require "./time_parser"
 
 module Fetcher
   module Software
@@ -38,9 +39,11 @@ module Fetcher
 
       api_url = "https://api.github.com/repos/#{repo}/releases"
 
-      response = HTTPClient.fetch(api_url, ::HTTP::Headers{
-        "Accept" => "application/vnd.github.v3+json",
-      })
+      github_headers = ::HTTP::Headers.new
+      github_headers["Accept"] = "application/vnd.github.v3+json"
+      merged = Headers.build(github_headers)
+
+      response = HTTPClient.fetch(api_url, merged)
 
       if response.status_code == 429
         raise RetriableError.new("GitHub rate limited")
@@ -53,24 +56,8 @@ module Fetcher
         release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
       end
 
-      entries = [] of Entry
-      stable_releases.first(limit).each do |release|
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
-        html_url = release["html_url"]?.try(&.as_s) || ""
-        published = release["published_at"]?.try(&.as_s)
-
-        pub_date = published ? Time.parse_iso8601(published) : nil
-
-        entries << Entry.new(
-          "#{repo} #{name}",
-          html_url,
-          "",
-          nil,
-          pub_date,
-          "github",
-          tag
-        )
+      entries = stable_releases.first(limit).map do |release|
+        parse_github_release(release, repo)
       end
 
       Result.new(
@@ -81,6 +68,17 @@ module Fetcher
         favicon: "https://github.com/favicon.ico",
         error_message: nil
       )
+    end
+
+    private def self.parse_github_release(release : JSON::Any, repo : String) : Entry
+      tag = release["tag_name"]?.try(&.as_s) || ""
+      name = release["name"]?.try(&.as_s).presence || tag
+      html_url = release["html_url"]?.try(&.as_s) || ""
+      published = release["published_at"]?.try(&.as_s)
+
+      pub_date = TimeParser.parse_iso8601(published)
+
+      Entry.new("#{repo} #{name}", html_url, "", nil, pub_date, "github", tag)
     end
 
     private def self.extract_github_repo(url : String) : String?
@@ -94,19 +92,17 @@ module Fetcher
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, ::HTTP::Headers.new)
+      response = HTTPClient.fetch(atom_url, Headers.build(::HTTP::Headers.new))
 
       return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "gitlab", limit)
 
-      site_link = "https://gitlab.com/#{repo}"
-
       Result.new(
         entries: entries,
         etag: response.headers["ETag"]?,
         last_modified: response.headers["Last-Modified"]?,
-        site_link: site_link,
+        site_link: "https://gitlab.com/#{repo}",
         favicon: "https://gitlab.com/favicon.ico",
         error_message: nil
       )
@@ -123,19 +119,17 @@ module Fetcher
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, ::HTTP::Headers.new)
+      response = HTTPClient.fetch(atom_url, Headers.build(::HTTP::Headers.new))
 
       return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "codeberg", limit)
 
-      site_link = "https://codeberg.org/#{repo}"
-
       Result.new(
         entries: entries,
         etag: response.headers["ETag"]?,
         last_modified: response.headers["Last-Modified"]?,
-        site_link: site_link,
+        site_link: "https://codeberg.org/#{repo}",
         favicon: "https://codeberg.org/favicon.ico",
         error_message: nil
       )
@@ -148,53 +142,23 @@ module Fetcher
 
     private def self.parse_atom_entries(body : String, source : String, limit : Int32) : Array(Entry)
       xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
-      entries = [] of Entry
 
-      xml.xpath_nodes("//entry").each do |entry|
-        title_node = entry.xpath_node("title")
-        title = title_node.nil? ? "Untitled" : (title_node.text.try(&.strip) || "Untitled")
-
-        link_node = entry.xpath_node("link")
-        if link_node
-          link = link_node["href"]? || (link_node.text.try(&.strip) || "")
-        else
-          link = ""
-        end
-
-        published_node = entry.xpath_node("published") || entry.xpath_node("updated")
-        pub_date = published_node ? parse_time(published_node.text) : nil
-
-        entries << Entry.new(title, link, "", nil, pub_date, source, nil)
-
-        break if entries.size >= limit
+      xml.xpath_nodes("//entry").first(limit).map do |entry|
+        parse_atom_entry(entry, source)
       end
-
-      entries
     end
 
-    private def self.parse_time(time_str : String?) : Time?
-      return unless time_str
+    private def self.parse_atom_entry(entry : XML::Node, source : String) : Entry
+      title_node = entry.xpath_node("title")
+      title = title_node.nil? ? "Untitled" : (title_node.text.try(&.strip) || "Untitled")
 
-      formats = [
-        "%a, %d %b %Y %H:%M:%S %z",
-        "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%Y-%m-%dT%H:%M:%S",
-      ]
+      link_node = entry.xpath_node("link")
+      link = link_node.try(&.[]?("href")) || link_node.try(&.text).try(&.strip) || ""
 
-      formats.each do |fmt|
-        begin
-          return Time.parse(time_str.strip, fmt, Time::Location::UTC)
-        rescue
-        end
-      end
+      published_node = entry.xpath_node("published") || entry.xpath_node("updated")
+      pub_date = TimeParser.parse(published_node.try(&.text), TimeParser::ATOM_FORMATS)
 
-      begin
-        return Time.parse_iso8601(time_str.strip)
-      rescue
-      end
-
-      nil
+      Entry.new(title, link, "", nil, pub_date, source, nil)
     end
   end
 end

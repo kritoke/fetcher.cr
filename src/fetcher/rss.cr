@@ -4,6 +4,7 @@ require "./entry"
 require "./result"
 require "./retry"
 require "./http_client"
+require "./time_parser"
 
 module Fetcher
   module RSS
@@ -123,7 +124,7 @@ module Fetcher
       pub_date_str = node.xpath_node("./*[local-name()='pubDate']").try(&.text) ||
                      node.xpath_node("./*[local-name()='dc:date']").try(&.text) ||
                      node.xpath_node("./*[local-name()='date']").try(&.text)
-      pub_date = parse_time(pub_date_str)
+      pub_date = TimeParser.parse(pub_date_str, TimeParser::RSS_FORMATS)
 
       Entry.new(title, link, "", nil, pub_date, "rss", nil)
     end
@@ -171,35 +172,9 @@ module Fetcher
 
       published_str = node.xpath_node("./*[local-name()='published']").try(&.text) ||
                       node.xpath_node("./*[local-name()='updated']").try(&.text)
-      pub_date = parse_time(published_str)
+      pub_date = TimeParser.parse(published_str, TimeParser::ATOM_FORMATS)
 
       Entry.new(title, link, "", nil, pub_date, "atom", nil)
-    end
-
-    private def self.parse_time(time_str : String?) : Time?
-      return unless time_str
-
-      formats = [
-        "%a, %d %b %Y %H:%M:%S %z",
-        "%Y-%m-%dT%H:%M:%S%z",
-        "%Y-%m-%dT%H:%M:%SZ",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y-%m-%d",
-      ]
-
-      formats.each do |fmt|
-        begin
-          return Time.parse(time_str.strip, fmt, Time::Location::UTC)
-        rescue
-        end
-      end
-
-      begin
-        return Time.parse_iso8601(time_str.strip)
-      rescue
-      end
-
-      nil
     end
   end
 end
