@@ -255,3 +255,166 @@ describe Fetcher::Reddit::RedditFetchError do
     ex.message.should eq("Subreddit not found")
   end
 end
+
+describe Fetcher::TimeParser do
+  it "parses RSS date formats" do
+    time = Fetcher::TimeParser.parse("Wed, 15 Jan 2024 10:30:00 +0000")
+    time.should_not be_nil
+    time.try(&.year).should eq(2024)
+    time.try(&.month).should eq(1)
+    time.try(&.day).should eq(15)
+  end
+
+  it "parses ISO8601 date formats" do
+    time = Fetcher::TimeParser.parse("2024-01-15T10:30:00Z")
+    time.should_not be_nil
+    time.try(&.year).should eq(2024)
+    time.try(&.month).should eq(1)
+    time.try(&.day).should eq(15)
+  end
+
+  it "returns nil for invalid dates" do
+    time = Fetcher::TimeParser.parse("invalid date")
+    time.should be_nil
+  end
+
+  it "returns nil for empty strings" do
+    time = Fetcher::TimeParser.parse("")
+    time.should be_nil
+  end
+
+  it "parses GitHub ISO8601 format" do
+    time = Fetcher::TimeParser.parse_iso8601("2024-01-15T10:30:00Z")
+    time.should_not be_nil
+    time.try(&.year).should eq(2024)
+  end
+end
+
+describe "Integration Tests" do
+  describe "RSS parsing" do
+    it "parses valid RSS feed structure" do
+      rss_xml = <<-XML
+      <?xml version="1.0"?>
+      <rss version="2.0">
+        <channel>
+          <title>Test Feed</title>
+          <link>https://example.com</link>
+          <item>
+            <title>Test Article</title>
+            <link>https://example.com/article</link>
+            <pubDate>Wed, 15 Jan 2024 10:30:00 +0000</pubDate>
+          </item>
+        </channel>
+      </rss>
+      XML
+
+      xml = XML.parse(rss_xml)
+      channel = xml.xpath_node("//channel")
+      channel.should_not be_nil
+      channel.try(&.xpath_node("title").try(&.text)).should eq("Test Feed")
+    end
+
+    it "parses valid Atom feed structure" do
+      atom_xml = <<-XML
+      <?xml version="1.0"?>
+      <feed xmlns="http://www.w3.org/2005/Atom">
+        <title>Test Atom Feed</title>
+        <link rel="alternate" href="https://example.com"/>
+        <entry>
+          <title>Test Entry</title>
+          <link href="https://example.com/entry"/>
+          <published>2024-01-15T10:30:00Z</published>
+        </entry>
+      </feed>
+      XML
+
+      xml = XML.parse(atom_xml)
+      feed = xml.xpath_node("//*[local-name()='feed']")
+      feed.should_not be_nil
+      feed.try(&.xpath_node("//*[local-name()='title']").try(&.text)).should eq("Test Atom Feed")
+    end
+  end
+
+  describe "Reddit JSON parsing" do
+    it "parses valid Reddit JSON structure" do
+      reddit_json = <<-JSON
+      [
+        {
+          "kind": "Listing",
+          "data": {
+            "children": [
+              {
+                "kind": "t3",
+                "data": {
+                  "title": "Test Post",
+                  "url": "https://example.com",
+                  "permalink": "/r/crystal/comments/test/",
+                  "created_utc": 1705315800.0,
+                  "is_self": false
+                }
+              }
+            ]
+          }
+        }
+      ]
+      JSON
+
+      parsed = JSON.parse(reddit_json)
+      children = parsed[0]["data"]["children"]
+      children.should_not be_nil
+      children.as_a.size.should eq(1)
+      
+      post = children[0]["data"]
+      post["title"].as_s.should eq("Test Post")
+      post["created_utc"].as_f.should eq(1705315800.0)
+    end
+  end
+
+  describe "GitHub releases JSON parsing" do
+    it "parses valid GitHub releases structure" do
+      github_json = <<-JSON
+      [
+        {
+          "tag_name": "v1.0.0",
+          "name": "Release 1.0.0",
+          "html_url": "https://github.com/test/repo/releases/v1.0.0",
+          "published_at": "2024-01-15T10:30:00Z",
+          "prerelease": false,
+          "draft": false
+        }
+      ]
+      JSON
+
+      releases = Array(JSON::Any).from_json(github_json)
+      releases.size.should eq(1)
+      
+      release = releases[0]
+      release["tag_name"].as_s.should eq("v1.0.0")
+      release["prerelease"].as_bool.should be_false
+    end
+
+    it "filters out prereleases" do
+      github_json = <<-JSON
+      [
+        {
+          "tag_name": "v1.0.0",
+          "name": "Stable",
+          "prerelease": false,
+          "draft": false
+        },
+        {
+          "tag_name": "v1.1.0-beta",
+          "name": "Beta",
+          "prerelease": true,
+          "draft": false
+        }
+      ]
+      JSON
+
+      releases = Array(JSON::Any).from_json(github_json)
+      stable = releases.reject { |r| r["prerelease"]?.try(&.as_bool) || r["draft"]?.try(&.as_bool) }
+      stable.size.should eq(1)
+      stable[0]["tag_name"].as_s.should eq("v1.0.0")
+    end
+  end
+end

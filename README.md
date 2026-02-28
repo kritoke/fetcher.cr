@@ -12,6 +12,11 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, and software 
 - **Automatic Driver Detection** - Automatically selects the right parser based on URL
 - **Caching Support** - ETag and Last-Modified header support
 - **Retry Logic** - Built-in retry with exponential backoff
+- **Secure URL Detection** - Uses regex patterns to prevent domain spoofing
+
+## Performance Notes
+
+Connection pooling was removed in v0.2.0 for simplicity. Each request creates a new `HTTP::Client` instance. For most use cases this is fine, but high-frequency fetching may experience slight performance overhead from repeated TCP connections.
 
 ## Installation
 
