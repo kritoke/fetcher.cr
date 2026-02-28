@@ -1,30 +1,27 @@
 require "http/client"
 
 module Fetcher
-  record Config,
-    user_agent : String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    connect_timeout : Time::Span = 10.seconds,
-    read_timeout : Time::Span = 30.seconds,
-    accept_header : String = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
-
-  DEFAULT_CONFIG = Config.new
-
   module HTTPClient
-    def self.fetch(url : String, headers : ::HTTP::Headers, config : Config = DEFAULT_CONFIG) : ::HTTP::Client::Response
+    DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    DEFAULT_ACCEPT_HEADER = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
+    DEFAULT_CONNECT_TIMEOUT = 10.seconds
+    DEFAULT_READ_TIMEOUT = 30.seconds
+
+    def self.fetch(url : String, headers : ::HTTP::Headers) : ::HTTP::Client::Response
       uri = URI.parse(url)
       client = ::HTTP::Client.new(uri)
-      client.connect_timeout = config.connect_timeout
-      client.read_timeout = config.read_timeout
+      client.connect_timeout = DEFAULT_CONNECT_TIMEOUT
+      client.read_timeout = DEFAULT_READ_TIMEOUT
 
       client.get(uri.request_target, headers: headers)
     end
   end
 
   module Headers
-    def self.build(custom_headers : ::HTTP::Headers, config : Config = DEFAULT_CONFIG) : ::HTTP::Headers
+    def self.build(custom_headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Headers
       defaults = ::HTTP::Headers{
-        "User-Agent"      => config.user_agent,
-        "Accept"          => config.accept_header,
+        "User-Agent"      => HTTPClient::DEFAULT_USER_AGENT,
+        "Accept"          => HTTPClient::DEFAULT_ACCEPT_HEADER,
         "Accept-Language" => "en-US,en;q=0.9",
         "Connection"      => "keep-alive",
       }
