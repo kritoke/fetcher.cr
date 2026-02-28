@@ -37,3 +37,6 @@ flake.private.nix
 
 # Local ticket storage
 .tickets/
+
+# Build artifacts
+fetcher
