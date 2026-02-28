@@ -19,23 +19,21 @@ module Fetcher
       sort = extract_sort(url)
       actual_limit = Math.min(limit, 25)
 
-      Fetcher.with_retry(
-        is_retriable: ->(ex : Exception) {
-          ex.is_a?(RetriableError) || ex.is_a?(RedditFetchError)
-        }
-      ) do
-        fetch_reddit(subreddit, sort, actual_limit)
+      Fetcher.with_retry do
+        fetch_reddit(subreddit, sort, actual_limit, headers)
       end
     end
 
-    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32) : Result
+    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers) : Result
       url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
-      headers = ::HTTP::Headers{
+      reddit_headers = ::HTTP::Headers{
         "User-Agent" => USER_AGENT,
         "Accept"     => "application/json",
       }
+      final_headers = reddit_headers.dup
+      final_headers.merge!(headers)
 
-      response = HTTPClient.fetch(url, headers)
+      response = HTTPClient.fetch(url, final_headers)
 
       case response.status_code
       when 200

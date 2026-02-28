@@ -178,6 +178,13 @@ describe Fetcher do
     it "does not detect GitHub without releases path" do
       Fetcher.detect_driver("https://github.com/crystal-lang/crystal").should eq(Fetcher::DriverType::RSS)
     end
+
+    it "does not detect fake domains" do
+      Fetcher.detect_driver("https://notreddit.com/r/test").should eq(Fetcher::DriverType::RSS)
+      Fetcher.detect_driver("https://fakegithub.com/foo/releases").should eq(Fetcher::DriverType::RSS)
+      Fetcher.detect_driver("https://gitlab.fake.com/foo/bar/-/releases").should eq(Fetcher::DriverType::RSS)
+      Fetcher.detect_driver("https://codeberg.fake.org/foo/bar/releases").should eq(Fetcher::DriverType::RSS)
+    end
   end
 
   describe ".pull" do
@@ -214,6 +221,11 @@ describe Fetcher do
     it "returns error for non-reddit URL" do
       result = Fetcher.pull_reddit("https://example.com/feed.xml")
       result.error_message.should eq("Not a Reddit subreddit URL")
+    end
+
+    it "returns error for invalid subreddit" do
+      result = Fetcher.pull_reddit("https://reddit.com/r/invalid_subreddit_that_does_not_exist_12345")
+      result.error_message.should_not be_nil
     end
   end
 

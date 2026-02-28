@@ -1,5 +1,4 @@
 require "http/client"
-require "./time_parser"
 
 module Fetcher
   record Config,
@@ -9,12 +8,6 @@ module Fetcher
     accept_header : String = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
 
   DEFAULT_CONFIG = Config.new
-
-  class RetriableError < Exception
-    def initialize(message : String)
-      super(message)
-    end
-  end
 
   module HTTPClient
     def self.fetch(url : String, headers : ::HTTP::Headers, config : Config = DEFAULT_CONFIG) : ::HTTP::Client::Response

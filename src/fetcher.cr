@@ -15,13 +15,13 @@ module Fetcher
   end
 
   def self.detect_driver(url : String) : DriverType
-    if url.includes?("reddit.com/r/")
+    if url.matches?(%r{://(www\.)?reddit\.com/r/}i)
       DriverType::Reddit
-    elsif url.includes?("github.com") && url.includes?("/releases")
+    elsif url.matches?(%r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i)
       DriverType::Software
-    elsif url.includes?("gitlab.com") && url.includes?("/-/releases")
+    elsif url.matches?(%r{://(www\.)?gitlab\.com/[^/]+/[^/]+/-/releases}i)
       DriverType::Software
-    elsif url.includes?("codeberg.org") && url.includes?("/releases")
+    elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
       DriverType::Software
     else
       DriverType::RSS
