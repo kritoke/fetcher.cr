@@ -11,6 +11,7 @@ require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
 require "./fetcher/json_feed"
+require "./fetcher/request_config"
 
 module Fetcher
   enum DriverType
@@ -36,23 +37,23 @@ module Fetcher
     end
   end
 
-  def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
+  def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     final_headers = Headers.build(headers)
     driver = detect_driver(url)
 
     case driver
     in .rss?
-      RSS.pull(url, final_headers, limit)
+      RSS.pull(url, final_headers, limit, config)
     in .reddit?
-      Reddit.pull(url, final_headers, limit)
+      Reddit.pull(url, final_headers, limit, config)
     in .software?
-      Software.pull(url, final_headers, limit)
+      Software.pull(url, final_headers, limit, config)
     in .json_feed?
-      JSONFeed.pull(url, final_headers, limit)
+      JSONFeed.pull(url, final_headers, limit, config)
     end
   end
 
-  def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100) : Result
+  def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     base_headers = Headers.build(headers)
     final_headers = Headers.with_cache(base_headers, etag, last_modified)
 
@@ -60,29 +61,29 @@ module Fetcher
 
     case driver
     in .rss?
-      RSS.pull(url, final_headers, limit)
+      RSS.pull(url, final_headers, limit, config)
     in .reddit?
-      Reddit.pull(url, final_headers, limit)
+      Reddit.pull(url, final_headers, limit, config)
     in .software?
-      Software.pull(url, final_headers, limit)
+      Software.pull(url, final_headers, limit, config)
     in .json_feed?
-      JSONFeed.pull(url, final_headers, limit)
+      JSONFeed.pull(url, final_headers, limit, config)
     end
   end
 
-  def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
-    RSS.pull(url, Headers.build(headers), limit)
+  def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+    RSS.pull(url, Headers.build(headers), limit, config)
   end
 
-  def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
-    Reddit.pull(url, Headers.build(headers), limit)
+  def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+    Reddit.pull(url, Headers.build(headers), limit, config)
   end
 
-  def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
-    Software.pull(url, Headers.build(headers), limit)
+  def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+    Software.pull(url, Headers.build(headers), limit, config)
   end
 
-  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
-    JSONFeed.pull(url, Headers.build(headers), limit)
+  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+    JSONFeed.pull(url, Headers.build(headers), limit, config)
   end
 end

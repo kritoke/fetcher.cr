@@ -8,7 +8,7 @@ require "./time_parser"
 
 module Fetcher
   module Software
-    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100) : Result
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       provider = detect_provider(url)
       return Fetcher.error_result("Unknown software provider") unless provider
 

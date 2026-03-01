@@ -1045,3 +1045,85 @@ describe "Phase 2: JSON Feed Support" do
     end
   end
 end
+
+describe "Phase 4: HTTP Improvements" do
+  describe "RequestConfig" do
+    it "has default values" do
+      config = Fetcher::RequestConfig.new
+      config.connect_timeout.should eq(10.seconds)
+      config.read_timeout.should eq(30.seconds)
+      config.max_redirects.should eq(5)
+      config.follow_redirects.should be_true
+      config.ssl_verify.should be_true
+    end
+
+    it "accepts custom timeouts" do
+      config = Fetcher::RequestConfig.new(
+        connect_timeout: 30.seconds,
+        read_timeout: 60.seconds
+      )
+      config.connect_timeout.should eq(30.seconds)
+      config.read_timeout.should eq(60.seconds)
+    end
+
+    it "can disable redirects" do
+      config = Fetcher::RequestConfig.new(follow_redirects: false)
+      config.follow_redirects.should be_false
+    end
+  end
+
+  describe "Headers with compression" do
+    it "includes Accept-Encoding header" do
+      headers = Fetcher::Headers.build
+      headers["Accept-Encoding"]?.should eq("gzip, deflate")
+    end
+
+    it "preserves custom Accept-Encoding" do
+      custom = HTTP::Headers{"Accept-Encoding" => "br"}
+      headers = Fetcher::Headers.build(custom)
+      headers["Accept-Encoding"]?.should eq("br")
+    end
+  end
+
+  describe "pull with RequestConfig" do
+    it "accepts config parameter" do
+      config = Fetcher::RequestConfig.new(
+        connect_timeout: 5.seconds,
+        read_timeout: 15.seconds
+      )
+      result = Fetcher.pull("http://invalid.invalid.test/feed.xml", config: config)
+      result.error_message.should_not be_nil
+    end
+
+    it "uses default config when not provided" do
+      result = Fetcher.pull("http://invalid.invalid.test/feed.xml")
+      result.error_message.should_not be_nil
+    end
+  end
+
+  describe "pull_* methods with RequestConfig" do
+    it "pull_rss accepts config" do
+      config = Fetcher::RequestConfig.new(read_timeout: 60.seconds)
+      result = Fetcher.pull_rss("http://invalid.invalid.test/feed.xml", config: config)
+      result.error_message.should_not be_nil
+    end
+
+    it "pull_reddit accepts config" do
+      config = Fetcher::RequestConfig.new(connect_timeout: 20.seconds)
+      result = Fetcher.pull_reddit("https://reddit.com/r/test", config: config)
+      result.error_message.should_not be_nil
+    end
+
+    it "pull_software accepts config" do
+      config = Fetcher::RequestConfig.new(read_timeout: 45.seconds)
+      result = Fetcher.pull_software("https://github.com/user/repo/releases", config: config)
+      result.error_message.should_not be_nil
+    end
+
+    it "pull_json_feed accepts config" do
+      config = Fetcher::RequestConfig.new(connect_timeout: 15.seconds)
+      result = Fetcher.pull_json_feed("https://example.com/feed.json", config: config)
+      result.error_message.should_not be_nil
+    end
+  end
+end

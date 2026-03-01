@@ -12,7 +12,7 @@ module Fetcher
     class RedditFetchError < Exception
     end
 
-    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100) : Result
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       subreddit = extract_subreddit(url)
       return Fetcher.error_result("Not a Reddit subreddit URL") unless subreddit
 
@@ -20,11 +20,11 @@ module Fetcher
       actual_limit = Math.min(limit, 25)
 
       Fetcher.with_retry do
-        fetch_reddit(subreddit, sort, actual_limit, headers)
+        fetch_reddit(subreddit, sort, actual_limit, headers, config)
       end
     end
 
-    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers) : Result
+    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
       url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
       reddit_headers = ::HTTP::Headers{
         "User-Agent" => USER_AGENT,
@@ -33,7 +33,7 @@ module Fetcher
       final_headers = reddit_headers.dup
       final_headers.merge!(headers)
 
-      response = HTTPClient.fetch(url, final_headers)
+      response = HTTPClient.fetch(url, final_headers, config)
 
       case response.status_code
       when 200

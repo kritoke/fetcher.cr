@@ -1,4 +1,5 @@
 require "http/client"
+require "./request_config"
 
 module Fetcher
   module HTTPClient
@@ -7,11 +8,11 @@ module Fetcher
     DEFAULT_CONNECT_TIMEOUT = 10.seconds
     DEFAULT_READ_TIMEOUT    = 30.seconds
 
-    def self.fetch(url : String, headers : ::HTTP::Headers) : ::HTTP::Client::Response
+    def self.fetch(url : String, headers : ::HTTP::Headers, config : RequestConfig = RequestConfig.new) : ::HTTP::Client::Response
       uri = URI.parse(url)
       client = ::HTTP::Client.new(uri)
-      client.connect_timeout = DEFAULT_CONNECT_TIMEOUT
-      client.read_timeout = DEFAULT_READ_TIMEOUT
+      client.connect_timeout = config.connect_timeout
+      client.read_timeout = config.read_timeout
 
       client.get(uri.request_target, headers: headers)
     end
@@ -23,6 +24,7 @@ module Fetcher
         "User-Agent"      => HTTPClient::DEFAULT_USER_AGENT,
         "Accept"          => HTTPClient::DEFAULT_ACCEPT_HEADER,
         "Accept-Language" => "en-US,en;q=0.9",
+        "Accept-Encoding" => "gzip, deflate",
         "Connection"      => "keep-alive",
       }
 

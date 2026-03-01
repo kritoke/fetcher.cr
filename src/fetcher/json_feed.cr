@@ -9,14 +9,14 @@ require "./attachment"
 
 module Fetcher
   module JSONFeed
-    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100) : Result
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       Fetcher.with_retry do
-        perform_fetch(url, headers, limit)
+        perform_fetch(url, headers, limit, config)
       end
     end
 
-    private def self.perform_fetch(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
-      response = HTTPClient.fetch(url, headers)
+    private def self.perform_fetch(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
+      response = HTTPClient.fetch(url, headers, config)
 
       case response.status_code
       when 304
