@@ -1,4 +1,6 @@
 require "http/client"
+require "./fetcher/attachment"
+require "./fetcher/author"
 require "./fetcher/entry"
 require "./fetcher/result"
 require "./fetcher/retry"

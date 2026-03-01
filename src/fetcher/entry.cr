@@ -1,4 +1,5 @@
 require "html"
+require "./attachment"
 
 module Fetcher
   record Entry,
@@ -6,18 +7,30 @@ module Fetcher
     url : String,
     source_type : String,
     content : String = "",
+    content_html : String? = nil,
     author : String? = nil,
+    author_url : String? = nil,
     published_at : Time? = nil,
+    categories : Array(String) = [] of String,
+    attachments : Array(Attachment) = [] of Attachment,
     version : String? = nil do
     def self.create(title : String,
                     url : String,
                     source_type : String,
                     content : String = "",
+                    content_html : String? = nil,
                     author : String? = nil,
+                    author_url : String? = nil,
                     published_at : Time? = nil,
+                    categories : Array(String) = [] of String,
+                    attachments : Array(Attachment) = [] of Attachment,
                     version : String? = nil) : Entry
-      new(title: title, url: url, source_type: source_type, content: content,
-        author: author, published_at: published_at, version: version)
+      new(title: title, url: url, source_type: source_type,
+        content: content, content_html: content_html,
+        author: author, author_url: author_url,
+        published_at: published_at,
+        categories: categories, attachments: attachments,
+        version: version)
     end
 
     def self.sanitize_title(title : String?) : String

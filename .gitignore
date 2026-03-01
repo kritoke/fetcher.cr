@@ -38,4 +38,4 @@ lib/
 .tickets/
 
 # Build artifacts
-fetcher
+/fetcher$
