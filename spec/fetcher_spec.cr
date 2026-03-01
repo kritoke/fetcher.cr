@@ -1127,3 +1127,81 @@ describe "Phase 4: HTTP Improvements" do
     end
   end
 end
+
+describe "Integration Tests - Fixtures" do
+  describe "RSS fixture" do
+    it "reads WordPress fixture file" do
+      File.exists?("test/fixtures/rss_wordpress.xml").should be_true
+      xml = File.read("test/fixtures/rss_wordpress.xml")
+      xml.should contain("content:encoded")
+      xml.should contain("dc:creator")
+    end
+
+    it "has podcast enclosure in fixture" do
+      xml = File.read("test/fixtures/rss_wordpress.xml")
+      xml.should contain("audio/mpeg")
+    end
+  end
+
+  describe "Atom fixture" do
+    it "reads Atom fixture file" do
+      File.exists?("test/fixtures/atom_full.xml").should be_true
+      xml = File.read("test/fixtures/atom_full.xml")
+      xml.should contain("type=\"html\"")
+      xml.should contain("xml:lang")
+    end
+  end
+
+  describe "JSON Feed fixture" do
+    it "reads JSON Feed fixture file" do
+      File.exists?("test/fixtures/jsonfeed_full.json").should be_true
+      json = File.read("test/fixtures/jsonfeed_full.json")
+      json.should contain("content_html")
+      json.should contain("attachments")
+    end
+
+    it "parses JSON Feed fixture" do
+      json = File.read("test/fixtures/jsonfeed_full.json")
+      parsed = JSON.parse(json)
+
+      parsed["version"].as_s.should eq("https://jsonfeed.org/version/1.1")
+      parsed["title"].as_s.should eq("Test JSON Feed")
+      parsed["items"].as_a.size.should eq(3)
+    end
+
+    it "extracts attachments from JSON Feed fixture" do
+      json = File.read("test/fixtures/jsonfeed_full.json")
+      parsed = JSON.parse(json)
+      item = parsed["items"][0]
+      attachments = item["attachments"].as_a
+
+      attachments.size.should eq(1)
+      attachments[0]["mime_type"].as_s.should eq("audio/mpeg")
+      attachments[0]["duration_in_seconds"].as_i.should eq(3600)
+    end
+  end
+
+  describe "HTTP compression" do
+    it "includes Accept-Encoding header" do
+      headers = Fetcher::Headers.build
+      headers["Accept-Encoding"].should eq("gzip, deflate")
+    end
+  end
+
+  describe "RequestConfig" do
+    it "has configurable timeouts" do
+      config = Fetcher::RequestConfig.new(
+        connect_timeout: 30.seconds,
+        read_timeout: 60.seconds
+      )
+      config.connect_timeout.should eq(30.seconds)
+      config.read_timeout.should eq(60.seconds)
+    end
+
+    it "has default values" do
+      config = Fetcher::RequestConfig.new
+      config.max_redirects.should eq(5)
+      config.follow_redirects.should be_true
+    end
+  end
+end
