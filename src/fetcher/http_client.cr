@@ -2,10 +2,10 @@ require "http/client"
 
 module Fetcher
   module HTTPClient
-    DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    DEFAULT_ACCEPT_HEADER = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
+    DEFAULT_USER_AGENT      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    DEFAULT_ACCEPT_HEADER   = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
     DEFAULT_CONNECT_TIMEOUT = 10.seconds
-    DEFAULT_READ_TIMEOUT = 30.seconds
+    DEFAULT_READ_TIMEOUT    = 30.seconds
 
     def self.fetch(url : String, headers : ::HTTP::Headers) : ::HTTP::Client::Response
       uri = URI.parse(url)

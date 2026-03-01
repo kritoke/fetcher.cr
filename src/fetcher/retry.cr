@@ -43,14 +43,7 @@ module Fetcher
   end
 
   def self.error_result(message : String) : Result
-    Result.new(
-      entries: [] of Entry,
-      etag: nil,
-      last_modified: nil,
-      site_link: nil,
-      favicon: nil,
-      error_message: message
-    )
+    Result.error(message)
   end
 
   def self.transient_error?(ex : Exception) : Bool

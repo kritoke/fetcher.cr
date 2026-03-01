@@ -363,7 +363,7 @@ describe "Integration Tests" do
       children = parsed[0]["data"]["children"]
       children.should_not be_nil
       children.as_a.size.should eq(1)
-      
+
       post = children[0]["data"]
       post["title"].as_s.should eq("Test Post")
       post["created_utc"].as_f.should eq(1705315800.0)
@@ -387,7 +387,7 @@ describe "Integration Tests" do
 
       releases = Array(JSON::Any).from_json(github_json)
       releases.size.should eq(1)
-      
+
       release = releases[0]
       release["tag_name"].as_s.should eq("v1.0.0")
       release["prerelease"].as_bool.should be_false
@@ -412,7 +412,7 @@ describe "Integration Tests" do
       JSON
 
       releases = Array(JSON::Any).from_json(github_json)
-      stable = releases.reject { |r| r["prerelease"]?.try(&.as_bool) || r["draft"]?.try(&.as_bool) }
+      stable = releases.reject { |release| release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool) }
       stable.size.should eq(1)
       stable[0]["tag_name"].as_s.should eq("v1.0.0")
     end

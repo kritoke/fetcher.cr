@@ -21,13 +21,10 @@ module Fetcher
 
       case response.status_code
       when 304
-        Result.new(
+        Result.success(
           entries: [] of Entry,
           etag: response.headers["ETag"]?,
-          last_modified: response.headers["Last-Modified"]?,
-          site_link: nil,
-          favicon: nil,
-          error_message: nil
+          last_modified: response.headers["Last-Modified"]?
         )
       when 200..299
         parse_feed(response.body, url, limit)
@@ -93,13 +90,10 @@ module Fetcher
 
       favicon = xml.xpath_node("//*[local-name()='channel']/*[local-name()='image']/*[local-name()='url']").try(&.text)
 
-      Result.new(
+      Result.success(
         entries: entries,
-        etag: nil,
-        last_modified: nil,
         site_link: site_link,
-        favicon: favicon,
-        error_message: nil
+        favicon: favicon
       )
     end
 
@@ -115,18 +109,17 @@ module Fetcher
     end
 
     private def self.parse_rss_item(node : XML::Node) : Entry
-      title = node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip)
-      title = HTML.unescape(title) if title
-      title = "Untitled" if title.nil? || title.empty?
+      title_node = node.xpath_node("./*[local-name()='title']").try(&.text)
+      title = Entry.sanitize_title(title_node)
 
-      link = node.xpath_node("./*[local-name()='link']").try(&.text) || "#"
+      link = HTMLUtils.sanitize_link(node.xpath_node("./*[local-name()='link']").try(&.text))
 
       pub_date_str = node.xpath_node("./*[local-name()='pubDate']").try(&.text) ||
                      node.xpath_node("./*[local-name()='dc:date']").try(&.text) ||
                      node.xpath_node("./*[local-name()='date']").try(&.text)
       pub_date = TimeParser.parse(pub_date_str, TimeParser::RSS_FORMATS)
 
-      Entry.new(title, link, "", nil, pub_date, "rss", nil)
+      Entry.create(title: title, url: link, source_type: "rss", published_at: pub_date)
     end
 
     private def self.parse_atom(xml : XML::Node, limit : Int32) : Result
@@ -149,32 +142,29 @@ module Fetcher
       favicon = feed_node.xpath_node("./*[local-name()='icon']").try(&.text) ||
                 feed_node.xpath_node("./*[local-name()='logo']").try(&.text)
 
-      Result.new(
+      Result.success(
         entries: entries,
-        etag: nil,
-        last_modified: nil,
         site_link: site_link,
-        favicon: favicon,
-        error_message: nil
+        favicon: favicon
       )
     end
 
     private def self.parse_atom_entry(node : XML::Node) : Entry
-      title = node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip)
-      title = HTML.unescape(title) if title
-      title = "Untitled" if title.nil? || title.empty?
+      title_node = node.xpath_node("./*[local-name()='title']").try(&.text)
+      title = Entry.sanitize_title(title_node)
 
       link_node = node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
                   node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
                   node.xpath_node("./*[local-name()='link'][@href]") ||
                   node.xpath_node("./*[local-name()='link']")
-      link = link_node.try(&.[]?("href")) || link_node.try(&.text).try(&.strip) || "#"
+      link = link_node.try(&.[]?("href")).try(&.strip).presence ||
+             link_node.try(&.text).try(&.strip).presence || "#"
 
       published_str = node.xpath_node("./*[local-name()='published']").try(&.text) ||
                       node.xpath_node("./*[local-name()='updated']").try(&.text)
       pub_date = TimeParser.parse(published_str, TimeParser::ATOM_FORMATS)
 
-      Entry.new(title, link, "", nil, pub_date, "atom", nil)
+      Entry.create(title: title, url: link, source_type: "atom", published_at: pub_date)
     end
   end
 end

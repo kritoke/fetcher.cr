@@ -41,13 +41,10 @@ module Fetcher
         site_link = "https://www.reddit.com/r/#{subreddit}"
         favicon = "https://www.reddit.com/favicon.ico"
 
-        Result.new(
+        Result.success(
           entries: items,
-          etag: nil,
-          last_modified: nil,
           site_link: site_link,
-          favicon: favicon,
-          error_message: nil
+          favicon: favicon
         )
       when 404
         raise RedditFetchError.new("Subreddit '#{subreddit}' not found")
@@ -98,7 +95,7 @@ module Fetcher
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
-      Entry.new(title, link, "", nil, pub_date, "reddit", nil)
+      Entry.create(title: title, url: link, source_type: "reddit", published_at: pub_date)
     end
 
     private def self.resolve_reddit_link(post_url : String, permalink : String, is_self : Bool) : String

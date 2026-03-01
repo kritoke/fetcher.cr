@@ -60,13 +60,11 @@ module Fetcher
         parse_github_release(release, repo)
       end
 
-      Result.new(
+      Result.success(
         entries: entries,
         etag: response.headers["ETag"]?,
-        last_modified: nil,
         site_link: "https://github.com/#{repo}",
-        favicon: "https://github.com/favicon.ico",
-        error_message: nil
+        favicon: "https://github.com/favicon.ico"
       )
     end
 
@@ -78,7 +76,7 @@ module Fetcher
 
       pub_date = TimeParser.parse_iso8601(published)
 
-      Entry.new("#{repo} #{name}", html_url, "", nil, pub_date, "github", tag)
+      Entry.create(title: "#{repo} #{name}", url: html_url, source_type: "github", published_at: pub_date, version: tag)
     end
 
     private def self.extract_github_repo(url : String) : String?
@@ -92,19 +90,18 @@ module Fetcher
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build(::HTTP::Headers.new))
+      response = HTTPClient.fetch(atom_url, Headers.build)
 
       return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "gitlab", limit)
 
-      Result.new(
+      Result.success(
         entries: entries,
         etag: response.headers["ETag"]?,
         last_modified: response.headers["Last-Modified"]?,
         site_link: "https://gitlab.com/#{repo}",
-        favicon: "https://gitlab.com/favicon.ico",
-        error_message: nil
+        favicon: "https://gitlab.com/favicon.ico"
       )
     end
 
@@ -119,19 +116,18 @@ module Fetcher
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build(::HTTP::Headers.new))
+      response = HTTPClient.fetch(atom_url, Headers.build)
 
       return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200
 
       entries = parse_atom_entries(response.body, "codeberg", limit)
 
-      Result.new(
+      Result.success(
         entries: entries,
         etag: response.headers["ETag"]?,
         last_modified: response.headers["Last-Modified"]?,
         site_link: "https://codeberg.org/#{repo}",
-        favicon: "https://codeberg.org/favicon.ico",
-        error_message: nil
+        favicon: "https://codeberg.org/favicon.ico"
       )
     end
 
@@ -150,15 +146,16 @@ module Fetcher
 
     private def self.parse_atom_entry(entry : XML::Node, source : String) : Entry
       title_node = entry.xpath_node("title")
-      title = title_node.nil? ? "Untitled" : (title_node.text.try(&.strip) || "Untitled")
+      title = title_node.nil? ? "Untitled" : Entry.sanitize_title(title_node.text)
 
       link_node = entry.xpath_node("link")
-      link = link_node.try(&.[]?("href")) || link_node.try(&.text).try(&.strip) || ""
+      link = link_node.try(&.[]?("href")).try(&.strip).presence ||
+             link_node.try(&.text).try(&.strip).presence || ""
 
       published_node = entry.xpath_node("published") || entry.xpath_node("updated")
       pub_date = TimeParser.parse(published_node.try(&.text), TimeParser::ATOM_FORMATS)
 
-      Entry.new(title, link, "", nil, pub_date, source, nil)
+      Entry.create(title: title, url: link, source_type: source, published_at: pub_date)
     end
   end
 end
