@@ -10,12 +10,14 @@ require "./fetcher/time_parser"
 require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
+require "./fetcher/json_feed"
 
 module Fetcher
   enum DriverType
     RSS
     Reddit
     Software
+    JSONFeed
   end
 
   def self.detect_driver(url : String) : DriverType
@@ -27,6 +29,8 @@ module Fetcher
       DriverType::Software
     elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
       DriverType::Software
+    elsif url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")
+      DriverType::JSONFeed
     else
       DriverType::RSS
     end
@@ -43,6 +47,8 @@ module Fetcher
       Reddit.pull(url, final_headers, limit)
     in .software?
       Software.pull(url, final_headers, limit)
+    in .json_feed?
+      JSONFeed.pull(url, final_headers, limit)
     end
   end
 
@@ -59,6 +65,8 @@ module Fetcher
       Reddit.pull(url, final_headers, limit)
     in .software?
       Software.pull(url, final_headers, limit)
+    in .json_feed?
+      JSONFeed.pull(url, final_headers, limit)
     end
   end
 
@@ -72,5 +80,9 @@ module Fetcher
 
   def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
     Software.pull(url, Headers.build(headers), limit)
+  end
+
+  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100) : Result
+    JSONFeed.pull(url, Headers.build(headers), limit)
   end
 end
