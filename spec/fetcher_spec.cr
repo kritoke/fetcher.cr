@@ -294,19 +294,19 @@ describe "Integration Tests" do
   describe "RSS parsing" do
     it "parses valid RSS feed structure" do
       rss_xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0">
-        <channel>
-          <title>Test Feed</title>
-          <link>https://example.com</link>
-          <item>
-            <title>Test Article</title>
-            <link>https://example.com/article</link>
-            <pubDate>Wed, 15 Jan 2024 10:30:00 +0000</pubDate>
-          </item>
-        </channel>
-      </rss>
-      XML
+        <?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
+            <title>Test Feed</title>
+            <link>https://example.com</link>
+            <item>
+              <title>Test Article</title>
+              <link>https://example.com/article</link>
+              <pubDate>Wed, 15 Jan 2024 10:30:00 +0000</pubDate>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       xml = XML.parse(rss_xml)
       channel = xml.xpath_node("//channel")
@@ -316,17 +316,17 @@ describe "Integration Tests" do
 
     it "parses valid Atom feed structure" do
       atom_xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test Atom Feed</title>
-        <link rel="alternate" href="https://example.com"/>
-        <entry>
-          <title>Test Entry</title>
-          <link href="https://example.com/entry"/>
-          <published>2024-01-15T10:30:00Z</published>
-        </entry>
-      </feed>
-      XML
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Test Atom Feed</title>
+          <link rel="alternate" href="https://example.com"/>
+          <entry>
+            <title>Test Entry</title>
+            <link href="https://example.com/entry"/>
+            <published>2024-01-15T10:30:00Z</published>
+          </entry>
+        </feed>
+        XML
 
       xml = XML.parse(atom_xml)
       feed = xml.xpath_node("//*[local-name()='feed']")
@@ -338,26 +338,26 @@ describe "Integration Tests" do
   describe "Reddit JSON parsing" do
     it "parses valid Reddit JSON structure" do
       reddit_json = <<-JSON
-      [
-        {
-          "kind": "Listing",
-          "data": {
-            "children": [
-              {
-                "kind": "t3",
-                "data": {
-                  "title": "Test Post",
-                  "url": "https://example.com",
-                  "permalink": "/r/crystal/comments/test/",
-                  "created_utc": 1705315800.0,
-                  "is_self": false
+        [
+          {
+            "kind": "Listing",
+            "data": {
+              "children": [
+                {
+                  "kind": "t3",
+                  "data": {
+                    "title": "Test Post",
+                    "url": "https://example.com",
+                    "permalink": "/r/crystal/comments/test/",
+                    "created_utc": 1705315800.0,
+                    "is_self": false
+                  }
                 }
-              }
-            ]
+              ]
+            }
           }
-        }
-      ]
-      JSON
+        ]
+        JSON
 
       parsed = JSON.parse(reddit_json)
       children = parsed[0]["data"]["children"]
@@ -373,17 +373,17 @@ describe "Integration Tests" do
   describe "GitHub releases JSON parsing" do
     it "parses valid GitHub releases structure" do
       github_json = <<-JSON
-      [
-        {
-          "tag_name": "v1.0.0",
-          "name": "Release 1.0.0",
-          "html_url": "https://github.com/test/repo/releases/v1.0.0",
-          "published_at": "2024-01-15T10:30:00Z",
-          "prerelease": false,
-          "draft": false
-        }
-      ]
-      JSON
+        [
+          {
+            "tag_name": "v1.0.0",
+            "name": "Release 1.0.0",
+            "html_url": "https://github.com/test/repo/releases/v1.0.0",
+            "published_at": "2024-01-15T10:30:00Z",
+            "prerelease": false,
+            "draft": false
+          }
+        ]
+        JSON
 
       releases = Array(JSON::Any).from_json(github_json)
       releases.size.should eq(1)
@@ -395,21 +395,21 @@ describe "Integration Tests" do
 
     it "filters out prereleases" do
       github_json = <<-JSON
-      [
-        {
-          "tag_name": "v1.0.0",
-          "name": "Stable",
-          "prerelease": false,
-          "draft": false
-        },
-        {
-          "tag_name": "v1.1.0-beta",
-          "name": "Beta",
-          "prerelease": true,
-          "draft": false
-        }
-      ]
-      JSON
+        [
+          {
+            "tag_name": "v1.0.0",
+            "name": "Stable",
+            "prerelease": false,
+            "draft": false
+          },
+          {
+            "tag_name": "v1.1.0-beta",
+            "name": "Beta",
+            "prerelease": true,
+            "draft": false
+          }
+        ]
+        JSON
 
       releases = Array(JSON::Any).from_json(github_json)
       stable = releases.reject { |release| release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool) }
@@ -423,18 +423,18 @@ describe "Phase 1: Content Extraction" do
   describe "RSS content extraction" do
     it "extracts content:encoded over description" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
-        <channel>
-          <title>Test</title>
-          <item>
+        <?xml version="1.0"?>
+        <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+          <channel>
             <title>Test</title>
-            <description>Excerpt</description>
-            <content:encoded><![CDATA[<p>Full content</p>]]></content:encoded>
-          </item>
-        </channel>
-      </rss>
-      XML
+            <item>
+              <title>Test</title>
+              <description>Excerpt</description>
+              <content:encoded><![CDATA[<p>Full content</p>]]></content:encoded>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       parsed = XML.parse(xml)
       item = parsed.xpath_node("//item")
@@ -447,17 +447,17 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts dc:creator as author" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <channel>
-          <title>Test</title>
-          <item>
+        <?xml version="1.0"?>
+        <rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <channel>
             <title>Test</title>
-            <dc:creator>John Doe</dc:creator>
-          </item>
-        </channel>
-      </rss>
-      XML
+            <item>
+              <title>Test</title>
+              <dc:creator>John Doe</dc:creator>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       parsed = XML.parse(xml)
       item = parsed.xpath_node("//item")
@@ -469,18 +469,18 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts categories" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0">
-        <channel>
-          <title>Test</title>
-          <item>
+        <?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
             <title>Test</title>
-            <category>Technology</category>
-            <category>Programming</category>
-          </item>
-        </channel>
-      </rss>
-      XML
+            <item>
+              <title>Test</title>
+              <category>Technology</category>
+              <category>Programming</category>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       parsed = XML.parse(xml)
       item = parsed.xpath_node("//item")
@@ -493,17 +493,17 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts enclosures as attachments" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0">
-        <channel>
-          <title>Test</title>
-          <item>
+        <?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
             <title>Test</title>
-            <enclosure url="https://example.com/file.mp3" type="audio/mpeg" length="123456"/>
-          </item>
-        </channel>
-      </rss>
-      XML
+            <item>
+              <title>Test</title>
+              <enclosure url="https://example.com/file.mp3" type="audio/mpeg" length="123456"/>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       parsed = XML.parse(xml)
       item = parsed.xpath_node("//item")
@@ -517,19 +517,19 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts feed metadata" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <rss version="2.0">
-        <channel>
-          <title>Feed Title</title>
-          <link>https://example.com</link>
-          <description>Feed Description</description>
-          <language>en-US</language>
-          <item>
-            <title>Item</title>
-          </item>
-        </channel>
-      </rss>
-      XML
+        <?xml version="1.0"?>
+        <rss version="2.0">
+          <channel>
+            <title>Feed Title</title>
+            <link>https://example.com</link>
+            <description>Feed Description</description>
+            <language>en-US</language>
+            <item>
+              <title>Item</title>
+            </item>
+          </channel>
+        </rss>
+        XML
 
       parsed = XML.parse(xml)
       channel = parsed.xpath_node("//channel")
@@ -546,15 +546,15 @@ describe "Phase 1: Content Extraction" do
   describe "Atom content extraction" do
     it "extracts content with HTML type" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test</title>
-        <entry>
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
           <title>Test</title>
-          <content type="html"><![CDATA[<p>HTML content</p>]]></content>
-        </entry>
-      </feed>
-      XML
+          <entry>
+            <title>Test</title>
+            <content type="html"><![CDATA[<p>HTML content</p>]]></content>
+          </entry>
+        </feed>
+        XML
 
       parsed = XML.parse(xml)
       entry = parsed.xpath_node("//*[local-name()='entry']")
@@ -571,18 +571,18 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts author name and uri" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test</title>
-        <entry>
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
           <title>Test</title>
-          <author>
-            <name>Jane Doe</name>
-            <uri>https://example.com/jane</uri>
-          </author>
-        </entry>
-      </feed>
-      XML
+          <entry>
+            <title>Test</title>
+            <author>
+              <name>Jane Doe</name>
+              <uri>https://example.com/jane</uri>
+            </author>
+          </entry>
+        </feed>
+        XML
 
       parsed = XML.parse(xml)
       entry = parsed.xpath_node("//*[local-name()='entry']")
@@ -596,16 +596,16 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts categories from term attribute" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test</title>
-        <entry>
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
           <title>Test</title>
-          <category term="Crystal"/>
-          <category term="Programming"/>
-        </entry>
-      </feed>
-      XML
+          <entry>
+            <title>Test</title>
+            <category term="Crystal"/>
+            <category term="Programming"/>
+          </entry>
+        </feed>
+        XML
 
       parsed = XML.parse(xml)
       entry = parsed.xpath_node("//*[local-name()='entry']")
@@ -618,19 +618,19 @@ describe "Phase 1: Content Extraction" do
 
     it "extracts feed-level author" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test Feed</title>
-        <subtitle>Feed subtitle</subtitle>
-        <author>
-          <name>Feed Author</name>
-          <uri>https://example.com/author</uri>
-        </author>
-        <entry>
-          <title>Entry</title>
-        </entry>
-      </feed>
-      XML
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
+          <title>Test Feed</title>
+          <subtitle>Feed subtitle</subtitle>
+          <author>
+            <name>Feed Author</name>
+            <uri>https://example.com/author</uri>
+          </author>
+          <entry>
+            <title>Entry</title>
+          </entry>
+        </feed>
+        XML
 
       parsed = XML.parse(xml)
       feed = parsed.xpath_node("//*[local-name()='feed']")
@@ -643,15 +643,15 @@ describe "Phase 1: Content Extraction" do
 
     it "handles entry with summary only (no content)" do
       xml = <<-XML
-      <?xml version="1.0"?>
-      <feed xmlns="http://www.w3.org/2005/Atom">
-        <title>Test</title>
-        <entry>
+        <?xml version="1.0"?>
+        <feed xmlns="http://www.w3.org/2005/Atom">
           <title>Test</title>
-          <summary>Just a summary</summary>
-        </entry>
-      </feed>
-      XML
+          <entry>
+            <title>Test</title>
+            <summary>Just a summary</summary>
+          </entry>
+        </feed>
+        XML
 
       parsed = XML.parse(xml)
       entry = parsed.xpath_node("//*[local-name()='entry']")
@@ -763,20 +763,20 @@ describe "Phase 2: JSON Feed Support" do
   describe "JSON Feed parsing" do
     it "parses valid JSON Feed structure" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test Feed",
-        "home_page_url": "https://example.com",
-        "items": [
-          {
-            "id": "1",
-            "title": "Test Item",
-            "url": "https://example.com/item-1",
-            "content_text": "Test content"
-          }
-        ]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test Feed",
+          "home_page_url": "https://example.com",
+          "items": [
+            {
+              "id": "1",
+              "title": "Test Item",
+              "url": "https://example.com/item-1",
+              "content_text": "Test content"
+            }
+          ]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       version = parsed["version"]?.try(&.as_s)
@@ -790,16 +790,16 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts content_html over content_text" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{
-          "id": "1",
-          "content_html": "<p>HTML content</p>",
-          "content_text": "Text content"
-        }]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{
+            "id": "1",
+            "content_html": "<p>HTML content</p>",
+            "content_text": "Text content"
+          }]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       item = parsed["items"][0]
@@ -812,16 +812,16 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts authors from item" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{
-          "id": "1",
-          "content_text": "Test",
-          "authors": [{"name": "Jane Doe", "url": "https://example.com/jane"}]
-        }]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{
+            "id": "1",
+            "content_text": "Test",
+            "authors": [{"name": "Jane Doe", "url": "https://example.com/jane"}]
+          }]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       item = parsed["items"][0]
@@ -833,16 +833,16 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts tags as categories" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{
-          "id": "1",
-          "content_text": "Test",
-          "tags": ["Ruby", "Crystal"]
-        }]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{
+            "id": "1",
+            "content_text": "Test",
+            "tags": ["Ruby", "Crystal"]
+          }]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       item = parsed["items"][0]
@@ -855,21 +855,21 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts attachments" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{
-          "id": "1",
-          "content_text": "Test",
-          "attachments": [{
-            "url": "https://example.com/file.mp3",
-            "mime_type": "audio/mpeg",
-            "size_in_bytes": 12345,
-            "duration_in_seconds": 3600
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{
+            "id": "1",
+            "content_text": "Test",
+            "attachments": [{
+              "url": "https://example.com/file.mp3",
+              "mime_type": "audio/mpeg",
+              "size_in_bytes": 12345,
+              "duration_in_seconds": 3600
+            }]
           }]
-        }]
-      }
-      JSON
+        }
+        JSON
 
       parsed = JSON.parse(json)
       item = parsed["items"][0]
@@ -883,17 +883,17 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts feed-level metadata" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Feed Title",
-        "home_page_url": "https://example.com",
-        "description": "Feed Description",
-        "language": "en-US",
-        "icon": "https://example.com/icon.png",
-        "favicon": "https://example.com/favicon.ico",
-        "items": []
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Feed Title",
+          "home_page_url": "https://example.com",
+          "description": "Feed Description",
+          "language": "en-US",
+          "icon": "https://example.com/icon.png",
+          "favicon": "https://example.com/favicon.ico",
+          "items": []
+        }
+        JSON
 
       parsed = JSON.parse(json)
       title = parsed["title"]?.try(&.as_s)
@@ -913,15 +913,15 @@ describe "Phase 2: JSON Feed Support" do
 
     it "extracts feed-level authors" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "authors": [
-          {"name": "Feed Author", "url": "https://example.com/author", "avatar": "https://example.com/avatar.jpg"}
-        ],
-        "items": []
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "authors": [
+            {"name": "Feed Author", "url": "https://example.com/author", "avatar": "https://example.com/avatar.jpg"}
+          ],
+          "items": []
+        }
+        JSON
 
       parsed = JSON.parse(json)
       authors = parsed["authors"]?.try(&.as_a)
@@ -936,15 +936,15 @@ describe "Phase 2: JSON Feed Support" do
 
     it "requires id field and returns nil for items without id" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [
-          {"id": "1", "content_text": "Has ID"},
-          {"content_text": "No ID"}
-        ]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [
+            {"id": "1", "content_text": "Has ID"},
+            {"content_text": "No ID"}
+          ]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       items = parsed["items"]?.try(&.as_a) || [] of JSON::Any
@@ -958,16 +958,16 @@ describe "Phase 2: JSON Feed Support" do
 
     it "uses date_modified when date_published is missing" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{
-          "id": "1",
-          "content_text": "Test",
-          "date_modified": "2024-01-17T14:00:00Z"
-        }]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{
+            "id": "1",
+            "content_text": "Test",
+            "date_modified": "2024-01-17T14:00:00Z"
+          }]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       item = parsed["items"][0]
@@ -980,12 +980,12 @@ describe "Phase 2: JSON Feed Support" do
 
     it "handles feed without authors gracefully" do
       json = <<-JSON
-      {
-        "version": "https://jsonfeed.org/version/1.1",
-        "title": "Test",
-        "items": [{"id": "1", "content_text": "Test"}]
-      }
-      JSON
+        {
+          "version": "https://jsonfeed.org/version/1.1",
+          "title": "Test",
+          "items": [{"id": "1", "content_text": "Test"}]
+        }
+        JSON
 
       parsed = JSON.parse(json)
       authors = parsed["authors"]?.try(&.as_a) || parsed["author"]?.try(&.as_a)

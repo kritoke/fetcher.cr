@@ -3,6 +3,7 @@ require "./entry"
 require "./result"
 require "./retry"
 require "./http_client"
+require "./rss"
 
 module Fetcher
   module Reddit
@@ -20,8 +21,20 @@ module Fetcher
       actual_limit = Math.min(limit, 25)
 
       Fetcher.with_retry do
-        fetch_reddit(subreddit, sort, actual_limit, headers, config)
+        begin
+          fetch_reddit(subreddit, sort, actual_limit, headers, config)
+        rescue ex : RedditFetchError
+          _ = ex
+          fetch_reddit_rss(subreddit, sort, actual_limit, headers, config)
+        end
       end
+    end
+
+    private def self.fetch_reddit_rss(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+      rss_url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.rss"
+      rss_headers = headers.dup
+      rss_headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      RSS.pull(rss_url, rss_headers, limit, config)
     end
 
     private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result

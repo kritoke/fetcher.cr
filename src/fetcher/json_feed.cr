@@ -92,7 +92,7 @@ module Fetcher
 
     private def self.parse_item(item : JSON::Any) : Entry?
       id = item["id"]?.try(&.to_s)
-      return nil if id.nil? || id.empty?
+      return if id.nil? || id.empty?
 
       url = item["url"]?.try(&.as_s) || id
       title = item["title"]?.try(&.as_s)
