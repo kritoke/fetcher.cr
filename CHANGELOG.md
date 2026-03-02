@@ -14,76 +14,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.0] - 2026-03-01
 
-### Added
+### What's New
 
-#### Content & Author Extraction
-- **Entry.content** - Now populated from RSS description/content:encoded and Atom content/summary
-- **Entry.content_html** - HTML version of content (when different from plain text)
-- **Entry.author** - Extracted from RSS dc:creator and Atom author/name
-- **Entry.author_url** - Extracted from Atom author/uri
-- **Entry.categories** - Array of tags/categories from RSS category and Atom category[@term]
-- **Entry.attachments** - Array of enclosures/media files (podcasts, downloads)
-- **Attachment** - New record type for enclosures with url, mime_type, size, duration
-- **Author** - New record type for feed authors with name, url, avatar
-- **Feed-level metadata** in Result:
-  - `feed_title` - Feed/channel title
-  - `feed_description` - Feed description/subtitle
-  - `feed_language` - Feed language code
-  - `feed_authors` - Array of feed-level authors
+#### Rich Content Extraction
+Get more from your feeds with automatic extraction of:
+- **Full article content** - No more just summaries; get complete posts from RSS and Atom feeds
+- **Author information** - Names and profile links automatically extracted
+- **Categories and tags** - Organize content with feed-provided metadata
+- **Media attachments** - Podcasts, downloads, and images captured in structured format
+- **Feed-level details** - Title, description, language, and authors from the feed itself
 
 #### JSON Feed Support
-- **JSONFeed** - Complete JSON Feed v1.1 parser module
-- **Auto-detection** - Automatic JSON Feed detection for .json, /feed.json, /feeds/json URLs
-- **Full feature parity** with RSS/Atom:
-  - content_html and content_text support
-  - Item and feed-level authors
-  - Tags as categories
-  - Attachments (podcasts, media)
-  - Feed metadata (title, description, language, icon, favicon)
-- **DriverType::JSONFeed** - New driver enum variant
-- **pull_json_feed()** - Explicit JSON Feed fetching method
+Now supports JSON Feed format (v1.0 and v1.1) in addition to RSS and Atom:
+- Automatic detection for `.json` and `/feed.json` URLs
+- Full feature parity with RSS/Atom feeds
+- No code changes needed - just works
 
-#### HTTP Improvements
-- **RequestConfig** - Configuration record for HTTP requests
-  - `connect_timeout` - Connection timeout (default: 10 seconds)
-  - `read_timeout` - Read timeout (default: 30 seconds)
-- **HTTP compression** - Accept-Encoding: gzip, deflate header support
-- **Configurable timeouts** - All pull methods accept optional `config` parameter
-- **Backward compatible** - All config parameters have sensible defaults
+#### Better Reliability
+- **Automatic fallbacks** - Reddit feeds gracefully fall back to RSS when the JSON API is unavailable
+- **Configurable timeouts** - Handle slow feeds with custom connection and read timeouts
+- **HTTP compression** - Faster loading with automatic gzip/deflate support
 
-#### Reddit RSS Fallback
-- **Automatic fallback** to RSS feed when JSON API fails
-- **Improved reliability** - Handles rate limits and API errors gracefully
-- **Same API** - No code changes needed for users
+#### Enhanced Test Coverage
+Comprehensive test suite added to ensure reliability across all feed types and features.
 
-#### Test Coverage
-- **16 tests** for content extraction features
-- **16 tests** for JSON Feed parsing
-- **11 tests** for HTTP improvements
-- **9 integration tests** with test fixtures
-- **3 test fixtures** for RSS, Atom, and JSON Feed
+### Compatibility
+✅ **Fully backward compatible** - All existing code continues to work unchanged
+✅ **No breaking changes** - All new fields have sensible defaults
+✅ **Opt-in features** - New capabilities are available when you need them
 
-### Changed
-
-#### Breaking Changes
-- **NONE** - All changes are backward compatible
-- All new fields have default values
-- Existing API signatures unchanged (new params have defaults)
-
-#### Improvements
-- **Entry** record enhanced with new optional fields (content, author, categories, etc.)
-- **Result** record enhanced with feed metadata fields
-- **HTTPClient.fetch** now accepts RequestConfig parameter
-- **All pull methods** accept RequestConfig parameter
-- **HTMLUtils** module for centralized text sanitization
-- **Factory methods** for Result (error/success) and Entry (create)
-
-### Documentation
-- Enhanced README with new feature examples
-
-### Fixed
-- Removed unused RequestConfig fields (max_redirects, follow_redirects, ssl_verify)
-- Documented unimplemented features for future versions
+### Technical Reference
+For detailed API documentation, field names, and code examples, see [API.md](API.md).
 
 ---
 
@@ -108,3 +69,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.3.0..HEAD
 [0.3.0]: https://github.com/kritoke/fetcher.cr/compare/v0.2.1..v0.3.0
 [0.2.1]: https://github.com/kritoke/fetcher.cr/compare/v0.2.0..v0.2.1
+[0.2.0]: https://github.com/kritoke/fetcher.cr/compare/v0.1.1..v0.2.0
