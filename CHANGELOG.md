@@ -51,6 +51,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Configurable timeouts** - All pull methods accept optional `config` parameter
 - **Backward compatible** - All config parameters have sensible defaults
 
+#### Reddit RSS Fallback
+- **Automatic fallback** to RSS feed when JSON API fails
+- **Improved reliability** - Handles rate limits and API errors gracefully
+- **Same API** - No code changes needed for users
+
 #### Test Coverage
 - **16 tests** for content extraction features
 - **16 tests** for JSON Feed parsing

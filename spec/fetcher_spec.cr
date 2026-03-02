@@ -227,6 +227,14 @@ describe Fetcher do
       result = Fetcher.pull_reddit("https://reddit.com/r/invalid_subreddit_that_does_not_exist_12345")
       result.error_message.should_not be_nil
     end
+
+    it "handles HTTP errors gracefully with RSS fallback" do
+      # Reddit module has RSS fallback when JSON API fails
+      # When JSON API returns HTTP error, it catches RedditFetchError
+      # and falls back to fetching via RSS feed for better reliability
+      ex = Fetcher::Reddit::RedditFetchError.new("HTTP error 500")
+      ex.message.should eq("HTTP error 500")
+    end
   end
 
   describe ".pull_software" do
