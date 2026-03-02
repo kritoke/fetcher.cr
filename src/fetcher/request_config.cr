@@ -7,8 +7,4 @@ module Fetcher
   record RequestConfig,
     connect_timeout : Time::Span = 10.seconds,
     read_timeout : Time::Span = 30.seconds
-  # TODO: Implement max_redirects, follow_redirects, ssl_verify (SPEC-003)
-  # max_redirects : Int32 = 5,
-  # follow_redirects : Bool = true,
-  # ssl_verify : Bool = true
 end
