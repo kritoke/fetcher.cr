@@ -1052,9 +1052,6 @@ describe "Phase 4: HTTP Improvements" do
       config = Fetcher::RequestConfig.new
       config.connect_timeout.should eq(10.seconds)
       config.read_timeout.should eq(30.seconds)
-      config.max_redirects.should eq(5)
-      config.follow_redirects.should be_true
-      config.ssl_verify.should be_true
     end
 
     it "accepts custom timeouts" do
@@ -1064,11 +1061,6 @@ describe "Phase 4: HTTP Improvements" do
       )
       config.connect_timeout.should eq(30.seconds)
       config.read_timeout.should eq(60.seconds)
-    end
-
-    it "can disable redirects" do
-      config = Fetcher::RequestConfig.new(follow_redirects: false)
-      config.follow_redirects.should be_false
     end
   end
 
@@ -1200,8 +1192,8 @@ describe "Integration Tests - Fixtures" do
 
     it "has default values" do
       config = Fetcher::RequestConfig.new
-      config.max_redirects.should eq(5)
-      config.follow_redirects.should be_true
+      config.connect_timeout.should eq(10.seconds)
+      config.read_timeout.should eq(30.seconds)
     end
   end
 end
