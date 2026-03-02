@@ -39,3 +39,6 @@ lib/
 
 # Build artifacts
 /fetcher$
+
+.opencode/
+SPEC*
