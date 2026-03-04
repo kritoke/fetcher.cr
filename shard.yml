@@ -7,7 +7,12 @@ authors:
 crystal: ">= 1.18.0"
 
 license: MIT
+
 description: A standalone feed fetching library for Crystal (RSS, Reddit, Software releases)
+
+dependencies:
+  sanitize:
+    github: straight-shoota/sanitize
 
 development_dependencies:
   ameba:
