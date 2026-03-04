@@ -50,7 +50,9 @@ module Fetcher
       return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>5MB)") if body.bytesize > MAX_FEED_SIZE
 
       begin
-        xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
+        xml = XML.parse(body, options: XML::ParserOptions::RECOVER |
+                                       XML::ParserOptions::NOENT |
+                                       XML::ParserOptions::NONET)
 
         return Fetcher.error_result(ErrorKind::InvalidFormat, "No root element") unless xml.root
 

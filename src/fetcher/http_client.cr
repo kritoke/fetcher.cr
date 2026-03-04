@@ -1,5 +1,6 @@
 require "http/client"
 require "socket"
+require "time"
 require "./request_config"
 
 module Fetcher
@@ -12,12 +13,53 @@ module Fetcher
     class DNSError < Exception
     end
 
+    class RateLimiter
+      @last_request : Time
+      @min_interval : Time::Span
+
+      def initialize(max_requests_per_second : Int32?)
+        if max_requests_per_second && max_requests_per_second > 0
+          @min_interval = 1.second / max_requests_per_second
+          @last_request = Time.utc(1970, 1, 1)
+        else
+          @min_interval = Time::Span.zero
+          @last_request = Time.utc(1970, 1, 1)
+        end
+      end
+
+      def wait
+        return if @min_interval.zero?
+
+        now = Time.utc
+        elapsed = now - @last_request
+        if elapsed < @min_interval
+          sleep(@min_interval - elapsed)
+        end
+        @last_request = Time.utc
+      end
+    end
+
+    @@rate_limiters = {} of String => RateLimiter
+    @@rate_limiters_lock = Mutex.new
+
+    def self.get_rate_limiter(domain : String, config : RequestConfig) : RateLimiter
+      return RateLimiter.new(config.max_requests_per_second) unless config.max_requests_per_second
+
+      @@rate_limiters_lock.synchronize do
+        @@rate_limiters[domain] ||= RateLimiter.new(config.max_requests_per_second)
+      end
+    end
+
     def self.fetch(url : String, headers : ::HTTP::Headers, config : RequestConfig = RequestConfig.new) : ::HTTP::Client::Response
       begin
         uri = URI.parse(url)
       rescue ex : URI::Error
         raise DNSError.new("Invalid URL: #{ex.message}")
       end
+
+      domain = uri.host || "default"
+      rate_limiter = get_rate_limiter(domain, config)
+      rate_limiter.wait
 
       begin
         client = ::HTTP::Client.new(uri)

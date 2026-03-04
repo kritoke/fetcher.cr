@@ -162,7 +162,9 @@ module Fetcher
     end
 
     private def self.parse_atom_entries(body : String, source : String, limit : Int32) : Array(Entry)
-      xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
+      xml = XML.parse(body, options: XML::ParserOptions::RECOVER |
+                                     XML::ParserOptions::NOENT |
+                                     XML::ParserOptions::NONET)
 
       xml.xpath_nodes("//entry").first(limit).map do |entry|
         parse_atom_entry(entry, source)
