@@ -1,12 +1,13 @@
 require "html"
 require "sanitize"
 require "./attachment"
+require "./source_type"
 
 module Fetcher
   record Entry,
     title : String,
     url : String,
-    source_type : String,
+    source_type : SourceType,
     content : String = "",
     content_html : String? = nil,
     author : String? = nil,
@@ -17,7 +18,7 @@ module Fetcher
     version : String? = nil do
     def self.create(title : String,
                     url : String,
-                    source_type : String,
+                    source_type : SourceType,
                     content : String = "",
                     content_html : String? = nil,
                     author : String? = nil,

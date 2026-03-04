@@ -11,12 +11,12 @@ describe Fetcher::Entry do
       content: "Test content",
       author: nil,
       published_at: nil,
-      source_type: "rss",
+      source_type: Fetcher::SourceType::RSS,
       version: nil
     )
     entry.title.should eq("Test Title")
     entry.url.should eq("https://example.com")
-    entry.source_type.should eq("rss")
+    entry.source_type.should eq(Fetcher::SourceType::RSS)
   end
 
   it "creates entry with all fields" do
@@ -27,7 +27,7 @@ describe Fetcher::Entry do
       content: "Test content",
       author: "author",
       published_at: time,
-      source_type: "rss",
+      source_type: Fetcher::SourceType::Atom,
       version: "1.0.0"
     )
     entry.title.should eq("Test Title")
@@ -45,7 +45,7 @@ describe Fetcher::Result do
       content: "",
       author: nil,
       published_at: nil,
-      source_type: "rss",
+      source_type: Fetcher::SourceType::RSS,
       version: nil
     )
     result = Fetcher::Result.new(
@@ -54,21 +54,22 @@ describe Fetcher::Result do
       last_modified: nil,
       site_link: "https://example.com",
       favicon: nil,
-      error_message: nil
+      error: nil
     )
     result.entries.size.should eq(1)
     result.site_link.should eq("https://example.com")
   end
 
-  it "can hold error message" do
+  it "can hold error" do
     result = Fetcher::Result.new(
       entries: [] of Fetcher::Entry,
       etag: nil,
       last_modified: nil,
       site_link: nil,
       favicon: nil,
-      error_message: "Network error"
+      error: Fetcher::Error.unknown("Network error")
     )
+    result.error.should_not be_nil
     result.error_message.should eq("Network error")
   end
 
@@ -79,7 +80,7 @@ describe Fetcher::Result do
       last_modified: "Wed, 15 Jan 2024 10:00:00 GMT",
       site_link: nil,
       favicon: nil,
-      error_message: nil
+      error: nil
     )
     result.etag.should eq("abc123")
     result.last_modified.should eq("Wed, 15 Jan 2024 10:00:00 GMT")
@@ -120,12 +121,19 @@ end
 
 describe Fetcher do
   describe ".error_result" do
-    it "creates error result with message" do
-      result = Fetcher.error_result("Something went wrong")
+    it "creates error result with Error" do
+      result = Fetcher.error_result(Fetcher::Error.unknown("Something went wrong"))
       result.error_message.should eq("Something went wrong")
       result.entries.should be_empty
       result.etag.should be_nil
       result.last_modified.should be_nil
+    end
+
+    it "creates error result with kind and message" do
+      result = Fetcher.error_result(Fetcher::ErrorKind::HTTPError, "HTTP 404", 404)
+      result.error.should_not be_nil
+      result.error.try(&.kind).should eq(Fetcher::ErrorKind::HTTPError)
+      result.error.try(&.status_code).should eq(404)
     end
   end
 
@@ -222,6 +230,7 @@ describe Fetcher do
     it "returns error for non-reddit URL" do
       result = Fetcher.pull_reddit("https://example.com/feed.xml")
       result.error_message.should eq("Not a Reddit subreddit URL")
+      result.error.try(&.kind).should eq(Fetcher::ErrorKind::InvalidURL)
     end
 
     it "returns error for invalid subreddit" do
@@ -242,11 +251,13 @@ describe Fetcher do
     it "returns error for non-software URL" do
       result = Fetcher.pull_software("https://example.com/feed.xml")
       result.error_message.should eq("Unknown software provider")
+      result.error.try(&.kind).should eq(Fetcher::ErrorKind::InvalidURL)
     end
 
     it "returns error for invalid GitHub URL (no releases path)" do
       result = Fetcher.pull_software("https://github.com/invalid/repo")
       result.error_message.should eq("Unknown software provider")
+      result.error.try(&.kind).should eq(Fetcher::ErrorKind::InvalidURL)
     end
   end
 end
@@ -677,7 +688,7 @@ describe "Phase 1: Content Extraction" do
       entry = Fetcher::Entry.create(
         title: "Test",
         url: "https://example.com",
-        source_type: "rss",
+        source_type: Fetcher::SourceType::RSS,
         content: "Full content here"
       )
       entry.content.should eq("Full content here")
@@ -687,7 +698,7 @@ describe "Phase 1: Content Extraction" do
       entry = Fetcher::Entry.create(
         title: "Test",
         url: "https://example.com",
-        source_type: "atom",
+        source_type: Fetcher::SourceType::Atom,
         author: "John Doe",
         author_url: "https://example.com/john"
       )
@@ -699,7 +710,7 @@ describe "Phase 1: Content Extraction" do
       entry = Fetcher::Entry.create(
         title: "Test",
         url: "https://example.com",
-        source_type: "rss",
+        source_type: Fetcher::SourceType::RSS,
         categories: ["Ruby", "Crystal"]
       )
       entry.categories.size.should eq(2)
@@ -715,7 +726,7 @@ describe "Phase 1: Content Extraction" do
       entry = Fetcher::Entry.create(
         title: "Test",
         url: "https://example.com",
-        source_type: "rss",
+        source_type: Fetcher::SourceType::RSS,
         attachments: [attachment]
       )
       entry.attachments.size.should eq(1)
@@ -1013,7 +1024,7 @@ describe "Phase 2: JSON Feed Support" do
       entry = Fetcher::Entry.create(
         title: "Test Post",
         url: "https://example.com/post",
-        source_type: "jsonfeed",
+        source_type: Fetcher::SourceType::JSONFeed,
         content: "<p>HTML content</p>",
         author: "John Doe",
         author_url: "https://example.com/john",
@@ -1022,7 +1033,7 @@ describe "Phase 2: JSON Feed Support" do
       )
 
       entry.title.should eq("Test Post")
-      entry.source_type.should eq("jsonfeed")
+      entry.source_type.should eq(Fetcher::SourceType::JSONFeed)
       entry.content.should eq("<p>HTML content</p>")
       entry.author.should eq("John Doe")
       entry.author_url.should eq("https://example.com/john")
@@ -1199,19 +1210,19 @@ describe "Integration Tests - Fixtures" do
       uri = URI.parse("http://example.com")
       client = HTTP::Client.new(uri)
       client.compress = true
-      
+
       compressed_body = IO::Memory.new
       Compress::Gzip::Writer.open(compressed_body) do |gzip|
         gzip.write "test content".to_slice
       end
       compressed_body.rewind
-      
+
       decompressed = IO::Memory.new
       Compress::Gzip::Reader.open(compressed_body) do |reader|
         IO.copy(reader, decompressed)
       end
       decompressed.rewind
-      
+
       String.new(decompressed.to_slice).should eq("test content")
     end
 

@@ -1,3 +1,5 @@
+require "./fetch_error"
+
 module Fetcher
   record RetryConfig,
     max_retries : Int32 = 3,
@@ -32,18 +34,22 @@ module Fetcher
         if is_retriable.call(ex)
           attempt += 1
           if attempt >= config.max_retries
-            return error_result("Failed after retries: #{ex.message}")
+            return error_result(Error.timeout("Failed after retries: #{ex.message}"))
           end
           sleep(config.delay_for_attempt(attempt))
         else
-          return error_result("#{ex.class}: #{ex.message}")
+          return error_result(Error.unknown("#{ex.class}: #{ex.message}"))
         end
       end
     end
   end
 
-  def self.error_result(message : String) : Result
-    Result.error(message)
+  def self.error_result(err : Error) : Result
+    Result.error(err)
+  end
+
+  def self.error_result(kind : ErrorKind, message : String, status_code : Int32? = nil) : Result
+    Result.error(Error.new(kind: kind, message: message, status_code: status_code))
   end
 
   def self.transient_error?(ex : Exception) : Bool

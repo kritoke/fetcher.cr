@@ -10,7 +10,7 @@ module Fetcher
   module Software
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       provider = detect_provider(url)
-      return Fetcher.error_result("Unknown software provider") unless provider
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider") unless provider
 
       Fetcher.with_retry do
         case provider
@@ -21,7 +21,7 @@ module Fetcher
         when "codeberg"
           pull_codeberg(url, headers, limit, config)
         else
-          Fetcher.error_result("Unsupported provider")
+          Fetcher.error_result(ErrorKind::InvalidURL, "Unsupported provider")
         end
       end
     end
@@ -35,7 +35,7 @@ module Fetcher
 
     private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_github_repo(url)
-      return Fetcher.error_result("Invalid GitHub repo URL") unless repo
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitHub repo URL") unless repo
 
       api_url = "https://api.github.com/repos/#{repo}/releases"
 
@@ -49,12 +49,12 @@ module Fetcher
         raise RetriableError.new("GitHub rate limited")
       end
 
-      return Fetcher.error_result("GitHub API error: #{response.status_code}") unless response.status_code == 200..299
+      return Fetcher.error_result(ErrorKind::HTTPError, "GitHub API error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
 
       begin
         releases = Array(JSON::Any).from_json(response.body)
       rescue ex : JSON::ParseException
-        return Fetcher.error_result("Invalid JSON from GitHub: #{ex.message}")
+        return Fetcher.error_result(ErrorKind::InvalidFormat, "Invalid JSON from GitHub: #{ex.message}")
       end
 
       stable_releases = releases.reject do |release|
@@ -85,7 +85,7 @@ module Fetcher
 
       pub_date = TimeParser.parse_iso8601(published)
 
-      Entry.create(title: "#{repo} #{name}", url: html_url, source_type: "github", published_at: pub_date, version: tag)
+      Entry.create(title: "#{repo} #{name}", url: html_url, source_type: SourceType::GitHub, published_at: pub_date, version: tag)
     end
 
     private def self.extract_github_repo(url : String) : String?
@@ -95,7 +95,7 @@ module Fetcher
 
     private def self.pull_gitlab(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_gitlab_repo(url)
-      return Fetcher.error_result("Invalid GitLab repo URL") unless repo
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitLab repo URL") unless repo
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
@@ -105,7 +105,7 @@ module Fetcher
         raise RetriableError.new("GitLab rate limited")
       end
 
-      return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200..299
+      return Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
 
       entries = parse_atom_entries(response.body, "gitlab", limit)
 
@@ -129,7 +129,7 @@ module Fetcher
 
     private def self.pull_codeberg(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_codeberg_repo(url)
-      return Fetcher.error_result("Invalid Codeberg repo URL") unless repo
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid Codeberg repo URL") unless repo
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
@@ -139,7 +139,7 @@ module Fetcher
         raise RetriableError.new("Codeberg rate limited")
       end
 
-      return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200..299
+      return Fetcher.error_result(ErrorKind::HTTPError, "Codeberg fetch error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
 
       entries = parse_atom_entries(response.body, "codeberg", limit)
 
@@ -182,7 +182,7 @@ module Fetcher
       published_node = entry.xpath_node("published") || entry.xpath_node("updated")
       pub_date = TimeParser.parse(published_node.try(&.text), TimeParser::ATOM_FORMATS)
 
-      Entry.create(title: title, url: link, source_type: source, published_at: pub_date)
+      Entry.create(title: title, url: link, source_type: SourceType.from_string(source), published_at: pub_date)
     end
   end
 end

@@ -15,7 +15,7 @@ module Fetcher
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       subreddit = extract_subreddit(url)
-      return Fetcher.error_result("Not a Reddit subreddit URL") unless subreddit
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Not a Reddit subreddit URL") unless subreddit
 
       sort = extract_sort(url)
       actual_limit = Math.min(limit, 25)
@@ -114,7 +114,7 @@ module Fetcher
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
-      Entry.create(title: title, url: link, source_type: "reddit", published_at: pub_date)
+      Entry.create(title: title, url: link, source_type: SourceType::Reddit, published_at: pub_date)
     end
 
     private def self.resolve_reddit_link(post_url : String, permalink : String, is_self : Bool) : String

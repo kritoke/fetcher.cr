@@ -30,7 +30,7 @@ module Fetcher
       when 500..599
         raise RetriableError.new("Server error: #{response.status_code}")
       else
-        Fetcher.error_result("HTTP #{response.status_code}")
+        Fetcher.error_result(ErrorKind::HTTPError, "HTTP #{response.status_code}", response.status_code)
       end
     rescue ex : IO::TimeoutError
       raise RetriableError.new("Timeout: #{ex.message}")
@@ -40,15 +40,15 @@ module Fetcher
       if Fetcher.transient_error?(ex)
         raise RetriableError.new(ex.message || "Unknown error")
       end
-      Fetcher.error_result("#{ex.class}: #{ex.message}")
+      Fetcher.error_result(ErrorKind::Unknown, "#{ex.class}: #{ex.message}")
     end
 
     private def self.parse_feed(body : String, limit : Int32) : Result
       parsed = JSON.parse(body)
 
       version = parsed["version"]?.try(&.as_s)
-      return Fetcher.error_result("Invalid JSON Feed: missing version") unless version
-      return Fetcher.error_result("Unsupported JSON Feed version") unless version.includes?("https://jsonfeed.org/version/")
+      return Fetcher.error_result(ErrorKind::InvalidFormat, "Invalid JSON Feed: missing version") unless version
+      return Fetcher.error_result(ErrorKind::InvalidFormat, "Unsupported JSON Feed version") unless version.includes?("https://jsonfeed.org/version/")
 
       feed_title = parsed["title"]?.try(&.as_s)
       home_url = parsed["home_page_url"]?.try(&.as_s)
@@ -72,9 +72,9 @@ module Fetcher
         feed_authors: feed_authors
       )
     rescue ex : JSON::ParseException
-      Fetcher.error_result("JSON parsing error: #{ex.message}")
+      Fetcher.error_result(ErrorKind::InvalidFormat, "JSON parsing error: #{ex.message}")
     rescue ex
-      Fetcher.error_result("Error: #{ex.class} - #{ex.message}")
+      Fetcher.error_result(ErrorKind::Unknown, "Error: #{ex.class} - #{ex.message}")
     end
 
     private def self.parse_authors(parsed : JSON::Any) : Array(Author)
@@ -119,7 +119,7 @@ module Fetcher
       Entry.create(
         title: title,
         url: url,
-        source_type: "jsonfeed",
+        source_type: SourceType::JSONFeed,
         content: content,
         author: author,
         author_url: author_url,

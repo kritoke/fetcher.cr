@@ -33,7 +33,7 @@ module Fetcher
       when 500..599
         raise RetriableError.new("Server error: #{response.status_code}")
       else
-        Fetcher.error_result("HTTP #{response.status_code}")
+        Fetcher.error_result(ErrorKind::HTTPError, "HTTP #{response.status_code}", response.status_code)
       end
     rescue ex : IO::TimeoutError
       raise RetriableError.new("Timeout: #{ex.message}")
@@ -43,16 +43,16 @@ module Fetcher
       if Fetcher.transient_error?(ex)
         raise RetriableError.new(ex.message || "Unknown error")
       end
-      Fetcher.error_result("#{ex.class}: #{ex.message}")
+      Fetcher.error_result(ErrorKind::Unknown, "#{ex.class}: #{ex.message}")
     end
 
     private def self.parse_feed(body : String, url : String, limit : Int32) : Result
-      return Fetcher.error_result("Feed too large (>5MB)") if body.bytesize > MAX_FEED_SIZE
+      return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>5MB)") if body.bytesize > MAX_FEED_SIZE
 
       begin
         xml = XML.parse(body, options: XML::ParserOptions::RECOVER | XML::ParserOptions::NOENT)
 
-        return Fetcher.error_result("No root element") unless xml.root
+        return Fetcher.error_result(ErrorKind::InvalidFormat, "No root element") unless xml.root
 
         rss = parse_rss(xml, limit)
         return rss unless rss.entries.empty?
@@ -60,11 +60,11 @@ module Fetcher
         atom = parse_atom(xml, limit)
         return atom unless atom.entries.empty?
 
-        Fetcher.error_result("Unsupported feed format")
+        Fetcher.error_result(ErrorKind::InvalidFormat, "Unsupported feed format")
       rescue ex : XML::Error
-        Fetcher.error_result("XML parsing error: #{ex.message}")
+        Fetcher.error_result(ErrorKind::InvalidFormat, "XML parsing error: #{ex.message}")
       rescue ex
-        Fetcher.error_result("Error: #{ex.class} - #{ex.message}")
+        Fetcher.error_result(ErrorKind::Unknown, "Error: #{ex.class} - #{ex.message}")
       end
     end
 
@@ -147,7 +147,7 @@ module Fetcher
       Entry.create(
         title: title,
         url: link,
-        source_type: "rss",
+        source_type: SourceType::RSS,
         content: content.strip,
         author: author,
         published_at: pub_date,
@@ -160,7 +160,7 @@ module Fetcher
       entries = [] of Entry
 
       feed_node = xml.xpath_node("//*[local-name()='feed']")
-      return Fetcher.error_result("No feed element") unless feed_node
+      return Fetcher.error_result(ErrorKind::InvalidFormat, "No feed element") unless feed_node
 
       alt = feed_node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
             feed_node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
@@ -221,7 +221,7 @@ module Fetcher
       Entry.create(
         title: title,
         url: link,
-        source_type: "atom",
+        source_type: SourceType::Atom,
         content: content.strip,
         author: author,
         author_url: author_url,
