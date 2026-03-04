@@ -25,7 +25,7 @@ module Fetcher
           etag: response.headers["ETag"]?,
           last_modified: response.headers["Last-Modified"]?
         )
-      when 200
+      when 200..299
         parse_feed(response.body, limit)
       when 500..599
         raise RetriableError.new("Server error: #{response.status_code}")
@@ -34,6 +34,8 @@ module Fetcher
       end
     rescue ex : IO::TimeoutError
       raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     rescue ex
       if Fetcher.transient_error?(ex)
         raise RetriableError.new(ex.message || "Unknown error")

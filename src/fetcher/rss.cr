@@ -37,6 +37,8 @@ module Fetcher
       end
     rescue ex : IO::TimeoutError
       raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     rescue ex
       if Fetcher.transient_error?(ex)
         raise RetriableError.new(ex.message || "Unknown error")

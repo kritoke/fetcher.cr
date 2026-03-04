@@ -10,5 +10,15 @@ module Fetcher
     def self.sanitize_link(link : String?, default : String = "#") : String
       link.try(&.strip).presence || default
     end
+
+    def self.validate_url(url : String?) : Bool
+      return false if url.nil? || url.empty?
+      begin
+        uri = URI.parse(url)
+        uri.scheme == "http" || uri.scheme == "https"
+      rescue
+        false
+      end
+    end
   end
 end

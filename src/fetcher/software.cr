@@ -15,11 +15,11 @@ module Fetcher
       Fetcher.with_retry do
         case provider
         when "github"
-          pull_github(url, headers, limit)
+          pull_github(url, headers, limit, config)
         when "gitlab"
-          pull_gitlab(url, headers, limit)
+          pull_gitlab(url, headers, limit, config)
         when "codeberg"
-          pull_codeberg(url, headers, limit)
+          pull_codeberg(url, headers, limit, config)
         else
           Fetcher.error_result("Unsupported provider")
         end
@@ -33,7 +33,7 @@ module Fetcher
       nil
     end
 
-    private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
+    private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_github_repo(url)
       return Fetcher.error_result("Invalid GitHub repo URL") unless repo
 
@@ -43,15 +43,20 @@ module Fetcher
       github_headers["Accept"] = "application/vnd.github.v3+json"
       merged = Headers.build(github_headers)
 
-      response = HTTPClient.fetch(api_url, merged)
+      response = HTTPClient.fetch(api_url, merged, config)
 
       if response.status_code == 429
         raise RetriableError.new("GitHub rate limited")
       end
 
-      return Fetcher.error_result("GitHub API error: #{response.status_code}") unless response.status_code == 200
+      return Fetcher.error_result("GitHub API error: #{response.status_code}") unless response.status_code == 200..299
 
-      releases = Array(JSON::Any).from_json(response.body)
+      begin
+        releases = Array(JSON::Any).from_json(response.body)
+      rescue ex : JSON::ParseException
+        return Fetcher.error_result("Invalid JSON from GitHub: #{ex.message}")
+      end
+
       stable_releases = releases.reject do |release|
         release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
       end
@@ -66,6 +71,10 @@ module Fetcher
         site_link: "https://github.com/#{repo}",
         favicon: "https://github.com/favicon.ico"
       )
+    rescue ex : IO::TimeoutError
+      raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     end
 
     private def self.parse_github_release(release : JSON::Any, repo : String) : Entry
@@ -84,15 +93,19 @@ module Fetcher
       match ? match[1] : nil
     end
 
-    private def self.pull_gitlab(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
+    private def self.pull_gitlab(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_gitlab_repo(url)
       return Fetcher.error_result("Invalid GitLab repo URL") unless repo
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build)
+      response = HTTPClient.fetch(atom_url, Headers.build, config)
 
-      return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200
+      if response.status_code == 429
+        raise RetriableError.new("GitLab rate limited")
+      end
+
+      return Fetcher.error_result("GitLab fetch error: #{response.status_code}") unless response.status_code == 200..299
 
       entries = parse_atom_entries(response.body, "gitlab", limit)
 
@@ -103,6 +116,10 @@ module Fetcher
         site_link: "https://gitlab.com/#{repo}",
         favicon: "https://gitlab.com/favicon.ico"
       )
+    rescue ex : IO::TimeoutError
+      raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     end
 
     private def self.extract_gitlab_repo(url : String) : String?
@@ -110,15 +127,19 @@ module Fetcher
       match ? match[1] : nil
     end
 
-    private def self.pull_codeberg(url : String, headers : ::HTTP::Headers, limit : Int32) : Result
+    private def self.pull_codeberg(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_codeberg_repo(url)
       return Fetcher.error_result("Invalid Codeberg repo URL") unless repo
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build)
+      response = HTTPClient.fetch(atom_url, Headers.build, config)
 
-      return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200
+      if response.status_code == 429
+        raise RetriableError.new("Codeberg rate limited")
+      end
+
+      return Fetcher.error_result("Codeberg fetch error: #{response.status_code}") unless response.status_code == 200..299
 
       entries = parse_atom_entries(response.body, "codeberg", limit)
 
@@ -129,6 +150,10 @@ module Fetcher
         site_link: "https://codeberg.org/#{repo}",
         favicon: "https://codeberg.org/favicon.ico"
       )
+    rescue ex : IO::TimeoutError
+      raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     end
 
     private def self.extract_codeberg_repo(url : String) : String?
@@ -142,6 +167,8 @@ module Fetcher
       xml.xpath_nodes("//entry").first(limit).map do |entry|
         parse_atom_entry(entry, source)
       end
+    rescue XML::Error
+      [] of Entry
     end
 
     private def self.parse_atom_entry(entry : XML::Node, source : String) : Entry

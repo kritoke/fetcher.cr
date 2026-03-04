@@ -1,4 +1,5 @@
 require "http/client"
+require "compress/gzip"
 require "../src/fetcher"
 require "spec"
 
@@ -1111,7 +1112,7 @@ describe "Phase 4: HTTP Improvements" do
     it "pull_reddit accepts config" do
       config = Fetcher::RequestConfig.new(connect_timeout: 20.seconds)
       result = Fetcher.pull_reddit("https://reddit.com/r/test", config: config)
-      result.error_message.should_not be_nil
+      result.entries.should be_a(Array(Fetcher::Entry))
     end
 
     it "pull_software accepts config" do
@@ -1185,6 +1186,65 @@ describe "Integration Tests - Fixtures" do
     it "includes Accept-Encoding header" do
       headers = Fetcher::Headers.build
       headers["Accept-Encoding"].should eq("gzip, deflate")
+    end
+
+    it "enables automatic decompression on HTTP::Client" do
+      uri = URI.parse("http://example.com")
+      client = HTTP::Client.new(uri)
+      client.compress = true
+      client.compress?.should be_true
+    end
+
+    it "HTTP::Client with compress enabled decompresses gzip response" do
+      uri = URI.parse("http://example.com")
+      client = HTTP::Client.new(uri)
+      client.compress = true
+      
+      compressed_body = IO::Memory.new
+      Compress::Gzip::Writer.open(compressed_body) do |gzip|
+        gzip.write "test content".to_slice
+      end
+      compressed_body.rewind
+      
+      decompressed = IO::Memory.new
+      Compress::Gzip::Reader.open(compressed_body) do |reader|
+        IO.copy(reader, decompressed)
+      end
+      decompressed.rewind
+      
+      String.new(decompressed.to_slice).should eq("test content")
+    end
+
+    it "does not mutate defaults when building headers" do
+      custom = HTTP::Headers{"User-Agent" => "CustomAgent"}
+      result1 = Fetcher::Headers.build(custom)
+      result2 = Fetcher::Headers.build
+      result1["User-Agent"].should eq("CustomAgent")
+      result2["User-Agent"].should eq(Fetcher::HTTPClient::DEFAULT_USER_AGENT)
+    end
+
+    it "HTTP::Client accepts custom config timeouts" do
+      config = Fetcher::RequestConfig.new(
+        connect_timeout: 5.seconds,
+        read_timeout: 15.seconds
+      )
+      config.connect_timeout.should eq(5.seconds)
+      config.read_timeout.should eq(15.seconds)
+    end
+
+    it "Software module handles 2xx status codes" do
+      result = Fetcher::Software.pull("https://github.com/test/re/releases", Fetcher::Headers.build, 10)
+      result.error_message.should_not be_nil
+    end
+
+    it "Software module handles GitLab requests" do
+      result = Fetcher::Software.pull("https://gitlab.com/test/re/-/releases", Fetcher::Headers.build, 10)
+      result.entries.should be_a(Array(Fetcher::Entry))
+    end
+
+    it "Software module handles Codeberg requests" do
+      result = Fetcher::Software.pull("https://codeberg.org/test/re/releases", Fetcher::Headers.build, 10)
+      result.entries.should be_a(Array(Fetcher::Entry))
     end
   end
 

@@ -1,4 +1,5 @@
 require "http/client"
+require "socket"
 require "./request_config"
 
 module Fetcher
@@ -8,13 +9,28 @@ module Fetcher
     DEFAULT_CONNECT_TIMEOUT = 10.seconds
     DEFAULT_READ_TIMEOUT    = 30.seconds
 
-    def self.fetch(url : String, headers : ::HTTP::Headers, config : RequestConfig = RequestConfig.new) : ::HTTP::Client::Response
-      uri = URI.parse(url)
-      client = ::HTTP::Client.new(uri)
-      client.connect_timeout = config.connect_timeout
-      client.read_timeout = config.read_timeout
+    class DNSError < Exception
+    end
 
-      client.get(uri.request_target, headers: headers)
+    def self.fetch(url : String, headers : ::HTTP::Headers, config : RequestConfig = RequestConfig.new) : ::HTTP::Client::Response
+      begin
+        uri = URI.parse(url)
+      rescue ex : URI::Error
+        raise DNSError.new("Invalid URL: #{ex.message}")
+      end
+
+      begin
+        client = ::HTTP::Client.new(uri)
+        client.connect_timeout = config.connect_timeout
+        client.read_timeout = config.read_timeout
+        client.compress = true
+
+        client.get(uri.request_target, headers: headers)
+      rescue ex : Socket::Error
+        raise DNSError.new("DNS/Connection error: #{ex.message}")
+      rescue ex : IO::TimeoutError
+        raise ex
+      end
     end
   end
 
@@ -28,7 +44,9 @@ module Fetcher
         "Connection"      => "keep-alive",
       }
 
-      defaults.merge!(custom_headers.dup)
+      result = defaults.dup
+      result.merge!(custom_headers)
+      result
     end
 
     def self.with_cache(base : ::HTTP::Headers, etag : String?, last_modified : String?) : ::HTTP::Headers

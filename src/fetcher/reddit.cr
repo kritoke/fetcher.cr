@@ -49,7 +49,7 @@ module Fetcher
       response = HTTPClient.fetch(url, final_headers, config)
 
       case response.status_code
-      when 200
+      when 200..299
         items = parse_reddit_response(response.body, limit)
         site_link = "https://www.reddit.com/r/#{subreddit}"
         favicon = "https://www.reddit.com/favicon.ico"
@@ -63,11 +63,15 @@ module Fetcher
         raise RedditFetchError.new("Subreddit '#{subreddit}' not found")
       when 429
         raise RetriableError.new("Rate limited by Reddit API")
-      when 503
-        raise RetriableError.new("Reddit service unavailable")
+      when 500..599
+        raise RetriableError.new("Reddit server error: #{response.status_code}")
       else
         raise RedditFetchError.new("HTTP error #{response.status_code}")
       end
+    rescue ex : IO::TimeoutError
+      raise RetriableError.new("Timeout: #{ex.message}")
+    rescue ex : HTTPClient::DNSError
+      raise RetriableError.new("DNS error: #{ex.message}")
     end
 
     private def self.extract_subreddit(url : String) : String?
@@ -88,6 +92,8 @@ module Fetcher
       return [] of Entry if children.nil?
 
       children.first(limit).compact_map { |child| parse_reddit_post(child) }
+    rescue JSON::ParseException
+      [] of Entry
     end
 
     private def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
