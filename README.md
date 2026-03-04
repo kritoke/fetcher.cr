@@ -16,14 +16,18 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 - **Caching Support** - ETag and Last-Modified header support
 - **Retry Logic** - Built-in retry with exponential backoff
 - **Configurable Timeouts** - Customize connection and read timeouts
+- **Rate Limiting** - Optional per-domain rate limiting to prevent API abuse
 - **HTTP Compression** - Automatic gzip/deflate support
-- **Secure URL Detection** - Uses regex patterns to prevent domain spoofing
+- **Secure URL Detection** - Blocks private IP ranges to prevent SSRF attacks
+- **Type-Safe Errors** - Structured error types for better error handling
 
 ## Performance Notes
 
 Connection pooling was removed in v0.2.0 for simplicity. Each request creates a new `HTTP::Client` instance. For most use cases this is fine, but high-frequency fetching may experience slight performance overhead from repeated TCP connections.
 
 v0.3.0 adds configurable timeouts to handle slow feeds.
+
+v0.4.0 adds optional rate limiting to prevent API abuse.
 
 ## Installation
 
@@ -33,7 +37,7 @@ Add to your `shard.yml`:
 dependencies:
   fetcher:
     github: kritoke/fetcher.cr
-    version: "~> 0.3"
+    version: "~> 0.4"
 ```
 
 ## Usage
@@ -91,6 +95,51 @@ config = Fetcher::RequestConfig.new(
 )
 
 result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
+```
+
+### Rate Limiting (v0.4.0+)
+
+```crystal
+# Configure per-domain rate limiting to prevent API abuse
+config = Fetcher::RequestConfig.new(
+  max_requests_per_second: 10  # Max 10 requests per second per domain
+)
+
+# Or with timeouts
+config = Fetcher::RequestConfig.new(
+  connect_timeout: 30.seconds,
+  read_timeout: 60.seconds,
+  max_requests_per_second: 5
+)
+
+result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
+```
+
+### Error Handling (v0.4.0+)
+
+```crystal
+result = Fetcher.pull("https://example.com/feed.xml")
+
+# New type-safe error handling
+if !result.success?
+  error = result.error
+  puts "Error: #{error.message}"
+  puts "Kind: #{error.kind}"  # ErrorKind enum
+  
+  case error.kind
+  when .timeout?
+    # Handle timeout
+  when .rate_limited?
+    # Handle rate limiting
+  when .http_error?
+    puts "HTTP #{error.status_code}"
+  end
+end
+
+# Backward compatible - still works
+if msg = result.error_message
+  puts "Error: #{msg}"
+end
 ```
 
 ### With Caching Headers
@@ -151,13 +200,17 @@ record Result,
   last_modified : String?,
   site_link : String?,
   favicon : String?,
-  error_message : String?,
+  error : Error?,           # Structured error (v0.4.0+)
+  error_message : String?,  # Backward compatible accessor
   
   # Feed metadata (v0.3.0+)
   feed_title : String?,
   feed_description : String?,
   feed_language : String?,
   feed_authors : Array(Author)
+
+# Check success/failure
+result.success?  # Returns true if no error
 
 record Author,
   name : String?,
@@ -171,8 +224,8 @@ record Author,
 record Entry,
   title : String,
   url : String,
-  source_type : String,  # "rss", "atom", "jsonfeed", "reddit", "github", etc.
-  
+  source_type : SourceType,  # Type-safe enum (v0.4.0+), was String
+   
   # Rich content (v0.3.0+)
   content : String,           # Full content
   content_html : String?,     # HTML version
@@ -193,12 +246,13 @@ record Attachment,
   duration_in_seconds : Int32?
 ```
 
-### RequestConfig (v0.3.0+)
+### RequestConfig (v0.4.0+)
 
 ```crystal
 record RequestConfig,
   connect_timeout : Time::Span = 10.seconds,
-  read_timeout : Time::Span = 30.seconds
+  read_timeout : Time::Span = 30.seconds,
+  max_requests_per_second : Int32? = nil  # Optional rate limiting
 ```
 
 ## Supported Feed Formats
@@ -231,7 +285,7 @@ record RequestConfig,
 
 ```bash
 crystal deps
-crystal spec  # 93 tests
+crystal spec  # 101 tests
 ```
 
 ## Contributing

@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.3.0.
+Technical API documentation for Fetcher v0.4.0.
 
 ## Table of Contents
 
@@ -13,6 +13,69 @@ Technical API documentation for Fetcher v0.3.0.
 
 ## Data Structures
 
+### ErrorKind (v0.4.0+)
+
+Enum for categorized error types:
+
+```crystal
+enum ErrorKind
+  DNSError        # DNS resolution failed
+  Timeout         # Connection or read timeout
+  InvalidURL      # URL validation failed
+  InvalidFormat   # Feed format parsing failed
+  HTTPError       # HTTP error response
+  RateLimited     # Rate limited by API
+  ServerError     # Server error (5xx)
+  Unknown         # Unknown error
+end
+```
+
+### Error (v0.4.0+)
+
+Structured error record with context:
+
+```crystal
+record Error,
+  kind : ErrorKind,      # Error category
+  message : String,      # Human-readable message
+  status_code : Int32?,  # HTTP status code if applicable
+  url : String?,         # URL that caused the error
+  driver : String?       # Driver that was used
+
+# Factory methods
+Error.dns(message)
+Error.timeout(message)
+Error.invalid_url(message)
+Error.invalid_format(message)
+Error.http(status_code, message, url)
+Error.rate_limited(message)
+Error.server_error(status_code, message)
+Error.unknown(message)
+end
+```
+
+### SourceType (v0.4.0+)
+
+Type-safe enum for feed sources:
+
+```crystal
+enum SourceType
+  RSS        # RSS 1.0/2.0
+  Atom       # Atom
+  JSONFeed   # JSON Feed
+  Reddit     # Reddit
+  GitHub     # GitHub releases
+  GitLab     # GitLab releases
+  Codeberg   # Codeberg releases
+
+  # Convert to string
+  def to_s : String  # "rss", "atom", etc.
+
+  # Parse from string
+  def self.from_string(value : String) : SourceType
+end
+```
+
 ### Result
 
 ```crystal
@@ -23,13 +86,18 @@ record Result,
   last_modified : String?,
   site_link : String?,
   favicon : String?,
-  error_message : String?,
+  error : Error?,             # Structured error (v0.4.0+)
+  error_message : String?,    # Backward compatible accessor
   
   # Feed metadata (v0.3.0+)
   feed_title : String?,
   feed_description : String?,
   feed_language : String?,
   feed_authors : Array(Author)
+
+# Methods
+def success? : Bool  # Returns true if no error
+def error_message : String?  # Backward compatible
 ```
 
 ### Entry
@@ -38,8 +106,8 @@ record Result,
 record Entry,
   title : String,
   url : String,
-  source_type : String,  # "rss", "atom", "jsonfeed", "reddit", "github", etc.
-  
+  source_type : SourceType,  # Type-safe enum (v0.4.0+), was String
+   
   # Rich content (v0.3.0+)
   content : String,           # Full content
   content_html : String?,     # HTML version
@@ -73,12 +141,13 @@ record Attachment,
   duration_in_seconds : Int32?
 ```
 
-### RequestConfig (v0.3.0+)
+### RequestConfig (v0.4.0+)
 
 ```crystal
 record RequestConfig,
   connect_timeout : Time::Span = 10.seconds,
-  read_timeout : Time::Span = 30.seconds
+  read_timeout : Time::Span = 30.seconds,
+  max_requests_per_second : Int32? = nil  # Rate limiting (nil = disabled)
 ```
 
 ---
@@ -160,6 +229,7 @@ HTTPClient.fetch(
 |-----------|------|---------|-------------|
 | `connect_timeout` | `Time::Span` | `10.seconds` | Connection timeout |
 | `read_timeout` | `Time::Span` | `30.seconds` | Read timeout |
+| `max_requests_per_second` | `Int32?` | `nil` | Rate limit per domain (nil = disabled) |
 
 ### Usage Examples
 
@@ -173,6 +243,19 @@ config = Fetcher::RequestConfig.new(
   read_timeout: 60.seconds
 )
 result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
+
+# Rate limiting (v0.4.0+)
+config = Fetcher::RequestConfig.new(
+  max_requests_per_second: 10
+)
+result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
+
+# Combined configuration
+config = Fetcher::RequestConfig.new(
+  connect_timeout: 30.seconds,
+  read_timeout: 60.seconds,
+  max_requests_per_second: 5
+)
 
 # With caching headers
 headers = HTTP::Headers{
@@ -276,6 +359,8 @@ The library automatically detects the feed type based on URL patterns:
 
 All methods return a `Result` struct. Check for errors:
 
+### Backward Compatible (v0.1.0+)
+
 ```crystal
 result = Fetcher.pull("https://example.com/feed.xml")
 
@@ -288,10 +373,38 @@ else
 end
 ```
 
+### Type-Safe Error Handling (v0.4.0+)
+
+```crystal
+result = Fetcher.pull("https://example.com/feed.xml")
+
+# Check success
+if result.success?
+  result.entries.each { |entry| puts entry.title }
+else
+  error = result.error
+  puts "Error: #{error.message}"
+  puts "Kind: #{error.kind}"  # ErrorKind enum
+  
+  # Pattern match on error type
+  case error.kind
+  when .timeout?
+    puts "Request timed out"
+  when .rate_limited?
+    puts "Rate limited, retry after cooling period"
+  when .http_error?
+    puts "HTTP #{error.status_code}"
+  when .dns_error?
+    puts "DNS resolution failed"
+  end
+end
+```
+
 ---
 
 ## Version History
 
+- **v0.4.0** - Structured error handling, SourceType enum, rate limiting, enhanced security
 - **v0.3.0** - Added content extraction, JSON Feed support, RequestConfig
 - **v0.2.1** - Bug fixes and cleanup
 - **v0.2.0** - Functional rewrite
