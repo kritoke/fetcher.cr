@@ -11,6 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.5.1] - 2026-03-09
+
+### Fixed
+- **Critical Reddit feed regression** - Fixed double compression issue causing Reddit feeds to fail
+  - Removed `Accept-Encoding` header from default headers
+  - HTTP::Client handles compression automatically when `compress = true`
+  - Reddit JSON API responses now parse correctly
+  - All Reddit feeds working again (25 entries per feed)
+  - Thanks to @kritoke for quickheadlines testing and reporting
+
+### Technical Details
+The issue was caused by setting both `Accept-Encoding: gzip, deflate` header AND `client.compress = true`:
+1. HTTP::Client automatically adds Accept-Encoding when compress is enabled
+2. Server sees the header and compresses the response
+3. HTTP::Client decompresses the response
+4. But with manual Accept-Encoding header, the response was double-compressed
+5. JSON.parse failed with binary garbage instead of valid JSON
+
+**Solution:** Let HTTP::Client handle compression automatically without manual headers.
+
 ## [0.5.0] - 2026-03-09
 
 ### What's New
@@ -179,7 +199,8 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.5.0..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.5.1..HEAD
+[0.5.1]: https://github.com/kritoke/fetcher.cr/compare/v0.5.0..v0.5.1
 [0.5.0]: https://github.com/kritoke/fetcher.cr/compare/v0.4.1..v0.5.0
 [0.4.1]: https://github.com/kritoke/fetcher.cr/compare/v0.4.0..v0.4.1
 [0.4.0]: https://github.com/kritoke/fetcher.cr/compare/v0.3.0..v0.4.0

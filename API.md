@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.5.0.
+Technical API documentation for Fetcher v0.5.1.
 
 ## Table of Contents
 
