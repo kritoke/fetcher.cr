@@ -1104,12 +1104,13 @@ describe "Phase 4: HTTP Improvements" do
   end
 
   describe "Headers with compression" do
-    it "includes Accept-Encoding header" do
+    it "does not manually set Accept-Encoding (handled by HTTP client)" do
       headers = Fetcher::HttpClient.build_headers
-      headers["Accept-Encoding"]?.should eq("gzip, deflate")
+      # Accept-Encoding is handled automatically by HTTP::Client when compress = true
+      headers["Accept-Encoding"]?.should be_nil
     end
 
-    it "preserves custom Accept-Encoding" do
+    it "preserves custom Accept-Encoding if explicitly set" do
       custom = HTTP::Headers{"Accept-Encoding" => "br"}
       headers = Fetcher::HttpClient.build_headers(custom)
       headers["Accept-Encoding"]?.should eq("br")

@@ -24,8 +24,8 @@ module Fetcher
       Fetcher.with_retry(config) do
         begin
           fetch_reddit(subreddit, sort, actual_limit, headers, config)
-        rescue ex : RedditFetchError
-          _ = ex
+        rescue ex : FetchError
+          # Fallback to RSS if JSON API fails for any reason
           fetch_reddit_rss(subreddit, sort, actual_limit, headers, config)
         end
       end

@@ -83,7 +83,6 @@ module Fetcher
         "User-Agent"      => DEFAULT_USER_AGENT,
         "Accept"          => DEFAULT_ACCEPT_HEADER,
         "Accept-Language" => "en-US,en;q=0.9",
-        "Accept-Encoding" => "gzip, deflate",
         "Connection"      => "keep-alive",
       }
 
