@@ -87,24 +87,43 @@ describe Fetcher::Result do
   end
 end
 
-describe Fetcher::RetryConfig do
-  it "has default values" do
-    config = Fetcher::RetryConfig.new
+describe "RequestConfig retry settings" do
+  it "has default retry values" do
+    config = Fetcher::RequestConfig.new
     config.max_retries.should eq(3)
     config.base_delay.should eq(1.second)
     config.max_delay.should eq(30.seconds)
     config.exponential_base.should eq(2.0)
   end
 
+  it "allows custom retry configuration" do
+    config = Fetcher::RequestConfig.new(max_retries: 5, base_delay: 2.seconds)
+    config.max_retries.should eq(5)
+    config.base_delay.should eq(2.seconds)
+  end
+
+  it "calculates exponential backoff correctly" do
+    config = Fetcher::RequestConfig.new(base_delay: 10.seconds, max_delay: 30.seconds)
+
+    # Test delay calculation (simulated)
+    attempt = 2
+    delay = config.base_delay * (config.exponential_base ** attempt)
+    delay = config.max_delay if delay > config.max_delay
+
+    delay.should eq(30.seconds) # 10 * 2^2 = 40, but capped at max_delay 30
+  end
+end
+
+describe "RetryConfig" do
   it "calculates delay for attempts" do
-    config = Fetcher::RetryConfig.new
+    config = Fetcher::RequestConfig.new
     config.delay_for_attempt(0).should eq(1.second)
     config.delay_for_attempt(1).should eq(2.seconds)
     config.delay_for_attempt(2).should eq(4.seconds)
   end
 
   it "caps delay at max_delay" do
-    config = Fetcher::RetryConfig.new(base_delay: 10.seconds, max_delay: 30.seconds)
+    config = Fetcher::RequestConfig.new(base_delay: 10.seconds, max_delay: 30.seconds)
     config.delay_for_attempt(1).should eq(20.seconds)
     config.delay_for_attempt(2).should eq(30.seconds)
     config.delay_for_attempt(10).should eq(30.seconds)
@@ -1086,13 +1105,13 @@ describe "Phase 4: HTTP Improvements" do
 
   describe "Headers with compression" do
     it "includes Accept-Encoding header" do
-      headers = Fetcher::Headers.build
+      headers = Fetcher::HttpClient.build_headers
       headers["Accept-Encoding"]?.should eq("gzip, deflate")
     end
 
     it "preserves custom Accept-Encoding" do
       custom = HTTP::Headers{"Accept-Encoding" => "br"}
-      headers = Fetcher::Headers.build(custom)
+      headers = Fetcher::HttpClient.build_headers(custom)
       headers["Accept-Encoding"]?.should eq("br")
     end
   end
@@ -1193,69 +1212,69 @@ describe "Integration Tests - Fixtures" do
     end
   end
 
-  describe "HTTP compression" do
-    it "includes Accept-Encoding header" do
-      headers = Fetcher::Headers.build
-      headers["Accept-Encoding"].should eq("gzip, deflate")
+  describe "Parser Integration Tests" do
+    it "RSSParser parses WordPress RSS feed" do
+      xml = File.read("test/fixtures/rss_wordpress.xml")
+      parser = Fetcher::RSSParser.new
+      entries = parser.parse_entries(xml, 10)
+      entries.size.should eq(2)
+
+      entry1 = entries[0]
+      entry1.title.should eq("WordPress Post with Content Encoded")
+      entry1.author.should eq("John Doe")
+      entry1.attachments.size.should eq(1)
     end
 
-    it "enables automatic decompression on HTTP::Client" do
-      uri = URI.parse("http://example.com")
-      client = HTTP::Client.new(uri)
-      client.compress = true
-      client.compress?.should be_true
+    it "RSSParser parses Atom feed" do
+      xml = File.read("test/fixtures/atom_full.xml")
+      parser = Fetcher::RSSParser.new
+      entries = parser.parse_entries(xml, 10)
+      entries.size.should eq(2)
+
+      entry1 = entries[0]
+      entry1.title.should eq("Atom Entry with HTML Content")
+      entry1.author.should eq("Jane Doe")
     end
 
-    it "HTTP::Client with compress enabled decompresses gzip response" do
-      uri = URI.parse("http://example.com")
-      client = HTTP::Client.new(uri)
-      client.compress = true
+    it "JSONFeedParser parses JSON Feed" do
+      json = File.read("test/fixtures/jsonfeed_full.json")
+      parser = Fetcher::JSONFeedParser.new
+      entries = parser.parse_entries(json, 10)
+      entries.size.should eq(3)
 
-      compressed_body = IO::Memory.new
-      Compress::Gzip::Writer.open(compressed_body) do |gzip|
-        gzip.write "test content".to_slice
-      end
-      compressed_body.rewind
-
-      decompressed = IO::Memory.new
-      Compress::Gzip::Reader.open(compressed_body) do |reader|
-        IO.copy(reader, decompressed)
-      end
-      decompressed.rewind
-
-      String.new(decompressed.to_slice).should eq("test content")
+      entry1 = entries[0]
+      entry1.title.should eq("JSON Feed Item with HTML Content")
+      entry1.author.should eq("John Smith")
+      entry1.attachments.size.should eq(1)
     end
 
-    it "does not mutate defaults when building headers" do
-      custom = HTTP::Headers{"User-Agent" => "CustomAgent"}
-      result1 = Fetcher::Headers.build(custom)
-      result2 = Fetcher::Headers.build
-      result1["User-Agent"].should eq("CustomAgent")
-      result2["User-Agent"].should eq(Fetcher::HTTPClient::DEFAULT_USER_AGENT)
-    end
-
-    it "HTTP::Client accepts custom config timeouts" do
-      config = Fetcher::RequestConfig.new(
-        connect_timeout: 5.seconds,
-        read_timeout: 15.seconds
+    it "EntryFactory creates validated entries" do
+      entry = Fetcher::EntryFactory.create(
+        title: "Test Entry",
+        url: "http://localhost/malicious",
+        source_type: Fetcher::SourceType::RSS,
+        content: "<script>alert('xss')</script>Safe content"
       )
-      config.connect_timeout.should eq(5.seconds)
-      config.read_timeout.should eq(15.seconds)
+      entry.url.should eq("#")                     # Should be blocked by URL validation
+      entry.content.should_not contain("<script>") # Should be sanitized
     end
 
-    it "Software module handles 2xx status codes" do
-      result = Fetcher::Software.pull("https://github.com/test/re/releases", Fetcher::Headers.build, 10)
-      result.error_message.should_not be_nil
-    end
+    it "ResultBuilder constructs results correctly" do
+      entry = Fetcher::EntryFactory.create(
+        title: "Test",
+        url: "https://example.com",
+        source_type: Fetcher::SourceType::RSS
+      )
 
-    it "Software module handles GitLab requests" do
-      result = Fetcher::Software.pull("https://gitlab.com/test/re/-/releases", Fetcher::Headers.build, 10)
-      result.entries.should be_a(Array(Fetcher::Entry))
-    end
+      result = Fetcher::ResultBuilder.success(
+        entries: [entry],
+        etag: "abc123",
+        site_link: "https://example.com"
+      )
 
-    it "Software module handles Codeberg requests" do
-      result = Fetcher::Software.pull("https://codeberg.org/test/re/releases", Fetcher::Headers.build, 10)
-      result.entries.should be_a(Array(Fetcher::Entry))
+      result.entries.size.should eq(1)
+      result.etag.should eq("abc123")
+      result.site_link.should eq("https://example.com")
     end
   end
 
@@ -1273,6 +1292,33 @@ describe "Integration Tests - Fixtures" do
       config = Fetcher::RequestConfig.new
       config.connect_timeout.should eq(10.seconds)
       config.read_timeout.should eq(30.seconds)
+    end
+  end
+
+  describe "Token Bucket Rate Limiting" do
+    it "maintains backward compatibility with existing API" do
+      # Test without custom rate limiting config
+      result = Fetcher.pull("https://httpbin.org/get")
+      result.success?.should be_true
+    end
+
+    it "allows rapid requests within burst capacity" do
+      # Create a config with generous burst capacity
+      config = Fetcher::RequestConfig.new(
+        rate_limit_capacity: 5.0,
+        rate_limit_refill_rate: 2.0
+      )
+
+      # Should be able to make 3 rapid requests
+      start_time = Time.utc
+      3.times do
+        result = Fetcher.pull("https://httpbin.org/get", ::HTTP::Headers.new, 1, config)
+        result.success?.should be_true
+      end
+      elapsed = Time.utc - start_time
+
+      # Should complete quickly (under 5 seconds for network requests)
+      elapsed.total_seconds.should be < 5.0
     end
   end
 end

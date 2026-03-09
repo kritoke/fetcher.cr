@@ -1,51 +1,56 @@
+require "time"
+
 module Fetcher
+  # RFC-compliant time parser for feed dates
+  # Supports RFC 2822 (RSS), RFC 3339/ISO 8601 (Atom, JSON Feed), and common variants
   module TimeParser
-    RSS_FORMATS = [
-      "%a, %d %b %Y %H:%M:%S %z",
-      "%Y-%m-%dT%H:%M:%S%z",
-      "%Y-%m-%dT%H:%M:%SZ",
-      "%Y-%m-%dT%H:%M:%S",
-      "%Y-%m-%d",
-    ]
+    # Parse time from various feed date formats
+    def self.parse(time_str : String?) : Time?
+      return if time_str.nil? || time_str.empty?
 
-    ATOM_FORMATS = [
-      "%Y-%m-%dT%H:%M:%S%z",
-      "%Y-%m-%dT%H:%M:%SZ",
-      "%Y-%m-%dT%H:%M:%S",
-      "%Y-%m-%d",
-    ]
-
-    def self.parse(time_str : String?, formats : Array(String)? = nil) : Time?
-      return unless time_str
       stripped = time_str.strip
       return if stripped.empty?
 
-      format_list = formats || RSS_FORMATS
-
-      format_list.each do |fmt|
-        begin
-          return Time.parse(stripped, fmt, Time::Location::UTC)
-        rescue
-        end
-      end
-
+      # Try RFC 2822 first (RSS format)
       begin
-        Time.parse_iso8601(stripped)
-      rescue
-        nil
+        return Time.parse_rfc2822(stripped)
+      rescue Time::Format::Error
+        # Continue to other formats
       end
+
+      # Try ISO 8601 / RFC 3339 (Atom, JSON Feed format)
+      begin
+        return Time.parse_iso8601(stripped)
+      rescue Time::Format::Error
+        # Continue to fallback parsing
+      end
+
+      # Fallback: try common date-only formats
+      begin
+        # Handle YYYY-MM-DD format
+        if stripped.matches?(/^\d{4}-\d{2}-\d{2}$/)
+          return Time.parse(stripped, "%Y-%m-%d", Time::Location::UTC)
+        end
+
+        # Handle YYYY-MM-DDTHH:MM:SS format without timezone
+        if stripped.matches?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+          return Time.parse(stripped, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC)
+        end
+      rescue
+        # Ignore parsing errors in fallback
+      end
+
+      nil
     end
 
+    # Parse ISO 8601 date string (for JSON Feed)
     def self.parse_iso8601(time_str : String?) : Time?
-      return unless time_str
-      stripped = time_str.strip
-      return if stripped.empty?
+      parse(time_str) # Delegate to main parse method which handles ISO 8601
+    end
 
-      begin
-        Time.parse_iso8601(stripped)
-      rescue
-        nil
-      end
+    # Parse RFC 2822 date string (for RSS)
+    def self.parse_rfc2822(time_str : String?) : Time?
+      parse(time_str) # Delegate to main parse method which handles RFC 2822
     end
   end
 end

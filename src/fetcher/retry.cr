@@ -1,19 +1,12 @@
 require "./fetch_error"
+require "./exceptions"
 
 module Fetcher
-  record RetryConfig,
-    max_retries : Int32 = 3,
-    base_delay : Time::Span = 1.second,
-    max_delay : Time::Span = 30.seconds,
-    exponential_base : Float64 = 2.0 do
-    def delay_for_attempt(attempt : Int32) : Time::Span
-      delay = base_delay * (exponential_base ** attempt)
-      delay = max_delay if delay > max_delay
-      delay
-    end
-  end
-
-  DEFAULT_RETRY_CONFIG = RetryConfig.new
+  # Retry configuration is now part of RequestConfig
+  DEFAULT_RETRY_CONFIG_MAX_RETRIES      = 3
+  DEFAULT_RETRY_CONFIG_BASE_DELAY       = 1.second
+  DEFAULT_RETRY_CONFIG_MAX_DELAY        = 30.seconds
+  DEFAULT_RETRY_CONFIG_EXPONENTIAL_BASE = 2.0
 
   class RetriableError < Exception
     def initialize(message : String)
@@ -22,8 +15,8 @@ module Fetcher
   end
 
   def self.with_retry(
-    config : RetryConfig = DEFAULT_RETRY_CONFIG,
-    is_retriable : Exception -> Bool = ->(ex : Exception) { ex.is_a?(RetriableError) },
+    config : RequestConfig,
+    is_retriable : Exception -> Bool = ->(ex : Exception) { ex.is_a?(RetriableError) || transient_error?(ex) },
     &operation : -> Result
   ) : Result
     attempt = 0
@@ -34,9 +27,11 @@ module Fetcher
         if is_retriable.call(ex)
           attempt += 1
           if attempt >= config.max_retries
-            return error_result(Error.timeout("Failed after retries: #{ex.message}"))
+            return error_result(Error.timeout("Failed after #{config.max_retries} retries: #{ex.message}"))
           end
-          sleep(config.delay_for_attempt(attempt))
+          delay = config.base_delay * (config.exponential_base ** attempt)
+          delay = config.max_delay if delay > config.max_delay
+          sleep(delay)
         else
           return error_result(Error.unknown("#{ex.class}: #{ex.message}"))
         end
@@ -53,6 +48,21 @@ module Fetcher
   end
 
   def self.transient_error?(ex : Exception) : Bool
+    # Check for typed exceptions first
+    case ex
+    when DNSError, TimeoutError, HTTPClientError
+      return true
+    when HTTPError
+      # Client errors (4xx) are not transient, server errors (5xx) are
+      if ex.status_code.nil?
+        return true
+      else
+        status_code = ex.status_code.as(Int32)
+        return (500..599).includes?(status_code)
+      end
+    end
+
+    # Fallback to string matching for legacy exceptions
     msg = ex.message.to_s.downcase
     msg.includes?("timeout") || msg.includes?("connection") || msg.includes?("dns")
   end

@@ -29,6 +29,8 @@ v0.3.0 adds configurable timeouts to handle slow feeds.
 
 v0.4.0 adds optional rate limiting to prevent API abuse.
 
+v0.5.0 adds streaming processing for memory safety with large feeds and token bucket rate limiting for better scalability.
+
 ## Installation
 
 Add to your `shard.yml`:
@@ -37,7 +39,7 @@ Add to your `shard.yml`:
 dependencies:
   fetcher:
     github: kritoke/fetcher.cr
-    version: "~> 0.4"
+    version: "~> 0.5"
 ```
 
 ## Usage

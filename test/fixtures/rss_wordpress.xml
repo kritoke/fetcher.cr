@@ -1,37 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>Test WordPress Blog</title>
-    <link>https://example.com</link>
-    <description>A test blog with WordPress-style content</description>
+    <title>Test Blog</title>
+    <link>https://testblog.com</link>
+    <description>A test blog for feed parsing</description>
     <language>en-US</language>
+    <image>
+      <url>https://testblog.com/favicon.ico</url>
+      <title>Test Blog</title>
+      <link>https://testblog.com</link>
+    </image>
+    
     <item>
-      <title>Post with Full Content</title>
-      <link>https://example.com/post-with-content</link>
-      <pubDate>Mon, 15 Jan 2024 10:00:00 +0000</pubDate>
+      <title>WordPress Post with Content Encoded</title>
+      <link>https://testblog.com/post1</link>
+      <pubDate>Wed, 15 Jan 2026 10:30:00 GMT</pubDate>
       <dc:creator>John Doe</dc:creator>
-      <description>This is the excerpt of the post.</description>
-      <content:encoded><![CDATA[<p>This is the <strong>full HTML content</strong> of the post.</p><p>It has multiple paragraphs and formatting.</p>]]></content:encoded>
-      <category>Technology</category>
+      <category>Tech</category>
       <category>Programming</category>
-      <enclosure url="https://example.com/file.pdf" type="application/pdf" length="12345"/>
+      <description>This is a brief description of the post.</description>
+      <content:encoded><![CDATA[<p>This is the full HTML content of the WordPress post.</p><p>It includes <strong>HTML formatting</strong>, images, and other rich content.</p>]]></content:encoded>
+      <enclosure url="https://testblog.com/audio/podcast.mp3" length="12345678" type="audio/mpeg"/>
     </item>
+    
     <item>
-      <title>Post with Description Only</title>
-      <link>https://example.com/post-with-description</link>
-      <pubDate>Tue, 16 Jan 2024 11:00:00 +0000</pubDate>
-      <dc:creator>Jane Smith</dc:creator>
+      <title>Simple RSS Post</title>
+      <link>https://testblog.com/post2</link>
+      <pubDate>Wed, 14 Jan 2026 15:45:00 GMT</pubDate>
       <description>This post only has a description, no content:encoded.</description>
-      <category>Tutorials</category>
-    </item>
-    <item>
-      <title>Podcast Episode</title>
-      <link>https://example.com/podcast-episode-1</link>
-      <pubDate>Wed, 17 Jan 2024 12:00:00 +0000</pubDate>
-      <dc:creator>Podcast Team</dc:creator>
-      <description>Episode 1 of our podcast discussing Crystal.</description>
-      <content:encoded><![CDATA[<p>Show notes and full transcript here.</p>]]></content:encoded>
-      <enclosure url="https://example.com/episode1.mp3" type="audio/mpeg" length="98765432"/>
+      <category>News</category>
     </item>
   </channel>
 </rss>

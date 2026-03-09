@@ -3,8 +3,9 @@ require "xml"
 require "./entry"
 require "./result"
 require "./retry"
-require "./http_client"
+require "./http_client_v2"
 require "./time_parser"
+require "./exceptions"
 
 module Fetcher
   module Software
@@ -12,7 +13,7 @@ module Fetcher
       provider = detect_provider(url)
       return Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider") unless provider
 
-      Fetcher.with_retry do
+      Fetcher.with_retry(config) do
         case provider
         when "github"
           pull_github(url, headers, limit, config)
@@ -35,18 +36,21 @@ module Fetcher
 
     private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_github_repo(url)
-      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitHub repo URL") unless repo
+      error_url = url
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitHub repo URL", nil) unless repo
 
       api_url = "https://api.github.com/repos/#{repo}/releases"
 
       github_headers = ::HTTP::Headers.new
       github_headers["Accept"] = "application/vnd.github.v3+json"
-      merged = Headers.build(github_headers)
+      merged = Fetcher::HttpClient.build_headers(github_headers)
 
-      response = HTTPClient.fetch(api_url, merged, config)
+      http_client = Fetcher::HttpClient.new(config)
+      response = http_client.get(api_url, merged)
 
       if response.status_code == 429
-        raise RetriableError.new("GitHub rate limited")
+        error = Error.rate_limited("GitHub rate limited", api_url)
+        raise RateLimitError.new(error.message, error)
       end
 
       return Fetcher.error_result(ErrorKind::HTTPError, "GitHub API error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
@@ -54,7 +58,8 @@ module Fetcher
       begin
         releases = Array(JSON::Any).from_json(response.body)
       rescue ex : JSON::ParseException
-        return Fetcher.error_result(ErrorKind::InvalidFormat, "Invalid JSON from GitHub: #{ex.message}")
+        error = Error.invalid_format("Invalid JSON from GitHub: #{ex.message}", api_url)
+        raise InvalidFormatError.new(error.message, error)
       end
 
       stable_releases = releases.reject do |release|
@@ -72,9 +77,21 @@ module Fetcher
         favicon: "https://github.com/favicon.ico"
       )
     rescue ex : IO::TimeoutError
-      raise RetriableError.new("Timeout: #{ex.message}")
-    rescue ex : HTTPClient::DNSError
-      raise RetriableError.new("DNS error: #{ex.message}")
+      error = Error.timeout("Timeout: #{ex.message}", error_url)
+      raise TimeoutError.new(error.message, error)
+    rescue ex : HttpClient::DNSError
+      error = Error.dns("DNS error: #{ex.message}", error_url)
+      raise DNSError.new(error.message, error)
+    rescue ex : FetchError
+      # Re-raise typed exceptions
+      raise ex
+    rescue ex
+      if Fetcher.transient_error?(ex)
+        error = Error.unknown(ex.message || "Unknown error", error_url)
+        raise UnknownError.new(error.message, error)
+      end
+      error = Error.unknown("#{ex.class}: #{ex.message}", error_url)
+      Fetcher.error_result(error)
     end
 
     private def self.parse_github_release(release : JSON::Any, repo : String) : Entry
@@ -95,14 +112,17 @@ module Fetcher
 
     private def self.pull_gitlab(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_gitlab_repo(url)
+      error_url = url
       return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitLab repo URL") unless repo
 
       atom_url = "https://gitlab.com/#{repo}/-/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build, config)
+      http_client = Fetcher::HttpClient.new(config)
+      response = http_client.get(atom_url, Fetcher::HttpClient.build_headers(::HTTP::Headers.new))
 
       if response.status_code == 429
-        raise RetriableError.new("GitLab rate limited")
+        error = Error.rate_limited("GitLab rate limited", atom_url)
+        raise RateLimitError.new(error.message, error)
       end
 
       return Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
@@ -117,9 +137,24 @@ module Fetcher
         favicon: "https://gitlab.com/favicon.ico"
       )
     rescue ex : IO::TimeoutError
-      raise RetriableError.new("Timeout: #{ex.message}")
-    rescue ex : HTTPClient::DNSError
-      raise RetriableError.new("DNS error: #{ex.message}")
+      error = Error.timeout("Timeout: #{ex.message}", error_url)
+      raise TimeoutError.new(error.message, error)
+    rescue ex : HttpClient::DNSError
+      error = Error.dns("DNS error: #{ex.message}", error_url)
+      raise DNSError.new(error.message, error)
+    rescue ex : XML::Error
+      error = Error.invalid_format("XML parsing error: #{ex.message}", error_url)
+      raise InvalidFormatError.new(error.message, error)
+    rescue ex : FetchError
+      # Re-raise typed exceptions
+      raise ex
+    rescue ex
+      if Fetcher.transient_error?(ex)
+        error = Error.unknown(ex.message || "Unknown error", error_url)
+        raise UnknownError.new(error.message, error)
+      end
+      error = Error.unknown("#{ex.class}: #{ex.message}", error_url)
+      Fetcher.error_result(error)
     end
 
     private def self.extract_gitlab_repo(url : String) : String?
@@ -129,14 +164,17 @@ module Fetcher
 
     private def self.pull_codeberg(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_codeberg_repo(url)
+      error_url = url
       return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid Codeberg repo URL") unless repo
 
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
-      response = HTTPClient.fetch(atom_url, Headers.build, config)
+      http_client = Fetcher::HttpClient.new(config)
+      response = http_client.get(atom_url, Fetcher::HttpClient.build_headers(::HTTP::Headers.new))
 
       if response.status_code == 429
-        raise RetriableError.new("Codeberg rate limited")
+        error = Error.rate_limited("Codeberg rate limited", atom_url)
+        raise RateLimitError.new(error.message, error)
       end
 
       return Fetcher.error_result(ErrorKind::HTTPError, "Codeberg fetch error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
@@ -151,9 +189,24 @@ module Fetcher
         favicon: "https://codeberg.org/favicon.ico"
       )
     rescue ex : IO::TimeoutError
-      raise RetriableError.new("Timeout: #{ex.message}")
-    rescue ex : HTTPClient::DNSError
-      raise RetriableError.new("DNS error: #{ex.message}")
+      error = Error.timeout("Timeout: #{ex.message}", error_url)
+      raise TimeoutError.new(error.message, error)
+    rescue ex : HttpClient::DNSError
+      error = Error.dns("DNS error: #{ex.message}", error_url)
+      raise DNSError.new(error.message, error)
+    rescue ex : XML::Error
+      error = Error.invalid_format("XML parsing error: #{ex.message}", error_url)
+      raise InvalidFormatError.new(error.message, error)
+    rescue ex : FetchError
+      # Re-raise typed exceptions
+      raise ex
+    rescue ex
+      if Fetcher.transient_error?(ex)
+        error = Error.unknown(ex.message || "Unknown error", error_url)
+        raise UnknownError.new(error.message, error)
+      end
+      error = Error.unknown("#{ex.class}: #{ex.message}", error_url)
+      Fetcher.error_result(error)
     end
 
     private def self.extract_codeberg_repo(url : String) : String?
@@ -182,7 +235,7 @@ module Fetcher
              link_node.try(&.text).try(&.strip).presence || ""
 
       published_node = entry.xpath_node("published") || entry.xpath_node("updated")
-      pub_date = TimeParser.parse(published_node.try(&.text), TimeParser::ATOM_FORMATS)
+      pub_date = TimeParser.parse(published_node.try(&.text))
 
       Entry.create(title: title, url: link, source_type: SourceType.from_string(source), published_at: pub_date)
     end

@@ -11,6 +11,78 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.5.0] - 2026-03-09
+
+### What's New
+
+#### Content-Type Based Detection
+Smarter feed format detection with HTTP content-type sniffing:
+- **HEAD request detection** - Analyzes Content-Type headers before fetching
+- **Graceful fallback** - Falls back to URL pattern matching when HEAD fails
+- **More reliable** - Reduces misclassification of feed types
+- **Backward compatible** - Existing code continues to work unchanged
+
+#### Unified HTTP Client Architecture
+Centralized HTTP handling with proper configuration:
+- **Single HTTP client** - All drivers use the same HTTP client instance
+- **Full configuration support** - Timeouts, headers, compression, and retries
+- **Proper resource management** - Consistent connection handling
+- **Better error handling** - Unified error categorization
+
+#### Token Bucket Rate Limiting
+Scalable rate limiting supporting complex scenarios:
+- **Token bucket algorithm** - Better than simple request counting
+- **Configurable burst capacity** - Allow temporary spikes in request rate
+- **Per-domain rate limits** - Independent limiting for each domain
+- **Thread-safe** - Handles concurrent requests without starvation
+- Configure via `RequestConfig.rate_limit_capacity` and `rate_limit_refill_rate`
+
+#### RFC-Compliant Time Parsing
+Standards-compliant time parsing for all feed formats:
+- **RFC 2822 support** - Proper RSS date parsing
+- **RFC 3339/ISO 8601** - Atom and JSON Feed format support
+- **Timezone preservation** - Properly handles timezone information
+- **Fallback formats** - Common date-only formats handled gracefully
+
+#### Streaming Processing
+Memory-safe feed processing with streaming:
+- **Stream parsing** - XML and JSON feeds parsed incrementally
+- **Hard memory limits** - 10MB limit prevents OOM errors
+- **Compression awareness** - Accounts for compressed content
+- **Early termination** - Stops on size violations
+
+#### Enhanced Security
+- **Standard URL validation** - Uses system libraries instead of custom checks
+- **SSRF protection** - Comprehensive private IP blocking (IPv4 and IPv6)
+- **XML parser hardening** - NONET option prevents network access during parsing
+
+#### Separated Concerns
+Clear separation of responsibilities:
+- **EntryParser** - Interface for driver-specific parsing
+- **EntryFactory** - Creates validated entries
+- **ResultBuilder** - Constructs structured results
+- Better testability and maintainability
+
+#### Comprehensive Testing
+- **126 passing tests** - Extensive test coverage
+- **Real fixtures** - Tests with actual RSS/Atom/JSON/Reddit feeds
+- **Property-based testing** - Edge case coverage
+- **Integration tests** - End-to-end validation
+
+### Compatibility
+✅ **Fully backward compatible** - All existing code continues to work unchanged
+✅ **No breaking changes** - New fields have sensible defaults
+✅ **Opt-in features** - Advanced features disabled by default
+
+### Technical Improvements
+- Reduced code duplication across drivers
+- Better error categorization and handling
+- Cleaner architecture with parser/factory/builder pattern
+- Improved memory safety and performance
+- Better test coverage (126 tests, all passing)
+
+---
+
 ## [0.4.1] - 2026-03-04
 
 ### Fixed
@@ -107,7 +179,8 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.4.1..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.5.0..HEAD
+[0.5.0]: https://github.com/kritoke/fetcher.cr/compare/v0.4.1..v0.5.0
 [0.4.1]: https://github.com/kritoke/fetcher.cr/compare/v0.4.0..v0.4.1
 [0.4.0]: https://github.com/kritoke/fetcher.cr/compare/v0.3.0..v0.4.0
 [0.3.0]: https://github.com/kritoke/fetcher.cr/compare/v0.2.1..v0.3.0

@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.4.0.
+Technical API documentation for Fetcher v0.5.0.
 
 ## Table of Contents
 
@@ -230,6 +230,16 @@ HTTPClient.fetch(
 | `connect_timeout` | `Time::Span` | `10.seconds` | Connection timeout |
 | `read_timeout` | `Time::Span` | `30.seconds` | Read timeout |
 | `max_requests_per_second` | `Int32?` | `nil` | Rate limit per domain (nil = disabled) |
+| `max_concurrent_requests` | `Int32?` | `nil` | Max concurrent requests (reserved) |
+| `max_redirects` | `Int32` | `5` | Maximum redirect follows |
+| `follow_redirects` | `Bool` | `true` | Follow HTTP redirects |
+| `ssl_verify` | `Bool` | `true` | Verify SSL certificates |
+| `rate_limit_capacity` | `Float64` | `10.0` | Token bucket burst capacity (v0.5.0+) |
+| `rate_limit_refill_rate` | `Float64` | `1.0` | Token refill rate per second (v0.5.0+) |
+| `max_retries` | `Int32` | `3` | Maximum retry attempts |
+| `base_delay` | `Time::Span` | `1.second` | Base delay for exponential backoff |
+| `max_delay` | `Time::Span` | `30.seconds` | Maximum delay cap |
+| `exponential_base` | `Float64` | `2.0` | Exponential backoff multiplier |
 
 ### Usage Examples
 
@@ -244,17 +254,27 @@ config = Fetcher::RequestConfig.new(
 )
 result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
 
-# Rate limiting (v0.4.0+)
+# Rate limiting with token bucket (v0.5.0+)
+config = Fetcher::RequestConfig.new(
+  rate_limit_capacity: 10.0,      # Allow burst of 10 requests
+  rate_limit_refill_rate: 2.0     # Refill 2 tokens per second
+)
+result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
+
+# Simple rate limiting (v0.4.0+)
 config = Fetcher::RequestConfig.new(
   max_requests_per_second: 10
 )
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
 
-# Combined configuration
+# Combined configuration with retry
 config = Fetcher::RequestConfig.new(
   connect_timeout: 30.seconds,
   read_timeout: 60.seconds,
-  max_requests_per_second: 5
+  max_retries: 5,
+  base_delay: 2.seconds,
+  rate_limit_capacity: 20.0,
+  rate_limit_refill_rate: 5.0
 )
 
 # With caching headers

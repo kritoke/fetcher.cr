@@ -2,8 +2,9 @@ require "json"
 require "./entry"
 require "./result"
 require "./retry"
-require "./http_client"
+require "./http_client_v2"
 require "./rss"
+require "./exceptions"
 
 module Fetcher
   module Reddit
@@ -20,7 +21,7 @@ module Fetcher
       sort = extract_sort(url)
       actual_limit = Math.min(limit, 25)
 
-      Fetcher.with_retry do
+      Fetcher.with_retry(config) do
         begin
           fetch_reddit(subreddit, sort, actual_limit, headers, config)
         rescue ex : RedditFetchError
@@ -46,7 +47,8 @@ module Fetcher
       final_headers = reddit_headers.dup
       final_headers.merge!(headers)
 
-      response = HTTPClient.fetch(url, final_headers, config)
+      http_client = Fetcher::HttpClient.new(config)
+      response = http_client.get(url, final_headers)
 
       case response.status_code
       when 200..299
@@ -60,18 +62,37 @@ module Fetcher
           favicon: favicon
         )
       when 404
-        raise RedditFetchError.new("Subreddit '#{subreddit}' not found")
+        error = Error.invalid_url("Subreddit '#{subreddit}' not found", url)
+        raise InvalidURLError.new(error.message, error)
       when 429
-        raise RetriableError.new("Rate limited by Reddit API")
+        error = Error.rate_limited("Rate limited by Reddit API", url)
+        raise RateLimitError.new(error.message, error)
       when 500..599
-        raise RetriableError.new("Reddit server error: #{response.status_code}")
+        error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", url)
+        raise HTTPServerError.new(error.message, response.status_code, error)
       else
-        raise RedditFetchError.new("HTTP error #{response.status_code}")
+        error = Error.http(response.status_code, "HTTP error #{response.status_code}", url)
+        raise HTTPError.new(error.message, response.status_code, error)
       end
     rescue ex : IO::TimeoutError
-      raise RetriableError.new("Timeout: #{ex.message}")
-    rescue ex : HTTPClient::DNSError
-      raise RetriableError.new("DNS error: #{ex.message}")
+      error = Error.timeout("Timeout: #{ex.message}", url)
+      raise TimeoutError.new(error.message, error)
+    rescue ex : HttpClient::DNSError
+      error = Error.dns("DNS error: #{ex.message}", url)
+      raise DNSError.new(error.message, error)
+    rescue ex : JSON::ParseException
+      error = Error.invalid_format("JSON parsing error: #{ex.message}", url)
+      raise InvalidFormatError.new(error.message, error)
+    rescue ex : FetchError
+      # Re-raise typed exceptions
+      raise ex
+    rescue ex
+      if Fetcher.transient_error?(ex)
+        error = Error.unknown(ex.message || "Unknown error", url)
+        raise UnknownError.new(error.message, error)
+      end
+      error = Error.unknown("#{ex.class}: #{ex.message}", url)
+      Fetcher.error_result(error)
     end
 
     private def self.extract_subreddit(url : String) : String?

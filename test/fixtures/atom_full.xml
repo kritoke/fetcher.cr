@@ -1,46 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en-US">
+<feed xmlns="http://www.w3.org/2005/Atom" xml:lang="en">
   <title>Test Atom Feed</title>
-  <subtitle>A test Atom feed with full content</subtitle>
-  <link rel="alternate" href="https://example.com"/>
-  <link rel="self" href="https://example.com/atom.xml"/>
-  <id>urn:uuid:example-atom-feed</id>
-  <updated>2024-01-17T12:00:00Z</updated>
+  <subtitle>A comprehensive test feed for Atom parsing</subtitle>
+  <link rel="alternate" href="https://testatom.com"/>
+  <link rel="self" href="https://testatom.com/feed.xml"/>
+  <updated>2026-01-15T10:30:00Z</updated>
+  <id>https://testatom.com</id>
+  <icon>https://testatom.com/favicon.ico</icon>
+  <logo>https://testatom.com/logo.png</logo>
+  
   <author>
     <name>Feed Author</name>
-    <uri>https://example.com/author</uri>
+    <uri>https://testatom.com/author</uri>
+    <email>author@testatom.com</email>
   </author>
+  
   <entry>
     <title>Atom Entry with HTML Content</title>
-    <link rel="alternate" href="https://example.com/entry-1"/>
-    <id>urn:uuid:entry-1</id>
-    <published>2024-01-15T10:00:00Z</published>
-    <updated>2024-01-15T10:00:00Z</updated>
+    <link rel="alternate" href="https://testatom.com/entry1"/>
+    <id>https://testatom.com/entry1</id>
+    <published>2026-01-15T10:30:00Z</published>
+    <updated>2026-01-15T10:30:00Z</updated>
     <author>
-      <name>Entry Author</name>
-      <uri>https://example.com/entry-author</uri>
+      <name>Jane Doe</name>
+      <uri>https://testatom.com/jane</uri>
     </author>
-    <summary>This is the summary of the entry.</summary>
-    <content type="html"><![CDATA[<p>This is the <em>full HTML content</em> of the entry.</p>]]></content>
-    <category term="Crystal"/>
-    <category term="Programming"/>
+    <content type="html"><![CDATA[<p>This is HTML content in an Atom feed.</p><p>It supports <em>rich formatting</em> and other features.</p>]]></content>
+    <category term="Technology"/>
+    <category term="Web Development"/>
   </entry>
+  
   <entry>
-    <title>Atom Entry with Text Content</title>
-    <link rel="alternate" href="https://example.com/entry-2"/>
-    <id>urn:uuid:entry-2</id>
-    <published>2024-01-16T11:00:00Z</published>
-    <updated>2024-01-16T11:00:00Z</updated>
-    <content type="text">This is plain text content without any HTML formatting.</content>
-    <category term="Tutorials"/>
-  </entry>
-  <entry>
-    <title>Entry with Summary Only</title>
-    <link rel="alternate" href="https://example.com/entry-3"/>
-    <id>urn:uuid:entry-3</id>
-    <published>2024-01-17T12:00:00Z</published>
-    <updated>2024-01-17T12:00:00Z</updated>
-    <summary>This entry only has a summary, no content element.</summary>
+    <title>Atom Entry with Summary</title>
+    <link rel="alternate" href="https://testatom.com/entry2"/>
+    <id>https://testatom.com/entry2</id>
+    <published>2026-01-14T15:45:00Z</published>
+    <updated>2026-01-14T15:45:00Z</updated>
+    <summary>This entry only has a summary, no full content.</summary>
     <category term="News"/>
   </entry>
 </feed>
