@@ -38,7 +38,7 @@ module Fetcher
       return DriverType::Reddit
     elsif url.matches?(%r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i)
       return DriverType::Software
-    elsif url.matches?(%r{://(www\.)?gitlab\.com/[^/]+/[^/]+/-/releases}i)
+    elsif url.matches?(%r{://[^/]+/[^/]+/[^/]+/-/releases}i)
       return DriverType::Software
     elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
       return DriverType::Software

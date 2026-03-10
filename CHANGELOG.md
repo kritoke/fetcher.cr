@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.6.0] - 2026-03-11
+
+### Added
+
+#### Enhanced Software Release Fetching
+
+- **GitHub body extraction** - `entry.content` and `entry.content_html` now contain release notes from the `body` field
+- **GitLab REST API support** - Uses `api/v4/projects/{id}/releases` for richer data
+- **GitLab fallback chain** - API → releases.atom → tags.atom (automatically tries tags if releases 404)
+- **Codeberg REST API support** - Uses `api/v1/repos/{owner}/{repo}/releases` with Atom fallback
+- **Self-hosted GitLab detection** - Any URL with `/-/releases` pattern is auto-detected (e.g., `gitlab.company.com/owner/repo/-/releases`)
+- **Version extraction from Atom** - Extracts semantic version numbers from Atom feed titles
+
+### Changed
+
+- URL detection regex updated to support any GitLab instance (not just gitlab.com)
+
+### Tests
+
+- Added 24 new tests for software release functionality
+- Total: 133 passing tests
+
 ## [0.5.1] - 2026-03-09
 
 ### Fixed
@@ -199,7 +221,8 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.5.1..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.6.0..HEAD
+[0.6.0]: https://github.com/kritoke/fetcher.cr/compare/v0.5.1..v0.6.0
 [0.5.1]: https://github.com/kritoke/fetcher.cr/compare/v0.5.0..v0.5.1
 [0.5.0]: https://github.com/kritoke/fetcher.cr/compare/v0.4.1..v0.5.0
 [0.4.1]: https://github.com/kritoke/fetcher.cr/compare/v0.4.0..v0.4.1

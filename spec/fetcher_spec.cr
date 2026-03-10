@@ -193,6 +193,11 @@ describe Fetcher do
       Fetcher.detect_driver("https://gitlab.com/foo/bar/-/releases").should eq(Fetcher::DriverType::Software)
     end
 
+    it "detects self-hosted GitLab releases" do
+      Fetcher.detect_driver("https://gitlab.company.com/org/repo/-/releases").should eq(Fetcher::DriverType::Software)
+      Fetcher.detect_driver("https://gitlab.internal.net/team/project/-/releases").should eq(Fetcher::DriverType::Software)
+    end
+
     it "detects Codeberg releases" do
       Fetcher.detect_driver("https://codeberg.org/foo/bar/releases").should eq(Fetcher::DriverType::Software)
     end
@@ -210,7 +215,6 @@ describe Fetcher do
     it "does not detect fake domains" do
       Fetcher.detect_driver("https://notreddit.com/r/test").should eq(Fetcher::DriverType::RSS)
       Fetcher.detect_driver("https://fakegithub.com/foo/releases").should eq(Fetcher::DriverType::RSS)
-      Fetcher.detect_driver("https://gitlab.fake.com/foo/bar/-/releases").should eq(Fetcher::DriverType::RSS)
       Fetcher.detect_driver("https://codeberg.fake.org/foo/bar/releases").should eq(Fetcher::DriverType::RSS)
     end
   end
@@ -454,6 +458,78 @@ describe "Integration Tests" do
       stable = releases.reject { |release| release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool) }
       stable.size.should eq(1)
       stable[0]["tag_name"].as_s.should eq("v1.0.0")
+    end
+
+    it "extracts body content from GitHub releases" do
+      github_json = %([{"tag_name":"v1.0.0","name":"Release 1.0.0","html_url":"https://github.com/test/repo/releases/v1.0.0","published_at":"2024-01-15T10:30:00Z","body":"## Changes - Fixed bug","prerelease":false,"draft":false}])
+
+      releases = Array(JSON::Any).from_json(github_json)
+      release = releases[0]
+      body = release["body"]?
+      body.should_not be_nil
+      body.not_nil!.as_s.should contain("Changes")
+    end
+  end
+
+  describe "GitLab API JSON parsing" do
+    it "parses valid GitLab releases API structure" do
+      gitlab_json = %([{"tag_name":"v1.0.0","name":"Release 1.0.0","description":"Release Notes for major release","released_at":"2024-01-15T10:30:00Z","_links":{"self":"https://gitlab.com/test/repo/-/releases/v1.0.0"}}])
+
+      releases = Array(JSON::Any).from_json(gitlab_json)
+      releases.size.should eq(1)
+
+      release = releases[0]
+      release["tag_name"].as_s.should eq("v1.0.0")
+      release["description"].as_s.should contain("Release Notes")
+      release["_links"]["self"].as_s.should eq("https://gitlab.com/test/repo/-/releases/v1.0.0")
+    end
+
+    it "handles missing optional fields" do
+      gitlab_json = %([{"tag_name":"v2.0.0","released_at":"2024-02-01T00:00:00Z"}])
+
+      releases = Array(JSON::Any).from_json(gitlab_json)
+      release = releases[0]
+      release["name"]?.should be_nil
+      release["description"]?.should be_nil
+    end
+  end
+
+  describe "Codeberg API JSON parsing" do
+    it "parses valid Codeberg releases API structure" do
+      codeberg_json = %([{"tag_name":"v1.0.0","name":"First Release","body":"Initial release with core features.","html_url":"https://codeberg.org/test/repo/releases/tag/v1.0.0","published_at":"2024-01-15T10:30:00Z"}])
+
+      releases = Array(JSON::Any).from_json(codeberg_json)
+      releases.size.should eq(1)
+
+      release = releases[0]
+      release["tag_name"].as_s.should eq("v1.0.0")
+      release["body"].as_s.should contain("Initial release")
+    end
+  end
+
+  describe "Software version extraction" do
+    it "extracts semantic version patterns" do
+      version_patterns = [
+        {"v1.2.3", "v1.2.3"},
+        {"Release 2.0.0", "2.0.0"},
+        {"v1.0.0-beta", "v1.0.0-beta"},
+        {"1.0.0", "1.0.0"},
+        {"v10.20.30", "v10.20.30"},
+      ]
+
+      version_patterns.each do |input, expected|
+        match = input.match(/v?\d+\.\d+(?:\.\d+)?(?:[-._]?\w+)?/)
+        match.should_not be_nil
+        match.not_nil![0].should eq(expected)
+      end
+    end
+
+    it "handles titles without versions" do
+      non_version_titles = ["Initial Release", "Hello World", "Bug Fixes"]
+      non_version_titles.each do |title|
+        match = title.match(/v?\d+\.\d+(?:\.\d+)?(?:[-._]?\w+)?/)
+        match.should be_nil
+      end
     end
   end
 end

@@ -185,10 +185,44 @@ The library automatically detects the feed type based on the URL:
 |-------------|--------|
 | `reddit.com/r/` | Reddit |
 | `github.com/.../releases` | Software |
-| `gitlab.com/.../-/releases` | Software |
+| `any-domain/.../-/releases` | Software (GitLab, including self-hosted) |
 | `codeberg.org/.../releases` | Software |
 | `.json`, `/feed.json`, `/feeds/json` | JSON Feed |
 | All others | RSS |
+
+## Software Releases
+
+The Software driver fetches releases from GitHub, GitLab (including self-hosted), and Codeberg with the following features:
+
+### Supported Platforms
+
+| Platform | API Used | Fallback |
+|----------|----------|----------|
+| GitHub | REST API (JSON) | None |
+| GitLab | REST API (JSON) | releases.atom → tags.atom |
+| Codeberg | REST API (JSON) | releases.atom |
+
+### Features
+
+- **Self-hosted GitLab**: Automatically detects any GitLab instance (e.g., `gitlab.company.com/owner/repo/-/releases`)
+- **GitLab fallback chain**: If releases API fails, falls back to Atom feed, then to tags Atom feed
+- **Release body extraction**: Extracts release notes/description into `entry.content` and `entry.content_html`
+- **Version extraction**: Release version available in `entry.version`
+
+### Example
+
+```crystal
+# GitHub releases
+result = Fetcher.pull("https://github.com/crystal-lang/crystal/releases")
+result.entries.first.content  # => "## Changes\n- Fixed bug..."
+
+# Self-hosted GitLab
+result = Fetcher.pull("https://gitlab.company.com/team/project/-/releases")
+result.entries.first.version  # => "v1.2.3"
+
+# Codeberg
+result = Fetcher.pull("https://codeberg.org/user/repo/releases")
+```
 
 ## Result Structure
 
