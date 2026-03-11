@@ -8,7 +8,7 @@ require "./exceptions"
 
 module Fetcher
   module Reddit
-    USER_AGENT      = "QuickHeadlines/0.3 (Reddit Feed Fetcher)"
+    USER_AGENT      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     REDDIT_API_BASE = "https://www.reddit.com"
 
     class RedditFetchError < Exception
