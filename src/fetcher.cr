@@ -25,6 +25,11 @@ require "./fetcher/json_feed"
 require "./fetcher/concurrent_fetcher"
 require "./fetcher/domain_batch_processor"
 require "./fetcher/request_config"
+require "./fetcher/streaming_parser"
+require "./fetcher/entry_iterator"
+require "./fetcher/streaming_fallback"
+require "./fetcher/xml_streaming_parser"
+require "./fetcher/json_streaming_parser"
 
 module Fetcher
   enum DriverType
