@@ -5,6 +5,7 @@ require "./retry"
 require "./h2o_http_client"
 require "./rss"
 require "./exceptions"
+require "./working_json_streaming_parser"
 
 module Fetcher
   module Reddit
@@ -52,6 +53,27 @@ module Fetcher
 
       case response.status_code
       when 200..299
+        # Use streaming parser if configured
+        if config.use_streaming_parser
+          begin
+            io = IO::Memory.new(response.body)
+            parser = Fetcher::WorkingJSONStreamingParser.new(limit)
+            items = parser.parse_entries(io, limit)
+            
+            site_link = "https://www.reddit.com/r/#{subreddit}"
+            favicon = "https://www.reddit.com/favicon.ico"
+
+            return Result.success(
+              entries: items,
+              site_link: site_link,
+              favicon: favicon
+            )
+          rescue ex
+            puts "Reddit streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
+          end
+        end
+        
+        # Fallback to DOM parser
         items = parse_reddit_response(response.body, limit)
         site_link = "https://www.reddit.com/r/#{subreddit}"
         favicon = "https://www.reddit.com/favicon.ico"
