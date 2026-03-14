@@ -7,21 +7,17 @@ module Fetcher
     max_redirects : Int32 = 5,
     follow_redirects : Bool = true,
     ssl_verify : Bool = true,
-    # HTTP client connection pool size
     http_client_pool_size : Int32? = nil,
-    # Circuit breaker configuration
     circuit_breaker_enabled : Bool = true,
     circuit_breaker_failure_threshold : Int32 = 5,
     circuit_breaker_recovery_timeout : Time::Span = 60.seconds,
-    # Token bucket rate limiting parameters
-    rate_limit_capacity : Float64 = 10.0,   # Burst capacity (default: 10 requests)
-    rate_limit_refill_rate : Float64 = 1.0, # Refill rate in tokens per second (default: 1 req/sec)
-    # Retry configuration
+    rate_limit_capacity : Float64 = 10.0,
+    rate_limit_refill_rate : Float64 = 1.0,
     max_retries : Int32 = 3,
     base_delay : Time::Span = 1.second,
     max_delay : Time::Span = 30.seconds,
-    exponential_base : Float64 = 2.0 do
-    # Calculate delay for a specific retry attempt
+    exponential_base : Float64 = 2.0,
+    use_streaming_parser : Bool = false do
     def delay_for_attempt(attempt : Int32) : Time::Span
       delay = base_delay * (exponential_base ** attempt)
       delay > max_delay ? max_delay : delay
