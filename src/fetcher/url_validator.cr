@@ -92,30 +92,14 @@ module Fetcher
     private def self.link_local?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
       if address.includes?(":")
-        # IPv6 address
-        # Check IPv6 link-local (fe80::/10)
-        address.downcase.starts_with?("fe80:") ||
-          address.downcase.starts_with?("fe81:") ||
-          address.downcase.starts_with?("fe82:") ||
-          address.downcase.starts_with?("fe83:") ||
-          address.downcase.starts_with?("fe84:") ||
-          address.downcase.starts_with?("fe85:") ||
-          address.downcase.starts_with?("fe86:") ||
-          address.downcase.starts_with?("fe87:") ||
-          address.downcase.starts_with?("fe88:") ||
-          address.downcase.starts_with?("fe89:") ||
-          address.downcase.starts_with?("fe8a:") ||
-          address.downcase.starts_with?("fe8b:") ||
-          address.downcase.starts_with?("fe8c:") ||
-          address.downcase.starts_with?("fe8d:") ||
-          address.downcase.starts_with?("fe8e:") ||
-          address.downcase.starts_with?("fe8f:") ||
-          address.downcase.starts_with?("fe9") ||
-          address.downcase.starts_with?("fea") ||
-          address.downcase.starts_with?("feb")
+        # IPv6 address - check link-local (fe80::/10)
+        # Simplified check: starts with "fe" followed by 8-f
+        downcase = address.downcase
+        return false unless downcase.starts_with?("fe")
+        second_char = downcase[2]?
+        second_char && "89abcdef".includes?(second_char)
       else
-        # IPv4 address
-        # Check IPv4 link-local (169.254.0.0/16)
+        # IPv4 address - check IPv4 link-local (169.254.0.0/16)
         parts = address.split(".").map(&.to_i)
         parts.size == 4 && parts[0] == 169 && parts[1] == 254
       end
@@ -162,7 +146,7 @@ module Fetcher
         ipv4_str = address.downcase.sub("::ffff:", "")
         begin
           ipv4 = Socket::IPAddress.new(ipv4_str, 80)
-          return ipv4.private? || ipv4.loopback? || link_local?(ipv4)
+          ipv4.private? || ipv4.loopback? || link_local?(ipv4)
         rescue
           false
         end

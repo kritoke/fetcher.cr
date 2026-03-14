@@ -5,6 +5,7 @@ require "./h2o_http_client"
 require "./exceptions"
 require "./rss_parser"
 require "./result_builder"
+require "./streaming_rss_parser"
 
 module Fetcher
   module RSS
@@ -24,7 +25,7 @@ module Fetcher
       when 304
         ResultBuilder.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)
       when 200..299
-        parse_feed(response.body, url, limit)
+        parse_feed(response.body, url, limit, config)
       when 500..599
         error = Error.server_error(response.status_code, "Server error: #{response.status_code}", url)
         raise FetchError.from_error(error)
@@ -59,9 +60,31 @@ module Fetcher
       Fetcher.error_result(error)
     end
 
-    private def self.parse_feed(body : String, url : String, limit : Int32) : Result
+    private def self.parse_feed(body : String, url : String, limit : Int32, config : RequestConfig) : Result
       return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>#{Fetcher::SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)") if body.bytesize > Fetcher::SafeFeedProcessor::MAX_FEED_SIZE
 
+      # Use streaming parser if configured
+      if config.use_streaming_parser
+        begin
+          parser = StreamingRSSParser.new
+          entries = parser.parse_entries(body, limit)
+          metadata = parser.parse_feed_metadata(body)
+
+          return ResultBuilder.success(
+            entries: entries,
+            site_link: metadata[:site_link],
+            favicon: metadata[:favicon],
+            feed_title: metadata[:feed_title],
+            feed_description: metadata[:feed_description],
+            feed_language: metadata[:feed_language],
+            feed_authors: metadata[:feed_authors]
+          )
+        rescue
+          # Fallback to DOM parser on streaming errors
+        end
+      end
+
+      # Default: use DOM parser
       begin
         parser = RSSParser.new
         entries = parser.parse_entries(body, limit)

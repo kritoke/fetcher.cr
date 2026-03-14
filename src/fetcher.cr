@@ -68,9 +68,9 @@ module Fetcher
       content_type = response.headers["content-type"]?.try(&.downcase)
 
       if content_type
-        if is_json_feed_content_type?(content_type, url)
+        if json_feed_content_type?(content_type, url)
           return DriverType::JSONFeed
-        elsif is_rss_content_type?(content_type)
+        elsif rss_content_type?(content_type)
           return DriverType::RSS
         end
       end
@@ -81,13 +81,13 @@ module Fetcher
     nil
   end
 
-  private def self.is_json_feed_content_type?(content_type : String, url : String) : Bool
+  private def self.json_feed_content_type?(content_type : String, url : String) : Bool
     content_type.includes?("application/feed+json") ||
       (content_type.includes?("application/json") &&
-       (url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")))
+        (url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")))
   end
 
-  private def self.is_rss_content_type?(content_type : String) : Bool
+  private def self.rss_content_type?(content_type : String) : Bool
     content_type.includes?("application/rss+xml") ||
       content_type.includes?("application/atom+xml") ||
       content_type.includes?("text/xml") ||

@@ -160,7 +160,7 @@ module Fetcher
       # Check cache first (2 second TTL)
       @@cache_lock.synchronize do
         if cache = @@cpu_cache
-          usage, timestamp, prev_total, prev_idle = cache
+          usage, timestamp, _, _ = cache
           return usage if (Time.utc - timestamp) < 2.seconds
         end
       end

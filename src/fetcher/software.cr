@@ -50,7 +50,8 @@ module Fetcher
     end
 
     private def self.extract_repo_path(url : String, domain : String) : String?
-      match = url.match(%r{#{domain}/([^/]+/[^/]+)/?})
+      pattern = "#{domain}/([^/]+/[^/]+)/?"
+      match = url.match(Regex.new(pattern))
       match ? match[1] : nil
     end
 
@@ -159,11 +160,11 @@ module Fetcher
       begin
         response = http_client.get(api_url, headers)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         releases = Array(JSON::Any).from_json(response.body)
-        return nil if releases.empty?
+        return if releases.empty?
 
         entries = releases.first(limit).map do |release|
           parse_gitlab_release(release, repo, base_url)
@@ -175,7 +176,7 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
-      rescue : JSON::ParseException
+      rescue JSON::ParseException
         nil
       rescue
         nil
@@ -210,11 +211,11 @@ module Fetcher
       begin
         response = http_client.get(atom_url, headers)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         entries = parse_atom_entries(response.body, "gitlab", limit)
-        return nil if entries.empty?
+        return if entries.empty?
 
         Result.success(
           entries: entries,
@@ -234,11 +235,11 @@ module Fetcher
       begin
         response = http_client.get(tags_url, headers)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         entries = parse_atom_entries(response.body, "gitlab", limit)
-        return nil if entries.empty?
+        return if entries.empty?
 
         Result.success(
           entries: entries,
@@ -253,7 +254,6 @@ module Fetcher
     end
 
     private def self.pull_codeberg(info : ProviderInfo, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-      base_url = info[:base_url]
       repo = info[:repo]
 
       http_client = Fetcher::H2OHttpClient.new(config)
@@ -274,11 +274,11 @@ module Fetcher
       begin
         response = http_client.get(api_url, headers)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         releases = Array(JSON::Any).from_json(response.body)
-        return nil if releases.empty?
+        return if releases.empty?
 
         entries = releases.first(limit).map do |release|
           parse_codeberg_release(release, repo)
@@ -290,7 +290,7 @@ module Fetcher
           site_link: "https://codeberg.org/#{repo}",
           favicon: "https://codeberg.org/favicon.ico"
         )
-      rescue : JSON::ParseException
+      rescue JSON::ParseException
         nil
       rescue
         nil
@@ -323,11 +323,11 @@ module Fetcher
       begin
         response = http_client.get(atom_url, headers)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         entries = parse_atom_entries(response.body, "codeberg", limit)
-        return nil if entries.empty?
+        return if entries.empty?
 
         Result.success(
           entries: entries,
