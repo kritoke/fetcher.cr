@@ -63,7 +63,6 @@ module Fetcher
         new_limit = calculate_adaptive_limit
         if new_limit != @current_limit
           # Adjust the channel capacity by creating a new one
-          old_permits = @permits
           new_permits = Channel(Nil).new(new_limit)
 
           # Transfer existing permits

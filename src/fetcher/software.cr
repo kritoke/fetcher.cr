@@ -136,7 +136,6 @@ module Fetcher
     private def self.pull_gitlab(info : ProviderInfo, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       base_url = info[:base_url]
       repo = info[:repo]
-      error_url = "#{base_url}/#{repo}/-/releases"
 
       http_client = Fetcher::H2OHttpClient.new(config)
       request_headers = Fetcher::H2OHttpClient.build_headers(::HTTP::Headers.new)
@@ -176,9 +175,9 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
-      rescue ex : JSON::ParseException
+      rescue : JSON::ParseException
         nil
-      rescue ex
+      rescue
         nil
       end
     end
@@ -224,7 +223,7 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
-      rescue ex
+      rescue
         nil
       end
     end
@@ -248,7 +247,7 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
-      rescue ex
+      rescue
         nil
       end
     end
@@ -256,7 +255,6 @@ module Fetcher
     private def self.pull_codeberg(info : ProviderInfo, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       base_url = info[:base_url]
       repo = info[:repo]
-      error_url = "#{base_url}/#{repo}/releases"
 
       http_client = Fetcher::H2OHttpClient.new(config)
       request_headers = Fetcher::H2OHttpClient.build_headers(::HTTP::Headers.new)
@@ -292,9 +290,9 @@ module Fetcher
           site_link: "https://codeberg.org/#{repo}",
           favicon: "https://codeberg.org/favicon.ico"
         )
-      rescue ex : JSON::ParseException
+      rescue : JSON::ParseException
         nil
-      rescue ex
+      rescue
         nil
       end
     end
@@ -338,7 +336,7 @@ module Fetcher
           site_link: "https://codeberg.org/#{repo}",
           favicon: "https://codeberg.org/favicon.ico"
         )
-      rescue ex
+      rescue
         nil
       end
     end
