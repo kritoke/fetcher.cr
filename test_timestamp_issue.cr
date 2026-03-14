@@ -27,21 +27,21 @@ reddit_atom = %(<?xml version="1.0" encoding="UTF-8"?>
 
 # Test using the actual RSS module internals via XML parsing
 xml = XML.parse(reddit_atom, options: XML::ParserOptions::RECOVER |
-                               XML::ParserOptions::NOENT |
-                               XML::ParserOptions::NONET)
+                                      XML::ParserOptions::NOENT |
+                                      XML::ParserOptions::NONET)
 
 feed_node = xml.xpath_node("//*[local-name()='feed']")
 if feed_node
   entries = feed_node.xpath_nodes("./*[local-name()='entry']")
   entries.each_with_index do |entry, i|
     title = entry.xpath_node("./*[local-name()='title']").try(&.text)
-    
+
     # Exact code from rss.cr:209-211
     published_str = entry.xpath_node("./*[local-name()='published']").try(&.text) ||
                     entry.xpath_node("./*[local-name()='updated']").try(&.text)
-    
+
     pub_date = Fetcher::TimeParser.parse(published_str, Fetcher::TimeParser::ATOM_FORMATS)
-    
+
     puts "Entry #{i + 1}:"
     puts "  Title: #{title}"
     puts "  published_str: #{published_str.inspect}"
@@ -76,14 +76,14 @@ if channel
   items = channel.xpath_nodes("./*[local-name()='item']")
   items.each_with_index do |item, i|
     title = item.xpath_node("./*[local-name()='title']").try(&.text)
-    
+
     # Exact code from rss.cr:125-128
     pub_date_str = item.xpath_node("./*[local-name()='pubDate']").try(&.text) ||
                    item.xpath_node("./*[local-name()='dc:date']").try(&.text) ||
                    item.xpath_node("./*[local-name()='date']").try(&.text)
-    
+
     pub_date = Fetcher::TimeParser.parse(pub_date_str, Fetcher::TimeParser::RSS_FORMATS)
-    
+
     puts "Item #{i + 1}:"
     puts "  Title: #{title}"
     puts "  pub_date_str: #{pub_date_str.inspect}"

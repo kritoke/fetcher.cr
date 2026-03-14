@@ -4,6 +4,10 @@ shards:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.7.0-dev+git.commit.0bc878de36c1f10afde766bdae74d6c74f265c70
 
+  h2o:
+    git: https://github.com/nomadlabsinc/h2o.git
+    version: 0.3.0+git.commit.b9cf4fac52d2dd88cf7851ca19459ddd65d9d1c6
+
   sanitize:
     git: https://github.com/straight-shoota/sanitize.git
     version: 0.1.0+git.commit.c17d933fed22c6d3d615cca91a895166414389af

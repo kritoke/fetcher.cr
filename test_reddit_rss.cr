@@ -22,11 +22,11 @@ if entry
   # Simulate the exact code from rss.cr:209-211
   published_str = entry.xpath_node("./*[local-name()='published']").try(&.text) ||
                   entry.xpath_node("./*[local-name()='updated']").try(&.text)
-  
+
   puts "Raw published_str: #{published_str.inspect}"
-  
+
   # Simulate TimeParser.parse call from rss.cr:211
   pub_date = Fetcher::TimeParser.parse(published_str, Fetcher::TimeParser::ATOM_FORMATS)
-  
+
   puts "Parsed pub_date: #{pub_date.inspect}"
 end

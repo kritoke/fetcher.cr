@@ -26,12 +26,12 @@ module Fetcher
       rescue ex
         if is_retriable.call(ex)
           attempt += 1
-          if attempt >= config.max_retries
-            return error_result(Error.timeout("Failed after #{config.max_retries} retries: #{ex.message}"))
-          end
           delay = config.base_delay * (config.exponential_base ** attempt)
           delay = config.max_delay if delay > config.max_delay
-          sleep(delay)
+          # Add jitter (±10% of the delay)
+          jitter_factor = 0.9 + (Random.rand * 0.2) # 0.9 to 1.1
+          actual_delay = delay * jitter_factor
+          sleep(actual_delay)
         else
           return error_result(Error.unknown("#{ex.class}: #{ex.message}"))
         end

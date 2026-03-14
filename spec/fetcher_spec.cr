@@ -1181,14 +1181,14 @@ describe "Phase 4: HTTP Improvements" do
 
   describe "Headers with compression" do
     it "does not manually set Accept-Encoding (handled by HTTP client)" do
-      headers = Fetcher::HttpClient.build_headers
+      headers = Fetcher::H2OHttpClient.build_headers
       # Accept-Encoding is handled automatically by HTTP::Client when compress = true
       headers["Accept-Encoding"]?.should be_nil
     end
 
     it "preserves custom Accept-Encoding if explicitly set" do
       custom = HTTP::Headers{"Accept-Encoding" => "br"}
-      headers = Fetcher::HttpClient.build_headers(custom)
+      headers = Fetcher::H2OHttpClient.build_headers(custom)
       headers["Accept-Encoding"]?.should eq("br")
     end
   end

@@ -4,7 +4,7 @@ require "./fetcher/author"
 require "./fetcher/entry"
 require "./fetcher/result"
 require "./fetcher/retry"
-require "./fetcher/http_client_v2"
+require "./fetcher/h2o_http_client"
 require "./fetcher/html_utils"
 require "./fetcher/time_parser"
 require "./fetcher/source_type"
@@ -22,6 +22,8 @@ require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
 require "./fetcher/json_feed"
+require "./fetcher/concurrent_fetcher"
+require "./fetcher/domain_batch_processor"
 require "./fetcher/request_config"
 
 module Fetcher
@@ -46,8 +48,8 @@ module Fetcher
 
     # For other URLs, use content-type detection
     begin
-      head_headers = Fetcher::HttpClient.build_headers(headers)
-      http_client = Fetcher::HttpClient.new(config)
+      head_headers = Fetcher::H2OHttpClient.build_headers(headers)
+      http_client = Fetcher::H2OHttpClient.new(config)
       response = http_client.head(url, head_headers)
 
       content_type = response.headers["content-type"]?.try(&.downcase)
@@ -77,7 +79,7 @@ module Fetcher
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    final_headers = Fetcher::HttpClient.build_headers(headers)
+    final_headers = Fetcher::H2OHttpClient.build_headers(headers)
     driver = detect_driver(url, final_headers, config)
 
     case driver
@@ -90,11 +92,26 @@ module Fetcher
     in .json_feed?
       JSONFeed.pull(url, final_headers, limit, config)
     end
+  end
+
+  # Async version of pull
+  def self.pull_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull(url, headers, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    base_headers = Fetcher::HttpClient.build_headers(headers)
-    final_headers = Fetcher::HttpClient.with_cache(base_headers, etag, last_modified)
+    base_headers = Fetcher::H2OHttpClient.build_headers(headers)
+    final_headers = Fetcher::H2OHttpClient.with_cache(base_headers, etag, last_modified)
 
     driver = detect_driver(url, final_headers, config)
 
@@ -110,19 +127,94 @@ module Fetcher
     end
   end
 
+  # Async version with cache headers
+  def self.pull_async(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull(url, headers, etag, last_modified, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
+  end
+
   def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    RSS.pull(url, Fetcher::HttpClient.build_headers(headers), limit, config)
+    RSS.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+  end
+
+  # Async version
+  def self.pull_rss_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull_rss(url, headers, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async RSS fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
   end
 
   def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Reddit.pull(url, Fetcher::HttpClient.build_headers(headers), limit, config)
+    Reddit.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+  end
+
+  # Async version
+  def self.pull_reddit_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull_reddit(url, headers, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async Reddit fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
   end
 
   def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Software.pull(url, Fetcher::HttpClient.build_headers(headers), limit, config)
+    Software.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+  end
+
+  # Async version
+  def self.pull_software_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull_software(url, headers, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async software fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
   end
 
   def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    JSONFeed.pull(url, Fetcher::HttpClient.build_headers(headers), limit, config)
+    JSONFeed.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+  end
+
+  # Async version
+  def self.pull_json_feed_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
+    channel = Channel(Result).new
+    spawn do
+      begin
+        result = pull_json_feed(url, headers, limit, config)
+        channel.send(result)
+      rescue ex
+        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async JSON feed fetch error: #{ex.message}")
+        channel.send(error_result)
+      end
+    end
+    channel
   end
 end

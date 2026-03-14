@@ -18,8 +18,8 @@ reddit_xml = %(<?xml version="1.0" encoding="UTF-8"?>
 
 # Simulate the parse_feed logic from rss.cr:49-71
 xml = XML.parse(reddit_xml, options: XML::ParserOptions::RECOVER |
-                               XML::ParserOptions::NOENT |
-                               XML::ParserOptions::NONET)
+                                     XML::ParserOptions::NOENT |
+                                     XML::ParserOptions::NONET)
 
 puts "=== Testing parse_rss ==="
 puts "Root: #{xml.root.try(&.name)}"
@@ -44,15 +44,15 @@ puts "feed found: #{feed_node ? "YES" : "NO"}"
 if feed_node
   entries = feed_node.xpath_nodes("./*[local-name()='entry']")
   puts "Atom entries found: #{entries.size}"
-  
+
   entries.each_with_index do |entry, i|
     puts "\nEntry #{i + 1}:"
-    
+
     # Exact code from rss.cr:209-211
     published_str = entry.xpath_node("./*[local-name()='published']").try(&.text) ||
                     entry.xpath_node("./*[local-name()='updated']").try(&.text)
     puts "  published_str: #{published_str.inspect}"
-    
+
     pub_date = Fetcher::TimeParser.parse(published_str, Fetcher::TimeParser::ATOM_FORMATS)
     puts "  pub_date: #{pub_date.inspect}"
   end

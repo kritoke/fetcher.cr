@@ -1,14 +1,11 @@
-require "http/client"
-require "socket"
-require "time"
-require "mutex"
+require "h2o"
 require "./request_config"
 require "./token_bucket_rate_limiter"
 
 module Fetcher
-  # Unified HTTP client interface that handles all HTTP operations
-  # with proper configuration, error handling, and rate limiting
-  class HttpClient
+  # HTTP client using h2o library with connection pooling, circuit breaker,
+  # and advanced HTTP/2 features
+  class H2OHttpClient
     DEFAULT_USER_AGENT    = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     DEFAULT_ACCEPT_HEADER = "application/rss+xml, application/atom+xml, application/xml;q=0.9, text/xml;q=0.8, */*;q=0.7"
 
@@ -18,11 +15,28 @@ module Fetcher
     @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
     @@limiters_lock = Mutex.new
 
+    # Shared h2o client instance with connection pooling
+    @@h2o_client : H2O::Client? = nil
+    @@client_lock = Mutex.new
+
     def self.get_token_bucket_limiter(domain : String, config : RequestConfig) : TokenBucketRateLimiter
       @@limiters_lock.synchronize do
         @@token_bucket_limiters[domain] ||= TokenBucketRateLimiter.new(
           config.rate_limit_capacity,
           config.rate_limit_refill_rate
+        )
+      end
+    end
+
+    def self.get_h2o_client(config : RequestConfig) : H2O::Client
+      @@client_lock.synchronize do
+        # Use the read timeout as the overall timeout for h2o client
+        # The h2o client handles both connection and request timeouts internally
+        @@h2o_client ||= H2O::Client.new(
+          connection_pool_size: config.http_client_pool_size || 10,
+          timeout: config.read_timeout,
+          verify_ssl: config.ssl_verify,
+          circuit_breaker_enabled: config.circuit_breaker_enabled
         )
       end
     end
@@ -37,11 +51,22 @@ module Fetcher
       rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
       rate_limiter.acquire
 
-      client = ::HTTP::Client.new(uri)
-      client.connect_timeout = @config.connect_timeout
-      client.read_timeout = @config.read_timeout
+      h2o_client = self.class.get_h2o_client(@config)
 
-      client.head(uri.request_target, headers: headers)
+      # Convert Crystal HTTP headers to h2o headers
+      h2o_headers = H2O::Headers.new
+      headers.each do |pair|
+        name = pair[0]
+        values = pair[1]
+        # Join multiple values with comma (standard for HTTP headers)
+        value = values.is_a?(Array) ? values.join(", ") : values.to_s
+        h2o_headers[name] = value
+      end
+
+      response = h2o_client.head(url, h2o_headers)
+
+      # Convert h2o response back to Crystal HTTP response
+      convert_response(response, url)
     rescue ex : URI::Error
       raise DNSError.new("Invalid URL: #{ex.message}")
     rescue ex : Socket::Error
@@ -57,25 +82,49 @@ module Fetcher
       rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
       rate_limiter.acquire
 
-      client = ::HTTP::Client.new(uri)
-      client.connect_timeout = @config.connect_timeout
-      client.read_timeout = @config.read_timeout
-      client.compress = true
+      h2o_client = self.class.get_h2o_client(@config)
 
-      response = client.get(uri.request_target, headers: headers)
+      # Convert Crystal HTTP headers to h2o headers
+      h2o_headers = H2O::Headers.new
+      headers.each do |pair|
+        name = pair[0]
+        values = pair[1]
+        # Join multiple values with comma (standard for HTTP headers)
+        value = values.is_a?(Array) ? values.join(", ") : values.to_s
+        h2o_headers[name] = value
+      end
+
+      response = h2o_client.get(url, h2o_headers)
 
       # Check decompressed response size to prevent compression bombs
       if response.body && response.body.bytesize > Fetcher::SafeFeedProcessor::MAX_FEED_SIZE
         raise DNSError.new("Response too large (>#{Fetcher::SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")
       end
 
-      response
+      # Convert h2o response back to Crystal HTTP response
+      convert_response(response, url)
     rescue ex : URI::Error
       raise DNSError.new("Invalid URL: #{ex.message}")
     rescue ex : Socket::Error
       raise DNSError.new("DNS/Connection error: #{ex.message}")
     rescue ex : IO::TimeoutError
       raise ex
+    end
+
+    private def convert_response(h2o_response : H2O::Response, url : String) : ::HTTP::Client::Response
+      # Create Crystal HTTP response from h2o response
+      crystal_response = ::HTTP::Client::Response.new(
+        status_code: h2o_response.status,
+        body: h2o_response.body || "",
+        headers: ::HTTP::Headers.new
+      )
+
+      # Copy headers
+      h2o_response.headers.each do |name, value|
+        crystal_response.headers[name] = value
+      end
+
+      crystal_response
     end
 
     def self.build_headers(custom_headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Headers

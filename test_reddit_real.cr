@@ -39,13 +39,13 @@ puts "\nEntries found: #{entries.size}"
 
 entries.each_with_index do |entry, i|
   puts "\n--- Entry #{i + 1} ---"
-  
+
   # Simulate exact code from rss.cr:209-211
   published_str = entry.xpath_node("./*[local-name()='published']").try(&.text) ||
                   entry.xpath_node("./*[local-name()='updated']").try(&.text)
-  
+
   puts "published_str: #{published_str.inspect}"
-  
+
   # Simulate TimeParser.parse call
   pub_date = Fetcher::TimeParser.parse(published_str, Fetcher::TimeParser::ATOM_FORMATS)
   puts "pub_date: #{pub_date.inspect}"

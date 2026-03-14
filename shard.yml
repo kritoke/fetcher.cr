@@ -13,6 +13,9 @@ description: A standalone feed fetching library for Crystal (RSS, Reddit, Softwa
 dependencies:
   sanitize:
     github: straight-shoota/sanitize
+  h2o:
+    github: nomadlabsinc/h2o
+    branch: main
 
 development_dependencies:
   ameba:

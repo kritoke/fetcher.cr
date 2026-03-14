@@ -4,7 +4,7 @@ require "uri"
 require "./entry"
 require "./result"
 require "./retry"
-require "./http_client_v2"
+require "./h2o_http_client"
 require "./time_parser"
 require "./exceptions"
 
@@ -63,9 +63,9 @@ module Fetcher
 
       github_headers = ::HTTP::Headers.new
       github_headers["Accept"] = "application/vnd.github.v3+json"
-      merged = Fetcher::HttpClient.build_headers(github_headers)
+      merged = Fetcher::H2OHttpClient.build_headers(github_headers)
 
-      http_client = Fetcher::HttpClient.new(config)
+      http_client = Fetcher::H2OHttpClient.new(config)
       response = http_client.get(api_url, merged)
 
       if response.status_code == 429
@@ -99,7 +99,7 @@ module Fetcher
     rescue ex : IO::TimeoutError
       error = Error.timeout("Timeout: #{ex.message}", error_url)
       raise TimeoutError.new(error.message, error)
-    rescue ex : HttpClient::DNSError
+    rescue ex : H2OHttpClient::DNSError
       error = Error.dns("DNS error: #{ex.message}", error_url)
       raise DNSError.new(error.message, error)
     rescue ex : FetchError
@@ -138,8 +138,8 @@ module Fetcher
       repo = info[:repo]
       error_url = "#{base_url}/#{repo}/-/releases"
 
-      http_client = Fetcher::HttpClient.new(config)
-      request_headers = Fetcher::HttpClient.build_headers(::HTTP::Headers.new)
+      http_client = Fetcher::H2OHttpClient.new(config)
+      request_headers = Fetcher::H2OHttpClient.build_headers(::HTTP::Headers.new)
 
       result = try_gitlab_api(base_url, repo, limit, http_client, request_headers)
       return result if result && result.success?
@@ -153,7 +153,7 @@ module Fetcher
       Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: No releases or tags found", 404)
     end
 
-    private def self.try_gitlab_api(base_url : String, repo : String, limit : Int32, http_client : HttpClient, headers : ::HTTP::Headers) : Result?
+    private def self.try_gitlab_api(base_url : String, repo : String, limit : Int32, http_client : H2OHttpClient, headers : ::HTTP::Headers) : Result?
       encoded_path = URI.encode_path(repo)
       api_url = "#{base_url}/api/v4/projects/#{encoded_path}/releases"
 
@@ -205,7 +205,7 @@ module Fetcher
       )
     end
 
-    private def self.try_gitlab_releases_atom(base_url : String, repo : String, limit : Int32, http_client : HttpClient, headers : ::HTTP::Headers) : Result?
+    private def self.try_gitlab_releases_atom(base_url : String, repo : String, limit : Int32, http_client : H2OHttpClient, headers : ::HTTP::Headers) : Result?
       atom_url = "#{base_url}/#{repo}/-/releases.atom"
 
       begin
@@ -229,7 +229,7 @@ module Fetcher
       end
     end
 
-    private def self.try_gitlab_tags_atom(base_url : String, repo : String, limit : Int32, http_client : HttpClient, headers : ::HTTP::Headers) : Result?
+    private def self.try_gitlab_tags_atom(base_url : String, repo : String, limit : Int32, http_client : H2OHttpClient, headers : ::HTTP::Headers) : Result?
       tags_url = "#{base_url}/#{repo}/-/tags?format=atom"
 
       begin
@@ -258,8 +258,8 @@ module Fetcher
       repo = info[:repo]
       error_url = "#{base_url}/#{repo}/releases"
 
-      http_client = Fetcher::HttpClient.new(config)
-      request_headers = Fetcher::HttpClient.build_headers(::HTTP::Headers.new)
+      http_client = Fetcher::H2OHttpClient.new(config)
+      request_headers = Fetcher::H2OHttpClient.build_headers(::HTTP::Headers.new)
 
       result = try_codeberg_api(repo, limit, http_client, request_headers)
       return result if result && result.success?
@@ -270,7 +270,7 @@ module Fetcher
       Fetcher.error_result(ErrorKind::HTTPError, "Codeberg fetch error: No releases found", 404)
     end
 
-    private def self.try_codeberg_api(repo : String, limit : Int32, http_client : HttpClient, headers : ::HTTP::Headers) : Result?
+    private def self.try_codeberg_api(repo : String, limit : Int32, http_client : H2OHttpClient, headers : ::HTTP::Headers) : Result?
       api_url = "https://codeberg.org/api/v1/repos/#{repo}/releases"
 
       begin
@@ -319,7 +319,7 @@ module Fetcher
       )
     end
 
-    private def self.try_codeberg_releases_atom(repo : String, limit : Int32, http_client : HttpClient, headers : ::HTTP::Headers) : Result?
+    private def self.try_codeberg_releases_atom(repo : String, limit : Int32, http_client : H2OHttpClient, headers : ::HTTP::Headers) : Result?
       atom_url = "https://codeberg.org/#{repo}/releases.atom"
 
       begin
