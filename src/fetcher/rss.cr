@@ -66,21 +66,25 @@ module Fetcher
       # Use streaming parser if configured
       if config.use_streaming_parser
         begin
+          reader = XML::Reader.new(body)
           parser = StreamingRSSParser.new
-          entries = parser.parse_entries(body, limit)
-          metadata = parser.parse_feed_metadata(body)
-
+          entries = parser.parse_entries(reader, limit)
+          
+          # For metadata, we'll need to parse it separately or use minimal values
+          # For now, use minimal metadata (this is a limitation of the current implementation)
           return ResultBuilder.success(
             entries: entries,
-            site_link: metadata[:site_link],
-            favicon: metadata[:favicon],
-            feed_title: metadata[:feed_title],
-            feed_description: metadata[:feed_description],
-            feed_language: metadata[:feed_language],
-            feed_authors: metadata[:feed_authors]
+            site_link: nil,
+            favicon: nil,
+            feed_title: nil,
+            feed_description: nil,
+            feed_language: nil,
+            feed_authors: [] of Author
           )
-        rescue
+        rescue ex : XML::Error
           # Fallback to DOM parser on streaming errors
+        rescue
+          # Fallback to DOM parser on any streaming errors
         end
       end
 

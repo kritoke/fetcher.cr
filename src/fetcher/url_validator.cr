@@ -95,9 +95,13 @@ module Fetcher
         # IPv6 address - check link-local (fe80::/10)
         # Simplified check: starts with "fe" followed by 8-f
         downcase = address.downcase
-        return false unless downcase.starts_with?("fe")
-        second_char = downcase[2]?
-        second_char && "89abcdef".includes?(second_char)
+        if downcase.starts_with?("fe")
+          second_char = downcase[2]?
+          if second_char
+            return "89abcdef".includes?(second_char)
+          end
+        end
+        false
       else
         # IPv4 address - check IPv4 link-local (169.254.0.0/16)
         parts = address.split(".").map(&.to_i)
