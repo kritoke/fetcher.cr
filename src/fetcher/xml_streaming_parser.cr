@@ -1,17 +1,49 @@
 require "xml"
 require "./entry"
 require "./result"  
-require "./time_parser"
-require "./author"
-require "./attachment"
-require "./html_utils"
-require "./rss_parser"
+require "./streaming_rss_parser"
 
 module Fetcher
-  # XML streaming parser using XML::Reader with lazy iterator pattern
+  # Feed metadata extracted during streaming
+  struct FeedMetadata
+    getter site_link : String?
+    getter favicon : String?
+    getter feed_title : String?
+    getter feed_description : String?
+    getter feed_language : String?
+    getter feed_authors : Array(Author)
+
+    def initialize(
+      @site_link : String? = nil,
+      @favicon : String? = nil, 
+      @feed_title : String? = nil,
+      @feed_description : String? = nil,
+      @feed_language : String? = nil,
+      @feed_authors : Array(Author) = [] of Author
+    )
+    end
+
+    # Create success result with this metadata
+    def to_result(entries : Array(Entry)) : Result
+      ResultBuilder.success(
+        entries: entries,
+        site_link: @site_link,
+        favicon: @favicon, 
+        feed_title: @feed_title,
+        feed_description: @feed_description,
+        feed_language: @feed_language,
+        feed_authors: @feed_authors
+      )
+    end
+  end
+
+  # XML streaming parser using existing StreamingRSSParser with lazy iterator pattern
   class XMLStreamingParser
+    @feed_metadata : FeedMetadata?
+
     def initialize(@limit : Int32 = 100)
       @entries_parsed = 0
+      @feed_metadata = nil
     end
 
     # Parse XML feed and return lazy iterator
@@ -19,68 +51,53 @@ module Fetcher
       XMLStreamingIterator.new(io, @limit)
     end
 
-    # Parse XML feed and return array (for compatibility)
+    # Parse XML feed completely and return Result with metadata
+    def parse_complete(io : IO, limit : Int32? = nil) : Result
+      actual_limit = limit || @limit
+      
+      # Use existing StreamingRSSParser for now
+      reader = XML::Reader.new(io)
+      parser = StreamingRSSParser.new
+      entries = parser.parse_entries(reader, actual_limit)
+      
+      # Create minimal metadata (feed metadata extraction will be added later)
+      metadata = FeedMetadata.new
+      metadata.to_result(entries)
+    rescue ex : XML::Error
+      error = Error.invalid_format("XML parsing error: #{ex.message}", "streaming")
+      Fetcher.error_result(ErrorKind::InvalidFormat, error.message)
+    end
+
+    # Parse XML feed and return array of entries
     def parse_entries(io : IO, limit : Int32? = nil) : Array(Entry)
       actual_limit = limit || @limit
-      parse(io).to_a(actual_limit)
+      reader = XML::Reader.new(io)
+      parser = StreamingRSSParser.new
+      parser.parse_entries(reader, actual_limit)
     end
   end
 
-  # Lazy iterator for XML streaming parser
+  # Lazy iterator wrapper for existing StreamingRSSParser
   class XMLStreamingIterator < EntryIterator
     def initialize(@io : IO, @limit : Int32)
       super()
       @reader = XML::Reader.new(@io)
-      @feed_metadata_extracted = false
-      @entries_parsed = 0
+      @parser = StreamingRSSParser.new
+      @entries = nil
+      @current_index = 0
     end
 
     protected def next_entry : Entry?
-      return nil if @entries_parsed >= @limit
-
-      while @reader.read
-        if @reader.node_type == :element
-          case @reader.name
-          when "item", "entry"
-            # Extract complete item/entry XML
-            item_xml = @reader.read_outer_xml
-            
-            # Parse using existing RSSParser logic
-            begin
-              doc = XML.parse(item_xml)
-              entry_node = doc.root
-              if entry_node
-                if @reader.name == "item"
-                  entry = RSSParser.new.parse_rss_item(entry_node)
-                else
-                  entry = RSSParser.new.parse_atom_entry(entry_node)
-                end
-                
-                if entry
-                  @entries_parsed += 1
-                  return entry
-                end
-              end
-            rescue ex : XML::Error
-              # Skip malformed items, continue processing
-              next
-            end
-          when "rss", "RDF", "feed"
-            # Extract feed metadata on first encounter
-            unless @feed_metadata_extracted
-              extract_feed_metadata(@reader)
-              @feed_metadata_extracted = true
-            end
-          end
-        end
+      # Parse all entries on first call (not truly lazy, but works for now)
+      @entries ||= @parser.parse_entries(@reader, @limit)
+      
+      if @current_index < @entries.size
+        entry = @entries[@current_index]
+        @current_index += 1
+        entry
+      else
+        nil
       end
-
-      nil
-    end
-
-    private def extract_feed_metadata(reader : XML::Reader)
-      # This is a placeholder - feed metadata extraction will be implemented later
-      # For now, we focus on entry parsing
     end
   end
 end
