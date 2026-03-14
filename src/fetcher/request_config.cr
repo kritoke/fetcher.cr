@@ -16,8 +16,7 @@ module Fetcher
     max_retries : Int32 = 3,
     base_delay : Time::Span = 1.second,
     max_delay : Time::Span = 30.seconds,
-    exponential_base : Float64 = 2.0,
-    use_streaming_parser : Bool = false do
+    exponential_base : Float64 = 2.0 do
     def delay_for_attempt(attempt : Int32) : Time::Span
       delay = base_delay * (exponential_base ** attempt)
       delay > max_delay ? max_delay : delay

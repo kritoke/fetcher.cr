@@ -5,7 +5,6 @@ require "./h2o_http_client"
 require "./exceptions"
 require "./rss_parser"
 require "./result_builder"
-require "./streaming_rss_parser"
 
 module Fetcher
   module RSS
@@ -63,32 +62,13 @@ module Fetcher
     private def self.parse_feed(body : String, url : String, limit : Int32, config : RequestConfig) : Result
       return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>#{Fetcher::SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)") if body.bytesize > Fetcher::SafeFeedProcessor::MAX_FEED_SIZE
 
-      # Use streaming parser if configured
-      if config.use_streaming_parser
-        begin
-          reader = XML::Reader.new(body)
-          parser = StreamingRSSParser.new
-          entries = parser.parse_entries(reader, limit)
-          
-          # For metadata, we'll need to parse it separately or use minimal values
-          # For now, use minimal metadata (this is a limitation of the current implementation)
-          return ResultBuilder.success(
-            entries: entries,
-            site_link: nil,
-            favicon: nil,
-            feed_title: nil,
-            feed_description: nil,
-            feed_language: nil,
-            feed_authors: [] of Author
-          )
-        rescue ex : XML::Error
-          # Fallback to DOM parser on streaming errors
-        rescue
-          # Fallback to DOM parser on any streaming errors
-        end
-      end
+      # Note: Streaming parser integration is experimental and currently disabled
+      # TODO: Complete streaming parser implementation in future version
+      # if config.use_streaming_parser
+      #   # ... streaming implementation would go here ...
+      # end
 
-      # Default: use DOM parser
+      # Use DOM parser (default and only working implementation)
       begin
         parser = RSSParser.new
         entries = parser.parse_entries(body, limit)

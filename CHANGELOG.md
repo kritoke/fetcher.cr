@@ -7,13 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **Streaming Parser Integration** - Added `use_streaming_parser` option to RequestConfig for memory-efficient feed parsing
-  - Automatically falls back to DOM parsing on streaming errors
-  - Default is false for backward compatibility
-  - Especially useful for large feeds (> 10MB)
-
 ### Fixed
 
 - **Code Quality Issues**
