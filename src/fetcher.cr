@@ -31,6 +31,8 @@ require "./fetcher/streaming_fallback"
 require "./fetcher/xml_streaming_parser"
 require "./fetcher/json_streaming_parser"
 require "./fetcher/simple_xml_streaming_parser"
+require "./fetcher/simple_json_streaming_parser"
+require "./fetcher/working_json_streaming_parser"
 
 module Fetcher
   enum DriverType

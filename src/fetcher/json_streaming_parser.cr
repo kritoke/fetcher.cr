@@ -81,24 +81,38 @@ module Fetcher
     end
 
     private def next_reddit_entry : Entry?
-      # Navigate to children array
+      # We're already positioned in the children array
+      # The first call will parse the first post
       @pull.read_object do |key|
         if key == "data"
-          @pull.read_object do |data_key|
-            if data_key == "children"
-              @pull.read_array do
-                # We're now in the array of posts
-                return parse_reddit_post
-              end
-            else
-              @pull.skip
-            end
-          end
+          return parse_reddit_post_data_and_create
         else
           @pull.skip
         end
       end
+      nil
+    end
 
+    private def parse_reddit_post_data_and_create : Entry?
+      post_data = parse_reddit_post_data
+      return nil unless post_data
+      
+      title = post_data[:title] || "Untitled"
+      post_url = post_data[:url] || ""
+      permalink = post_data[:permalink] || ""
+      created_utc = post_data[:created_utc] || 0.0
+      is_self = post_data[:is_self] || false
+      
+      link = resolve_reddit_link(post_url, permalink, is_self)
+      pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
+      
+      Entry.create(
+        title: title,
+        url: link,
+        source_type: SourceType::Reddit,
+        published_at: pub_date
+      )
+    rescue ex
       nil
     end
 
@@ -118,15 +132,182 @@ module Fetcher
     end
 
     private def parse_reddit_post : Entry?
-      # This is a simplified version - will be expanded later
-      # For now, return nil to focus on infrastructure
+      # Parse Reddit post from current pull parser position
+      # Expected format: {"data": {...post data...}}
+      
+      post_data = nil
+      
+      @pull.read_object do |key|
+        if key == "data"
+          post_data = parse_reddit_post_data
+          break  # Only need the first post
+        else
+          @pull.skip
+        end
+      end
+      
+      return nil unless post_data
+      
+      # Extract post fields
+      title = post_data[:title] || "Untitled"
+      post_url = post_data[:url] || ""
+      permalink = post_data[:permalink] || ""
+      created_utc = post_data[:created_utc] || 0.0
+      is_self = post_data[:is_self] || false
+      
+      # Resolve link
+      link = resolve_reddit_link(post_url, permalink, is_self)
+      
+      # Create published date
+      pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
+      
+      Entry.create(
+        title: title,
+        url: link,
+        source_type: SourceType::Reddit,
+        published_at: pub_date
+      )
+    rescue ex
+      # Skip malformed posts
       nil
     end
 
-    private def parse_json_feed_item : Entry?
-      # This is a simplified version - will be expanded later  
-      # For now, return nil to focus on infrastructure
+    private def parse_reddit_post_data : Hash(Symbol, String | Float64 | Bool)?
+      data = {} of Symbol => String | Float64 | Bool
+      
+      @pull.read_object do |key|
+        case key
+        when "title"
+          data[:title] = @pull.read_string
+        when "url"
+          data[:url] = @pull.read_string
+        when "permalink"
+          data[:permalink] = @pull.read_string
+        when "created_utc"
+          data[:created_utc] = @pull.read_float
+        when "is_self"
+          data[:is_self] = @pull.read_bool
+        else
+          @pull.skip
+        end
+      end
+      
+      data.empty? ? nil : data
+    rescue ex
       nil
+    end
+
+    private def resolve_reddit_link(post_url : String, permalink : String, is_self : Bool) : String
+      is_self || post_url.empty? ? "https://www.reddit.com#{permalink}" : post_url
+    end
+
+    private def parse_json_feed_item : Entry?
+      # Parse JSON Feed item from current pull parser position
+      # Expected format: {"id": "...", "url": "...", "title": "...", ...}
+      
+      item_data = parse_json_feed_item_data
+      return nil unless item_data
+      
+      # Extract item fields
+      title = item_data[:title] || "Untitled"
+      url = item_data[:url] || item_data[:id] || "#"
+      content_html = item_data[:content_html]
+      content_text = item_data[:content_text]
+      date_published = item_data[:date_published]
+      tags = item_data[:tags] || [] of String
+      authors_data = item_data[:authors] || [] of Hash(Symbol, String)
+      
+      # Create content
+      content = content_html.presence || content_text.presence || ""
+      
+      # Parse published date
+      pub_date = nil
+      if date_published && !date_published.empty?
+        pub_date = TimeParser.parse(date_published)
+      end
+      
+      # Parse authors
+      author = nil
+      author_url = nil
+      if authors_data.size > 0
+        first_author = authors_data[0]
+        author = first_author[:name]
+        author_url = first_author[:url]
+      end
+      
+      Entry.create(
+        title: title,
+        url: url,
+        source_type: SourceType::JSONFeed,
+        content: content,
+        published_at: pub_date,
+        author: author,
+        author_url: author_url,
+        categories: tags
+      )
+    rescue ex
+      # Skip malformed items
+      nil
+    end
+
+    private def parse_json_feed_item_data : Hash(Symbol, String | Array(String) | Array(Hash(Symbol, String)))?
+      data = {} of Symbol => String | Array(String) | Array(Hash(Symbol, String))
+      
+      @pull.read_object do |key|
+        case key
+        when "id"
+          data[:id] = @pull.read_string
+        when "url"
+          data[:url] = @pull.read_string
+        when "title"
+          data[:title] = @pull.read_string
+        when "content_html"
+          data[:content_html] = @pull.read_string
+        when "content_text"
+          data[:content_text] = @pull.read_string
+        when "date_published"
+          data[:date_published] = @pull.read_string
+        when "tags"
+          data[:tags] = parse_string_array
+        when "authors"
+          data[:authors] = parse_authors_array
+        else
+          @pull.skip
+        end
+      end
+      
+      data.empty? ? nil : data
+    rescue ex
+      nil
+    end
+
+    private def parse_string_array : Array(String)
+      tags = [] of String
+      @pull.read_array do
+        tags << @pull.read_string
+      end
+      tags
+    rescue ex
+      [] of String
+    end
+
+    private def parse_authors_array : Array(Hash(Symbol, String))
+      authors = [] of Hash(Symbol, String)
+      @pull.read_array do
+        author = {} of Symbol => String
+        @pull.read_object do |key|
+          case key
+          when "name", "url", "uri"
+            author[key.to_sym] = @pull.read_string
+          else
+            @pull.skip
+          end
+        end
+        authors << author unless author.empty?
+      end
+      authors
+    rescue ex
+      [] of Hash(Symbol, String)
     end
   end
 end
