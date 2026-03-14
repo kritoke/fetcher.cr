@@ -35,22 +35,33 @@ module Fetcher
       return false if host.nil? || host.empty?
 
       # Handle IPv6 addresses with brackets
-      clean_host = host
-      if host.starts_with?("[") && host.ends_with?("]")
-        clean_host = host[1..-2]
-      end
+      clean_host = clean_ipv6_host(host)
 
       # Block localhost and similar hosts
-      if clean_host.downcase == "localhost" ||
-         clean_host.downcase.ends_with?(".localhost") ||
-         clean_host == "0.0.0.0" ||
-         clean_host == "::" # IPv6 unspecified address
-        return false
-      end
+      return false if block_localhost?(clean_host)
 
-      # Try to validate as IP address
+      # Validate IP address (if it is one)
+      validate_ip_address(clean_host)
+    end
+
+    private def self.clean_ipv6_host(host : String) : String
+      if host.starts_with?("[") && host.ends_with?("]")
+        host[1..-2]
+      else
+        host
+      end
+    end
+
+    private def self.block_localhost?(host : String) : Bool
+      host.downcase == "localhost" ||
+        host.downcase.ends_with?(".localhost") ||
+        host == "0.0.0.0" ||
+        host == "::" # IPv6 unspecified address
+    end
+
+    private def self.validate_ip_address(host : String) : Bool
       begin
-        ip_address = Socket::IPAddress.new(clean_host, 80)
+        ip_address = Socket::IPAddress.new(host, 80)
 
         # Block private IPs
         return false if ip_address.private?
