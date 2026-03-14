@@ -117,6 +117,21 @@ config = Fetcher::RequestConfig.new(
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
 ```
 
+### Streaming Parser (v0.6.1+)
+
+```crystal
+# Use streaming parser for memory efficiency with large feeds
+# This is especially useful for feeds > 10MB
+config = Fetcher::RequestConfig.new(
+  use_streaming_parser: true
+)
+
+result = Fetcher.pull("https://large-feed.example.com/feed.xml", config: config)
+
+# Note: Streaming parser automatically falls back to DOM parsing on errors
+# Default is false for backward compatibility and robustness
+```
+
 ### Error Handling (v0.4.0+)
 
 ```crystal

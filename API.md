@@ -240,6 +240,7 @@ HTTPClient.fetch(
 | `base_delay` | `Time::Span` | `1.second` | Base delay for exponential backoff |
 | `max_delay` | `Time::Span` | `30.seconds` | Maximum delay cap |
 | `exponential_base` | `Float64` | `2.0` | Exponential backoff multiplier |
+| `use_streaming_parser` | `Bool` | `false` | Use streaming parser for memory efficiency (v0.6.1+) |
 
 ### Usage Examples
 
@@ -276,6 +277,12 @@ config = Fetcher::RequestConfig.new(
   rate_limit_capacity: 20.0,
   rate_limit_refill_rate: 5.0
 )
+
+# Streaming parser for memory efficiency (v0.6.1+)
+config = Fetcher::RequestConfig.new(
+  use_streaming_parser: true
+)
+result = Fetcher.pull("https://large-feed.example.com/feed.xml", config: config)
 
 # With caching headers
 headers = HTTP::Headers{

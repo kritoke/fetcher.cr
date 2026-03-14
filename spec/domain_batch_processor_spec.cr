@@ -26,7 +26,8 @@ describe Fetcher::DomainBatchProcessor do
 
     groups = Fetcher::DomainBatchProcessor.group_by_domain(urls)
 
-    groups["invalid"].size.should eq 1
+    # "invalid-url" parses successfully but has no host, so it goes to "default"
+    groups["default"].size.should eq 1
     groups["example.com"].size.should eq 1
     groups["test.com"].size.should eq 1
   end

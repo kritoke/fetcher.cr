@@ -12,7 +12,7 @@ module Fetcher
           uri = URI.parse(url)
           domain = uri.host || "default"
           groups[domain] << url
-        rescue ex
+        rescue
           # Invalid URL, group under "invalid"
           groups["invalid"] << url
         end

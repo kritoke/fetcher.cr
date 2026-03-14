@@ -36,17 +36,30 @@ module Fetcher
 
   def self.detect_driver(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, config : RequestConfig = RequestConfig.new) : DriverType
     # First, try to detect based on URL patterns for known sources
-    if url.matches?(%r{://(www\.)?reddit\.com/r/}i)
-      return DriverType::Reddit
-    elsif url.matches?(%r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i)
-      return DriverType::Software
-    elsif url.matches?(%r{://[^/]+/[^/]+/[^/]+/-/releases}i)
-      return DriverType::Software
-    elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
-      return DriverType::Software
-    end
+    driver = detect_by_url_pattern(url)
+    return driver if driver
 
     # For other URLs, use content-type detection
+    driver = detect_by_content_type(url, headers, config)
+    return driver if driver
+
+    # Final fallback based on URL extension/patterns
+    detect_by_url_extension(url)
+  end
+
+  private def self.detect_by_url_pattern(url : String) : DriverType?
+    if url.matches?(%r{://(www\.)?reddit\.com/r/}i)
+      DriverType::Reddit
+    elsif url.matches?(%r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i)
+      DriverType::Software
+    elsif url.matches?(%r{://[^/]+/[^/]+/[^/]+/-/releases}i)
+      DriverType::Software
+    elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
+      DriverType::Software
+    end
+  end
+
+  private def self.detect_by_content_type(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
     begin
       head_headers = Fetcher::H2OHttpClient.build_headers(headers)
       http_client = Fetcher::H2OHttpClient.new(config)
@@ -55,22 +68,33 @@ module Fetcher
       content_type = response.headers["content-type"]?.try(&.downcase)
 
       if content_type
-        if content_type.includes?("application/feed+json") ||
-           (content_type.includes?("application/json") &&
-           (url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")))
+        if json_feed_content_type?(content_type, url)
           return DriverType::JSONFeed
-        elsif content_type.includes?("application/rss+xml") ||
-              content_type.includes?("application/atom+xml") ||
-              content_type.includes?("text/xml") ||
-              content_type.includes?("application/xml")
+        elsif rss_content_type?(content_type)
           return DriverType::RSS
         end
       end
     rescue
-      # If HEAD request fails, fall back to URL-based detection
+      # If HEAD request fails, return nil to use fallback
     end
 
-    # Final fallback based on URL extension/patterns
+    nil
+  end
+
+  private def self.json_feed_content_type?(content_type : String, url : String) : Bool
+    content_type.includes?("application/feed+json") ||
+      (content_type.includes?("application/json") &&
+        (url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")))
+  end
+
+  private def self.rss_content_type?(content_type : String) : Bool
+    content_type.includes?("application/rss+xml") ||
+      content_type.includes?("application/atom+xml") ||
+      content_type.includes?("text/xml") ||
+      content_type.includes?("application/xml")
+  end
+
+  private def self.detect_by_url_extension(url : String) : DriverType
     if url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")
       DriverType::JSONFeed
     else

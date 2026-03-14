@@ -9,39 +9,37 @@ module Fetcher
 
     def self.from_error(error : Error) : FetchError
       case error.kind
-      when ErrorKind::DNSError
+      when .dns_error?
         DNSError.new(error.message, error)
-      when ErrorKind::Timeout
+      when .timeout?
         TimeoutError.new(error.message, error)
-      when ErrorKind::InvalidURL
+      when .invalid_url?
         InvalidURLError.new(error.message, error)
-      when ErrorKind::InvalidFormat
+      when .invalid_format?
         InvalidFormatError.new(error.message, error)
-      when ErrorKind::HTTPError
-        if error.status_code
-          status_code = error.status_code.as(Int32)
-          if (400..499).includes?(status_code)
-            HTTPClientError.new(error.message, status_code, error)
-          elsif (500..599).includes?(status_code)
-            HTTPServerError.new(error.message, status_code, error)
-          else
-            HTTPError.new(error.message, status_code, error)
-          end
-        else
-          HTTPError.new(error.message, nil, error)
-        end
-      when ErrorKind::RateLimited
+      when .http_error?, .server_error?
+        create_http_error(error)
+      when .rate_limited?
         RateLimitError.new(error.message, error)
-      when ErrorKind::ServerError
-        if error.status_code
-          HTTPServerError.new(error.message, error.status_code.as(Int32), error)
-        else
-          HTTPServerError.new(error.message, 500, error)
-        end
-      when ErrorKind::Unknown
+      when .unknown?
         UnknownError.new(error.message, error)
       else
         UnknownError.new(error.message, error)
+      end
+    end
+
+    private def self.create_http_error(error : Error) : FetchError
+      if error.status_code
+        status_code = error.status_code.as(Int32)
+        if (400..499).includes?(status_code)
+          HTTPClientError.new(error.message, status_code, error)
+        elsif (500..599).includes?(status_code)
+          HTTPServerError.new(error.message, status_code, error)
+        else
+          HTTPError.new(error.message, status_code, error)
+        end
+      else
+        HTTPError.new(error.message, nil, error)
       end
     end
   end
