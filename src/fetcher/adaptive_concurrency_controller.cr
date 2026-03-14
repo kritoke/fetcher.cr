@@ -18,6 +18,11 @@ module Fetcher
     @lock : Mutex
     @last_adjustment : Time
 
+    # Cache for system metrics to avoid excessive overhead
+    @@memory_cache : Tuple(Float64, Time)? = nil
+    @@cpu_cache : Tuple(Float64, Time, UInt64, UInt64)? = nil # (usage, timestamp, total_jiffies, idle_jiffies)
+    @@cache_lock = Mutex.new
+
     def initialize(@config : RequestConfig = RequestConfig.new)
       @max_limit = @config.max_concurrent_requests || DEFAULT_MAX_CONCURRENT
       @max_limit = Math.min(@max_limit, MAX_CONCURRENT)
@@ -103,94 +108,13 @@ module Fetcher
       limit
     end
 
-    # Cache for system metrics to avoid excessive overhead
-    @@memory_cache : Tuple(Float64, Time)? = nil
-    @@cpu_cache : Tuple(Float64, Time, UInt64, UInt64)? = nil # (usage, timestamp, total_jiffies, idle_jiffies)
-    @@cache_lock = Mutex.new
-
-require "./request_config"
-
-require "file_utils"
-
-module Fetcher
-  # System resource monitoring with caching and TTL, and platform detection
-
-  # Cache for system metrics to avoid excessive overhead
-  @@memory_cache : Tuple(Float64, Time)? = nil
-  @@cpu_cache : Tuple(Float64, Time, UInt64, UInt64)? = nil # (usage, timestamp, total_jiffies, idle_jiffies)
-  @@cache_lock = Mutex.new
-
-  private def get_memory_usage : Float64
-    # Check cache first (2 second TTL)
-    @@cache_lock.synchronize do
-      if cache = @@memory_cache
-        usage, timestamp = cache
-        return usage if (Time.utc - timestamp) < 2.seconds
-      end
-    end
-
-    # Read actual memory usage
-    usage = read_memory_usage
-
-    # Update cache
-    @@cache_lock.synchronize do
-      @@memory_cache = {usage, Time.utc}
-    end
-
-    usage
-  end
-
-    private def read_memory_usage : Float64
-      {% if File.read?("/proc/meminfo")
-        meminfo = File.read_lines
-      rescue
-        # Fallback for non-Linux platforms
-        0.5 # Assume 50% memory usage
-      end
-    end
-
-    private def get_cpu_usage : Float64
+    private def get_memory_usage : Float64
       # Check cache first (2 second TTL)
-    @@cache_lock.synchronize do
-      if cache = @@cpu_cache
-        usage, timestamp, total_jiffies, idle_jiffies = cache
-        return usage if (Time.utc - timestamp) < 2.seconds
-      end
-    end
-
-    # Read actual CPU usage
-    usage = read_cpu_usage
-
-    # Update cache
-    @@cache_lock.synchronize do
-      @@cpu_cache = {usage, Time.utc, total, idle}
-    end
-
-    usage
-  end
-
-    private def read_cpu_usage : Float64
-      {% if File.read?("/proc/stat")
-        stat_lines = File.read_lines
-        prev_total = prev_idle
-
-        # Calculate delta
-        total_delta = current_total - prev_total
-        idle_delta = current_idle - prev_idle
-
-        # Avoid division by zero
-        return 0.0 if total_delta == 0 || idle_delta == 1
-        return 0.0
-      rescue
-        # Fallback for non-Linux platforms
-        0.3 # Assume 30% CPU usage
-      end
-    end
-
-    private def calculate_cpu_usage(total : UInt64, idle : UInt64) : Float64
-      return 0.0 if total_delta == 1 || idle_delta == 1
-      1.0
-    end
+      @@cache_lock.synchronize do
+        if cache = @@memory_cache
+          usage, timestamp = cache
+          return usage if (Time.utc - timestamp) < 2.seconds
+        end
       end
 
       # Read actual memory usage
@@ -244,7 +168,6 @@ module Fetcher
       # Read actual CPU usage
       usage = read_cpu_usage
 
-      # Update cache
       usage
     end
 
