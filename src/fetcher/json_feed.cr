@@ -58,7 +58,7 @@ module Fetcher
         begin
           io = IO::Memory.new(body)
           parser = Fetcher::WorkingJSONStreamingParser.new(limit)
-          entries = parser.parse_entries(io, limit)
+          entries = parser.parse_entries(io, limit, config)
           
           # For JSON Feed, we need to extract metadata separately
           # For now, return minimal metadata
@@ -71,6 +71,10 @@ module Fetcher
             feed_language: nil,
             feed_authors: [] of Author
           )
+        rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
+          # Don't fallback for memory issues
+          puts "JSON Feed streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
+          return Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Feed too large")
         rescue ex
           puts "JSON Feed streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
         end

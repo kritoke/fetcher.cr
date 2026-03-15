@@ -52,8 +52,11 @@ module Fetcher
     end
 
     # Parse XML feed completely and return Result with metadata
-    def parse_complete(io : IO, limit : Int32? = nil) : Result
+    def parse_complete(io : IO, limit : Int32? = nil, config : RequestConfig? = nil) : Result
       actual_limit = limit || @limit
+      
+      # Check memory limit before parsing
+      check_memory_limit(io, config)
       
       # Use existing StreamingRSSParser for now
       reader = XML::Reader.new(io)
@@ -66,6 +69,13 @@ module Fetcher
     rescue ex : XML::Error
       error = Error.invalid_format("XML parsing error: #{ex.message}", "streaming")
       Fetcher.error_result(ErrorKind::InvalidFormat, error.message)
+    rescue ex : StreamingErrorHandling::MemoryLimitExceeded
+      # Don't fallback for memory issues - raise immediately
+      raise ex
+    rescue ex : Exception
+      # Generic error handling
+      error = Error.unknown("Streaming parser error: #{ex.message}", "streaming")
+      Fetcher.error_result(ErrorKind::Unknown, error.message)
     end
 
     # Parse XML feed and return array of entries
@@ -74,6 +84,19 @@ module Fetcher
       reader = XML::Reader.new(io)
       parser = StreamingRSSParser.new
       parser.parse_entries(reader, actual_limit)
+    rescue ex : XML::Error
+      [] of Entry
+    end
+
+    private def check_memory_limit(io : IO, config : RequestConfig?)
+      return unless config
+      
+      # Check if IO size exceeds memory limit
+      if io.responds_to?(:size) && io.size > config.max_streaming_memory
+        raise StreamingErrorHandling::MemoryLimitExceeded.new(
+          "Feed size (#{io.size} bytes) exceeds memory limit (#{config.max_streaming_memory} bytes)"
+        )
+      end
     end
   end
 

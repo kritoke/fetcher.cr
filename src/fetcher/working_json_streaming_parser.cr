@@ -3,6 +3,7 @@ require "./entry"
 require "./result"
 require "./reddit"
 require "./json_feed"
+require "./streaming_error_handling"
 
 module Fetcher
   # JSON streaming parser that uses existing parsers but provides streaming interface
@@ -10,8 +11,11 @@ module Fetcher
     def initialize(@limit : Int32 = 100)
     end
 
-    def parse_entries(io : IO, limit : Int32? = nil) : Array(Entry)
+    def parse_entries(io : IO, limit : Int32? = nil, config : RequestConfig? = nil) : Array(Entry)
       actual_limit = limit || @limit
+      
+      # Check memory limit before parsing
+      check_memory_limit(io, config)
       
       # Read the entire IO into a string (not truly streaming, but provides the interface)
       json_string = io.gets_to_end
@@ -40,6 +44,22 @@ module Fetcher
             return [] of Entry
           end
         end
+      end
+    rescue ex : StreamingErrorHandling::MemoryLimitExceeded
+      # Don't fallback for memory issues - raise immediately
+      raise ex
+    rescue ex : JSON::ParseException
+      [] of Entry
+    end
+
+    private def check_memory_limit(io : IO, config : RequestConfig?)
+      return unless config
+      
+      # Check if IO size exceeds memory limit
+      if io.responds_to?(:size) && io.size > config.max_streaming_memory
+        raise StreamingErrorHandling::MemoryLimitExceeded.new(
+          "Feed size (#{io.size} bytes) exceeds memory limit (#{config.max_streaming_memory} bytes)"
+        )
       end
     end
   end

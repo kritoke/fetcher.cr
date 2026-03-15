@@ -58,7 +58,7 @@ module Fetcher
           begin
             io = IO::Memory.new(response.body)
             parser = Fetcher::WorkingJSONStreamingParser.new(limit)
-            items = parser.parse_entries(io, limit)
+            items = parser.parse_entries(io, limit, config)
             
             site_link = "https://www.reddit.com/r/#{subreddit}"
             favicon = "https://www.reddit.com/favicon.ico"
@@ -68,6 +68,11 @@ module Fetcher
               site_link: site_link,
               favicon: favicon
             )
+          rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
+            # Don't fallback for memory issues
+            puts "Reddit streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
+            error = Error.invalid_format(ex.message || "Feed too large", url)
+            return Result.error(error)
           rescue ex
             puts "Reddit streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
           end
