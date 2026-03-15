@@ -7,8 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
+### Planned
+- Redirect control configuration
+- SSL verification options
 
+## [0.6.2] - 2026-03-14
+
+### Added
+- **Adaptive Buffer Sizing** - Dynamic buffer sizing for optimal streaming performance based on content type and size
+- **Buffer Pool** - Memory pool for reusable buffers to reduce GC pressure
+- **Connection Pool** - HTTP connection reuse for efficient high-frequency fetching
+- **Reddit Response Parsing** - Exposed `parse_reddit_response` as public method
+
+### Fixed
 - **Code Quality Issues**
   - Removed unused variables (`old_permits`, `error_url`)
   - Fixed unused rescue variables
@@ -16,10 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduced cyclomatic complexity in multiple methods
   - Enhanced SSRF protection with comprehensive IPv6 support
   - Implemented real system resource monitoring
-
-### Planned
-- Redirect control configuration
-- SSL verification options
 
 ## [0.6.1] - 2026-03-11
 
@@ -237,7 +244,8 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.6.1..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.6.2..HEAD
+[0.6.2]: https://github.com/kritoke/fetcher.cr/compare/v0.6.1..v0.6.2
 [0.6.1]: https://github.com/kritoke/fetcher.cr/compare/v0.6.0..v0.6.1
 [0.6.0]: https://github.com/kritoke/fetcher.cr/compare/v0.5.1..v0.6.0
 [0.5.1]: https://github.com/kritoke/fetcher.cr/compare/v0.5.0..v0.5.1

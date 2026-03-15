@@ -134,7 +134,7 @@ module Fetcher
       "hot"
     end
 
-    private def self.parse_reddit_response(body : String, limit : Int32) : Array(Entry)
+    def self.parse_reddit_response(body : String, limit : Int32) : Array(Entry)
       parsed = JSON.parse(body)
       children = extract_children(parsed)
       return [] of Entry if children.nil?
