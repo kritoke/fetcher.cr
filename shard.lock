@@ -4,9 +4,17 @@ shards:
     git: https://github.com/crystal-ameba/ameba.git
     version: 1.7.0-dev+git.commit.0bc878de36c1f10afde766bdae74d6c74f265c70
 
-  h2o:
-    git: https://github.com/nomadlabsinc/h2o.git
-    version: 0.3.0+git.commit.b9cf4fac52d2dd88cf7851ca19459ddd65d9d1c6
+  crest:
+    git: https://github.com/mamantoha/crest.git
+    version: 1.6.2
+
+  http-client-digest_auth:
+    git: https://github.com/mamantoha/http-client-digest_auth.git
+    version: 0.6.0
+
+  http_proxy:
+    git: https://github.com/mamantoha/http_proxy.git
+    version: 0.14.0
 
   sanitize:
     git: https://github.com/straight-shoota/sanitize.git

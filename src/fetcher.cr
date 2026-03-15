@@ -4,7 +4,7 @@ require "./fetcher/author"
 require "./fetcher/entry"
 require "./fetcher/result"
 require "./fetcher/retry"
-require "./fetcher/h2o_http_client"
+require "./fetcher/crest_http_client"
 require "./fetcher/html_utils"
 require "./fetcher/time_parser"
 require "./fetcher/source_type"
@@ -70,8 +70,8 @@ module Fetcher
 
   private def self.detect_by_content_type(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
     begin
-      head_headers = Fetcher::H2OHttpClient.build_headers(headers)
-      http_client = Fetcher::H2OHttpClient.new(config)
+      head_headers = Fetcher::CrestHttpClient.build_headers(headers)
+      http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.head(url, head_headers)
 
       content_type = response.headers["content-type"]?.try(&.downcase)
@@ -112,7 +112,7 @@ module Fetcher
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    final_headers = Fetcher::H2OHttpClient.build_headers(headers)
+    final_headers = Fetcher::CrestHttpClient.build_headers(headers)
     driver = detect_driver(url, final_headers, config)
 
     case driver
@@ -143,8 +143,8 @@ module Fetcher
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    base_headers = Fetcher::H2OHttpClient.build_headers(headers)
-    final_headers = Fetcher::H2OHttpClient.with_cache(base_headers, etag, last_modified)
+    base_headers = Fetcher::CrestHttpClient.build_headers(headers)
+    final_headers = Fetcher::CrestHttpClient.with_cache(base_headers, etag, last_modified)
 
     driver = detect_driver(url, final_headers, config)
 
@@ -176,7 +176,7 @@ module Fetcher
   end
 
   def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    RSS.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+    RSS.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
   # Async version
@@ -195,7 +195,7 @@ module Fetcher
   end
 
   def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Reddit.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+    Reddit.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
   # Async version
@@ -214,7 +214,7 @@ module Fetcher
   end
 
   def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Software.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+    Software.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
   # Async version
@@ -233,7 +233,7 @@ module Fetcher
   end
 
   def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    JSONFeed.pull(url, Fetcher::H2OHttpClient.build_headers(headers), limit, config)
+    JSONFeed.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
   # Async version

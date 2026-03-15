@@ -2,7 +2,7 @@ require "json"
 require "./entry"
 require "./result"
 require "./retry"
-require "./h2o_http_client"
+require "./crest_http_client"
 require "./rss"
 require "./exceptions"
 require "./working_json_streaming_parser"
@@ -48,7 +48,7 @@ module Fetcher
       final_headers = reddit_headers.dup
       final_headers.merge!(headers)
 
-      http_client = Fetcher::H2OHttpClient.new(config)
+      http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(url, final_headers)
 
       case response.status_code
@@ -104,7 +104,7 @@ module Fetcher
     rescue ex : IO::TimeoutError
       error = Error.timeout("Timeout: #{ex.message}", url)
       raise TimeoutError.new(error.message, error)
-    rescue ex : H2OHttpClient::DNSError
+    rescue ex : CrestHttpClient::DNSError
       error = Error.dns("DNS error: #{ex.message}", url)
       raise DNSError.new(error.message, error)
     rescue ex : JSON::ParseException

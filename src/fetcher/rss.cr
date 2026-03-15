@@ -1,7 +1,7 @@
 require "./entry"
 require "./result"
 require "./retry"
-require "./h2o_http_client"
+require "./crest_http_client"
 require "./exceptions"
 require "./rss_parser"
 require "./result_builder"
@@ -18,7 +18,7 @@ module Fetcher
     end
 
     private def self.perform_fetch(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-      http_client = Fetcher::H2OHttpClient.new(config)
+      http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(url, headers)
 
       case response.status_code
@@ -42,7 +42,7 @@ module Fetcher
     rescue ex : IO::TimeoutError
       error = Error.timeout("Timeout: #{ex.message}", url)
       raise TimeoutError.new(error.message, error)
-    rescue ex : H2OHttpClient::DNSError
+    rescue ex : CrestHttpClient::DNSError
       error = Error.dns("DNS error: #{ex.message}", url)
       raise DNSError.new(error.message, error)
     rescue ex : XML::Error

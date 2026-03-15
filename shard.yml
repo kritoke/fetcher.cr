@@ -1,5 +1,5 @@
 name: fetcher
-version: 0.6.2
+version: 0.6.3
 
 authors:
   - kritoke <3081486+kritoke@users.noreply.github.com>
@@ -13,9 +13,8 @@ description: A standalone feed fetching library for Crystal (RSS, Reddit, Softwa
 dependencies:
   sanitize:
     github: straight-shoota/sanitize
-  h2o:
-    github: nomadlabsinc/h2o
-    branch: main
+  crest:
+    github: mamantoha/crest
 
 development_dependencies:
   ameba:
