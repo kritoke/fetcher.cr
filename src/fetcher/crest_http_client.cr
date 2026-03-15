@@ -13,12 +13,19 @@ module Fetcher
     @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
     @@limiters_lock = Mutex.new
 
-    @@http_client : ::HTTP::Client? = nil
+    @@http_clients = {} of String => ::HTTP::Client
     @@client_lock = Mutex.new
 
-    def self.get_http_client(config : RequestConfig) : ::HTTP::Client
+    def self.get_http_client(host : String, config : RequestConfig) : ::HTTP::Client
       @@client_lock.synchronize do
-        @@http_client ||= ::HTTP::Client.new
+        client = @@http_clients[host]?
+        unless client
+          client = ::HTTP::Client.new(URI.parse("https://#{host}"))
+          client.connect_timeout = config.connect_timeout
+          client.read_timeout = config.read_timeout
+          @@http_clients[host] = client
+        end
+        client
       end
     end
 
@@ -32,21 +39,20 @@ module Fetcher
     end
 
     def initialize(@config : RequestConfig = RequestConfig.new)
-      @client = self.class.get_http_client(@config)
-      @client.connect_timeout = @config.connect_timeout
-      @client.read_timeout = @config.read_timeout
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
       uri = URI.parse(url)
+      host = uri.host || "default"
 
       domain = uri.host || "default"
       rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
       rate_limiter.acquire
 
+      http_client = self.class.get_http_client(host, @config)
       crest_headers = build_crest_headers(headers)
 
-      response = Crest.head(url, headers: crest_headers, http_client: @client)
+      response = Crest.head(url, headers: crest_headers, http_client: http_client)
       convert_response(response)
     rescue ex : URI::Error
       raise DNSError.new("Invalid URL: #{ex.message}")
@@ -60,14 +66,16 @@ module Fetcher
 
     def get(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
       uri = URI.parse(url)
+      host = uri.host || "default"
 
       domain = uri.host || "default"
       rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
       rate_limiter.acquire
 
+      http_client = self.class.get_http_client(host, @config)
       crest_headers = build_crest_headers(headers)
 
-      response = Crest.get(url, headers: crest_headers, http_client: @client)
+      response = Crest.get(url, headers: crest_headers, http_client: http_client)
       
       if response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
         raise DNSError.new("Response too large (>#{SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")

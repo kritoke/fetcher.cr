@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.6.4] - 2026-03-15
+
+### Fixed
+- **HTTP::Client.new** - Fixed Crystal 1.18 compatibility by passing proper URI to HTTP::Client constructor
+
 ## [0.6.3] - 2026-03-15
 
 ### Changed
