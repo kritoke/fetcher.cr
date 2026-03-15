@@ -59,7 +59,7 @@ module Fetcher
             io = IO::Memory.new(response.body)
             parser = Fetcher::WorkingJSONStreamingParser.new(limit)
             items = parser.parse_entries(io, limit, config)
-            
+
             site_link = "https://www.reddit.com/r/#{subreddit}"
             favicon = "https://www.reddit.com/favicon.ico"
 
@@ -77,7 +77,7 @@ module Fetcher
             puts "Reddit streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
           end
         end
-        
+
         # Fallback to DOM parser
         items = parse_reddit_response(response.body, limit)
         site_link = "https://www.reddit.com/r/#{subreddit}"

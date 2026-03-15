@@ -76,7 +76,7 @@ module Fetcher
       crest_headers = build_crest_headers(headers)
 
       response = Crest.get(url, headers: crest_headers, http_client: http_client)
-      
+
       if response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
         raise DNSError.new("Response too large (>#{SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")
       end
@@ -108,7 +108,7 @@ module Fetcher
         "Connection"      => "keep-alive",
       }
       result.merge!(headers)
-      
+
       hash = Hash(String, String).new
       result.each do |key, value|
         hash[key] = value.is_a?(Array) ? value.join(", ") : value.to_s

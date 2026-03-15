@@ -42,7 +42,7 @@ module Fetcher
 
       if @is_reddit
         return next_reddit_entry
-      elsif @is_json_feed  
+      elsif @is_json_feed
         return next_json_feed_entry
       else
         # Unknown JSON format, skip
@@ -96,16 +96,16 @@ module Fetcher
     private def parse_reddit_post_data_and_create : Entry?
       post_data = parse_reddit_post_data
       return nil unless post_data
-      
+
       title = post_data[:title] || "Untitled"
       post_url = post_data[:url] || ""
       permalink = post_data[:permalink] || ""
       created_utc = post_data[:created_utc] || 0.0
       is_self = post_data[:is_self] || false
-      
+
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
-      
+
       Entry.create(
         title: title,
         url: link,
@@ -134,33 +134,33 @@ module Fetcher
     private def parse_reddit_post : Entry?
       # Parse Reddit post from current pull parser position
       # Expected format: {"data": {...post data...}}
-      
+
       post_data = nil
-      
+
       @pull.read_object do |key|
         if key == "data"
           post_data = parse_reddit_post_data
-          break  # Only need the first post
+          break # Only need the first post
         else
           @pull.skip
         end
       end
-      
+
       return nil unless post_data
-      
+
       # Extract post fields
       title = post_data[:title] || "Untitled"
       post_url = post_data[:url] || ""
       permalink = post_data[:permalink] || ""
       created_utc = post_data[:created_utc] || 0.0
       is_self = post_data[:is_self] || false
-      
+
       # Resolve link
       link = resolve_reddit_link(post_url, permalink, is_self)
-      
+
       # Create published date
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
-      
+
       Entry.create(
         title: title,
         url: link,
@@ -174,7 +174,7 @@ module Fetcher
 
     private def parse_reddit_post_data : Hash(Symbol, String | Float64 | Bool)?
       data = {} of Symbol => String | Float64 | Bool
-      
+
       @pull.read_object do |key|
         case key
         when "title"
@@ -191,7 +191,7 @@ module Fetcher
           @pull.skip
         end
       end
-      
+
       data.empty? ? nil : data
     rescue ex
       nil
@@ -204,10 +204,10 @@ module Fetcher
     private def parse_json_feed_item : Entry?
       # Parse JSON Feed item from current pull parser position
       # Expected format: {"id": "...", "url": "...", "title": "...", ...}
-      
+
       item_data = parse_json_feed_item_data
       return nil unless item_data
-      
+
       # Extract item fields
       title = item_data[:title] || "Untitled"
       url = item_data[:url] || item_data[:id] || "#"
@@ -216,16 +216,16 @@ module Fetcher
       date_published = item_data[:date_published]
       tags = item_data[:tags] || [] of String
       authors_data = item_data[:authors] || [] of Hash(Symbol, String)
-      
+
       # Create content
       content = content_html.presence || content_text.presence || ""
-      
+
       # Parse published date
       pub_date = nil
       if date_published && !date_published.empty?
         pub_date = TimeParser.parse(date_published)
       end
-      
+
       # Parse authors
       author = nil
       author_url = nil
@@ -234,7 +234,7 @@ module Fetcher
         author = first_author[:name]
         author_url = first_author[:url]
       end
-      
+
       Entry.create(
         title: title,
         url: url,
@@ -252,7 +252,7 @@ module Fetcher
 
     private def parse_json_feed_item_data : Hash(Symbol, String | Array(String) | Array(Hash(Symbol, String)))?
       data = {} of Symbol => String | Array(String) | Array(Hash(Symbol, String))
-      
+
       @pull.read_object do |key|
         case key
         when "id"
@@ -275,7 +275,7 @@ module Fetcher
           @pull.skip
         end
       end
-      
+
       data.empty? ? nil : data
     rescue ex
       nil

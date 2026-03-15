@@ -19,7 +19,7 @@ module Fetcher
     exponential_base : Float64 = 2.0,
     # Streaming parser configuration for memory efficiency
     use_streaming_parser : Bool = false,
-    max_streaming_memory : Int32 = 10_485_760,  # 10MB default
+    max_streaming_memory : Int32 = 10_485_760, # 10MB default
     debug_streaming : Bool = false do
     def delay_for_attempt(attempt : Int32) : Time::Span
       delay = base_delay * (exponential_base ** attempt)

@@ -69,10 +69,10 @@ module Fetcher
           io = IO::Memory.new(body)
           parser = Fetcher::XMLStreamingParser.new(limit)
           result = parser.parse_complete(io, limit, config)
-          
+
           # If streaming parser returns success, use it
           return result if result.success?
-          
+
           # If streaming parser fails but doesn't raise, fallback to DOM
           puts "Streaming parser returned error, falling back to DOM parser" if config.debug_streaming
         rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded

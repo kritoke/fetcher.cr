@@ -346,7 +346,7 @@ module Fetcher
                                      XML::ParserOptions::NOENT |
                                      XML::ParserOptions::NONET)
 
-      xml.xpath_nodes("//entry").first(limit).map do |entry|
+      xml.xpath_nodes("//*[local-name()='entry']").first(limit).map do |entry|
         parse_atom_entry(entry, source)
       end
     rescue XML::Error
@@ -354,17 +354,17 @@ module Fetcher
     end
 
     private def self.parse_atom_entry(entry : XML::Node, source : String) : Entry
-      title_node = entry.xpath_node("title")
+      title_node = entry.xpath_node("./*[local-name()='title']")
       title = title_node.nil? ? "Untitled" : Entry.sanitize_title(title_node.text)
 
-      link_node = entry.xpath_node("link")
+      link_node = entry.xpath_node("./*[local-name()='link']")
       link = link_node.try(&.[]?("href")).try(&.strip).presence ||
              link_node.try(&.text).try(&.strip).presence || ""
 
-      published_node = entry.xpath_node("published") || entry.xpath_node("updated")
+      published_node = entry.xpath_node("./*[local-name()='published']") || entry.xpath_node("./*[local-name()='updated']")
       pub_date = TimeParser.parse(published_node.try(&.text))
 
-      content_node = entry.xpath_node("content")
+      content_node = entry.xpath_node("./*[local-name()='content']")
       content = content_node.try(&.text).try(&.strip) || ""
 
       version = extract_version_from_title(title)

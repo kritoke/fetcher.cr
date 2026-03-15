@@ -3,7 +3,7 @@ require "./src/fetcher"
 # Test streaming parser configuration and infrastructure
 config = Fetcher::RequestConfig.new(
   use_streaming_parser: true,
-  max_streaming_memory: 5_000_000,  # 5MB
+  max_streaming_memory: 5_000_000, # 5MB
   debug_streaming: false
 )
 
@@ -17,7 +17,7 @@ feed_types = [
   {content_type: "application/rss+xml", url: "https://example.com/feed.xml"},
   {content_type: "application/json", url: "https://reddit.com/r/crystal.json"},
   {content_type: "application/atom+xml", url: "https://example.com/atom.xml"},
-  {content_type: nil, url: "https://example.com/feed.json"}
+  {content_type: nil, url: "https://example.com/feed.json"},
 ]
 
 feed_types.each do |test|

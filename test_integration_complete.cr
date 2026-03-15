@@ -28,15 +28,15 @@ config_dom = Fetcher::RequestConfig.new(use_streaming_parser: false)
 class MockResponse
   def initialize(@body : String, @status_code : Int32 = 200)
   end
-  
+
   def body
     @body
   end
-  
+
   def status_code
     @status_code
   end
-  
+
   def headers
     {"Content-Type" => "application/rss+xml"}
   end
@@ -61,7 +61,7 @@ test_cases = [
   {content_type: "application/rss+xml", url: "https://example.com/feed.xml", expected: :rss},
   {content_type: "application/json", url: "https://reddit.com/r/test.json", expected: :reddit},
   {content_type: nil, url: "https://example.com/feed.atom", expected: :rss},
-  {content_type: "application/atom+xml", url: "https://example.com/atom", expected: :atom}
+  {content_type: "application/atom+xml", url: "https://example.com/atom", expected: :atom},
 ]
 
 test_cases.each do |test|

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>inkscape releases</title>
+  <link href="https://gitlab.com/inkscape/inkscape/-/releases.atom" rel="self" type="application/atom+xml"/>
+  <link href="https://gitlab.com/inkscape/inkscape/-/releases" rel="alternate" type="text/html"/>
+  <id>https://gitlab.com/inkscape/inkscape/-/releases</id>
+  <updated>2024-10-12T21:20:04Z</updated>
+  <entry>
+    <id>https://gitlab.com/inkscape/inkscape/-/releases/INKSCAPE_1_4</id>
+    <link href="https://gitlab.com/inkscape/inkscape/-/releases/INKSCAPE_1_4"/>
+    <title>INKSCAPE_1_4</title>
+    <updated>2024-10-12T21:20:04Z</updated>
+    <content></content>
+  </entry>
+  <entry>
+    <id>https://gitlab.com/inkscape/inkscape/-/releases/INKSCAPE_1_3_2</id>
+    <link href="https://gitlab.com/inkscape/inkscape/-/releases/INKSCAPE_1_3_2"/>
+    <title>INKSCAPE_1_3_2</title>
+    <updated>2024-09-15T14:30:22Z</updated>
+    <content>Bug fix release</content>
+  </entry>
+</feed>

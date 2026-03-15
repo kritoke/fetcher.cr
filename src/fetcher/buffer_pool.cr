@@ -54,9 +54,9 @@ module Fetcher
 
     private def self.categorize_size(size : Int) : Symbol
       case size
-      when ..4096    then :small
-      when ..16384   then :medium
-      else                :large
+      when ..4096  then :small
+      when ..16384 then :medium
+      else              :large
       end
     end
   end

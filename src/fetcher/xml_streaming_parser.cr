@@ -1,6 +1,6 @@
 require "xml"
 require "./entry"
-require "./result"  
+require "./result"
 require "./streaming_rss_parser"
 
 module Fetcher
@@ -15,11 +15,11 @@ module Fetcher
 
     def initialize(
       @site_link : String? = nil,
-      @favicon : String? = nil, 
+      @favicon : String? = nil,
       @feed_title : String? = nil,
       @feed_description : String? = nil,
       @feed_language : String? = nil,
-      @feed_authors : Array(Author) = [] of Author
+      @feed_authors : Array(Author) = [] of Author,
     )
     end
 
@@ -28,7 +28,7 @@ module Fetcher
       ResultBuilder.success(
         entries: entries,
         site_link: @site_link,
-        favicon: @favicon, 
+        favicon: @favicon,
         feed_title: @feed_title,
         feed_description: @feed_description,
         feed_language: @feed_language,
@@ -54,15 +54,15 @@ module Fetcher
     # Parse XML feed completely and return Result with metadata
     def parse_complete(io : IO, limit : Int32? = nil, config : RequestConfig? = nil) : Result
       actual_limit = limit || @limit
-      
+
       # Check memory limit before parsing
       check_memory_limit(io, config)
-      
+
       # Use existing StreamingRSSParser for now
       reader = XML::Reader.new(io)
       parser = StreamingRSSParser.new
       entries = parser.parse_entries(reader, actual_limit)
-      
+
       # Create minimal metadata (feed metadata extraction will be added later)
       metadata = FeedMetadata.new
       metadata.to_result(entries)
@@ -90,7 +90,7 @@ module Fetcher
 
     private def check_memory_limit(io : IO, config : RequestConfig?)
       return unless config
-      
+
       # Check if IO size exceeds memory limit
       if io.responds_to?(:size) && io.size > config.max_streaming_memory
         raise StreamingErrorHandling::MemoryLimitExceeded.new(
@@ -113,7 +113,7 @@ module Fetcher
     protected def next_entry : Entry?
       # Parse all entries on first call (not truly lazy, but works for now)
       @entries ||= @parser.parse_entries(@reader, @limit)
-      
+
       if @current_index < @entries.size
         entry = @entries[@current_index]
         @current_index += 1

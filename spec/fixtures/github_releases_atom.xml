@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>fetcher.cr releases</title>
+  <link href="https://github.com/kritoke/fetcher.cr/releases.atom" rel="self" type="application/atom+xml"/>
+  <link href="https://github.com/kritoke/fetcher.cr/releases" rel="alternate" type="text/html"/>
+  <id>tag:github.com,2008:Repository/123456789</id>
+  <updated>2026-03-15T12:00:00Z</updated>
+  <entry>
+    <id>tag:github.com,2008:Repository/123456789/v0.6.4</id>
+    <link href="https://github.com/kritoke/fetcher.cr/releases/tag/v0.6.4"/>
+    <title>v0.6.4</title>
+    <updated>2026-03-15T12:00:00Z</updated>
+    <content><![CDATA[Fixed Crystal 1.18 compatibility]]></content>
+  </entry>
+  <entry>
+    <id>tag:github.com,2008:Repository/123456789/v0.6.3</id>
+    <link href="https://github.com/kritoke/fetcher.cr/releases/tag/v0.6.3"/>
+    <title>v0.6.3</title>
+    <updated>2026-03-15T10:30:00Z</updated>
+    <content><![CDATA[Switched to crest HTTP client]]></content>
+  </entry>
+</feed>

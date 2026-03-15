@@ -8,7 +8,7 @@ puts "Streaming parser config created: #{config.use_streaming_parser}"
 xml_parser = Fetcher::XMLStreamingParser.new(10)
 puts "XML streaming parser created"
 
-# Test JSON streaming parser  
+# Test JSON streaming parser
 json_parser = Fetcher::JSONStreamingParser.new(10)
 puts "JSON streaming parser created"
 

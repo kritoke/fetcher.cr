@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>testuser/testrepo releases</title>
+  <link href="https://codeberg.org/testuser/testrepo/releases.atom" rel="self" type="application/atom+xml"/>
+  <link href="https://codeberg.org/testuser/testrepo/releases" rel="alternate" type="text/html"/>
+  <id>https://codeberg.org/testuser/testrepo/releases</id>
+  <updated>2024-01-15T10:30:00Z</updated>
+  <entry>
+    <id>https://codeberg.org/testuser/testrepo/releases/tag/v1.0.0</id>
+    <link href="https://codeberg.org/testuser/testrepo/releases/tag/v1.0.0"/>
+    <title>v1.0.0</title>
+    <updated>2024-01-15T10:30:00Z</updated>
+    <content></content>
+  </entry>
+  <entry>
+    <id>https://codeberg.org/testuser/testrepo/releases/tag/v0.8.0</id>
+    <link href="https://codeberg.org/testuser/testrepo/releases/tag/v0.8.0"/>
+    <title>v0.8.0</title>
+    <updated>2024-01-05T09:20:00Z</updated>
+    <content>Initial release</content>
+  </entry>
+</feed>

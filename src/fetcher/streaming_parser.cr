@@ -11,7 +11,7 @@ module Fetcher
         when .includes?("application/rss+xml")
           return :rss
         when .includes?("application/atom+xml")
-          return :atom  
+          return :atom
         when .includes?("application/json")
           # Check URL patterns for more specific detection
           if url.includes?("reddit.com")

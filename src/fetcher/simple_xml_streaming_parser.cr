@@ -2,7 +2,7 @@ require "xml"
 require "./entry"
 require "./result"
 require "./time_parser"
-require "./author" 
+require "./author"
 require "./attachment"
 require "./html_utils"
 
@@ -15,32 +15,32 @@ module Fetcher
     def parse_entries(io : IO, limit : Int32? = nil) : Array(Entry)
       actual_limit = limit || @limit
       reader = XML::Reader.new(io)
-      
+
       entries = [] of Entry
       is_in_item = false
       current_entry_data = nil
-      
+
       while reader.read && entries.size < actual_limit
         case reader.node_type
         when :element
           if reader.name == "item"
             is_in_item = true
             current_entry_data = {
-              :title => "",
-              :link => "",
-              :pub_date => "",
+              :title       => "",
+              :link        => "",
+              :pub_date    => "",
               :description => "",
-              :content => ""
+              :content     => "",
             }
           elsif is_in_item && current_entry_data
             # Handle item elements - read their content
             element_name = reader.name
             element_content = read_element_content(reader)
-            
+
             case element_name
             when "title"
               current_entry_data[:title] = element_content
-            when "link"  
+            when "link"
               current_entry_data[:link] = element_content
             when "pubDate", "dc:date"
               current_entry_data[:pub_date] = element_content
@@ -70,7 +70,7 @@ module Fetcher
           end
         end
       end
-      
+
       entries
     end
 
@@ -78,10 +78,10 @@ module Fetcher
       if reader.empty_element?
         return ""
       end
-      
+
       content = ""
       depth = 0
-      
+
       while reader.read
         case reader.node_type
         when :text, :cdata
@@ -99,7 +99,7 @@ module Fetcher
           break
         end
       end
-      
+
       content
     end
   end

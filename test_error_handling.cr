@@ -23,7 +23,7 @@ large_rss += "</channel></rss>"
 
 config_memory_limit = Fetcher::RequestConfig.new(
   use_streaming_parser: true,
-  max_streaming_memory: 1_000_000,  # 1MB limit for testing
+  max_streaming_memory: 1_000_000, # 1MB limit for testing
   debug_streaming: true
 )
 
@@ -48,7 +48,7 @@ json_error = JSON::ParseException.new("Test JSON error", 0, 0)
 memory_error = Fetcher::StreamingErrorHandling::MemoryLimitExceeded.new("Test memory error")
 
 puts "  XML::Error: #{xml_error.class}"
-puts "  JSON::ParseException: #{json_error.class}"  
+puts "  JSON::ParseException: #{json_error.class}"
 puts "  MemoryLimitExceeded: #{memory_error.class}"
 
 # Test error handling
@@ -92,7 +92,7 @@ XML
 
 config_normal = Fetcher::RequestConfig.new(
   use_streaming_parser: true,
-  max_streaming_memory: 10_000_000  # 10MB
+  max_streaming_memory: 10_000_000 # 10MB
 )
 
 puts "  Feed size: #{normal_rss.bytesize} bytes"

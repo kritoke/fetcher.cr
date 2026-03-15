@@ -42,7 +42,7 @@ module Fetcher
     def self.return_connection(domain : String, client : HTTP::Client)
       @@lock.synchronize do
         pool = (@@pools[domain] ||= Array(PooledConnection).new)
-        
+
         active_count = pool.size
         if active_count < @@max_connections_per_domain
           pool << PooledConnection.new(client, domain)

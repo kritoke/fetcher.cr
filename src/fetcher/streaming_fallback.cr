@@ -23,7 +23,7 @@ module Fetcher
           if config.debug_streaming?
             puts "Streaming parser failed, falling back to DOM parser: #{ex.class} - #{ex.message}"
           end
-          
+
           # Re-raise to let caller handle fallback
           raise ex
         end
@@ -32,7 +32,7 @@ module Fetcher
         streaming_block.call
       end
     end
-    
+
     # Check if debug streaming is enabled
     private def self.debug_streaming?(config : RequestConfig) : Bool
       config.debug_streaming

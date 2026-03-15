@@ -9,7 +9,7 @@ module Fetcher
       ex : Exception,
       config : RequestConfig,
       feed_type : Symbol,
-      url : String? = nil
+      url : String? = nil,
     ) : Exception
       case ex
       when XML::Error, JSON::ParseException
@@ -42,16 +42,16 @@ module Fetcher
       # Common transient errors
       message = ex.message.to_s.downcase
       message.includes?("timeout") ||
-      message.includes?("connection reset") ||
-      message.includes?("broken pipe") ||
-      message.includes?("network") ||
-      message.includes?("ssl")
+        message.includes?("connection reset") ||
+        message.includes?("broken pipe") ||
+        message.includes?("network") ||
+        message.includes?("ssl")
     end
 
     # Log fallback information (only if debug enabled)
     private def self.log_fallback(config : RequestConfig, error_type : String, feed_type : Symbol, url : String?, ex : Exception)
       return unless config.debug_streaming
-      
+
       url_str = url ? " for #{url}" : ""
       puts "Streaming parser #{error_type} error#{url_str} (#{feed_type}): #{ex.class} - #{ex.message}"
       puts "  Falling back to DOM parser..."
@@ -60,7 +60,7 @@ module Fetcher
     # Log error information (only if debug enabled)
     private def self.log_error(config : RequestConfig, error_type : String, feed_type : Symbol, url : String?, ex : Exception)
       return unless config.debug_streaming
-      
+
       url_str = url ? " for #{url}" : ""
       puts "Streaming parser #{error_type} error#{url_str} (#{feed_type}): #{ex.class} - #{ex.message}"
       puts "  Not falling back to avoid resource issues"

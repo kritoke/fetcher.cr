@@ -59,7 +59,7 @@ module Fetcher
           io = IO::Memory.new(body)
           parser = Fetcher::WorkingJSONStreamingParser.new(limit)
           entries = parser.parse_entries(io, limit, config)
-          
+
           # For JSON Feed, we need to extract metadata separately
           # For now, return minimal metadata
           return ResultBuilder.success(
@@ -79,7 +79,7 @@ module Fetcher
           puts "JSON Feed streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
         end
       end
-      
+
       # Fallback to DOM parser
       parsed = JSON.parse(body)
 
