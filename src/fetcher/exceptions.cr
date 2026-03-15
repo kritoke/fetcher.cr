@@ -1,3 +1,5 @@
+require "./fetch_error"
+
 module Fetcher
   # Base exception for all fetcher errors
   class FetchError < Exception

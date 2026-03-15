@@ -17,6 +17,7 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 - **Retry Logic** - Built-in retry with exponential backoff
 - **Configurable Timeouts** - Customize connection and read timeouts
 - **Rate Limiting** - Optional per-domain rate limiting to prevent API abuse
+- **Circuit Breaker** - Per-domain circuit breaker for resilience when fetching thousands of feeds
 - **HTTP Compression** - Automatic gzip/deflate support
 - **Secure URL Detection** - Blocks private IP ranges to prevent SSRF attacks
 - **Type-Safe Errors** - Structured error types for better error handling
@@ -31,6 +32,10 @@ v0.4.0 adds optional rate limiting to prevent API abuse.
 
 v0.5.0 adds streaming processing for memory safety with large feeds and token bucket rate limiting for better scalability.
 
+v0.6.0 adds circuit breaker support for resilience when fetching thousands of feeds.
+
+v0.7.0 removes async API methods and fixes thread-safety issues with HTTP client reuse.
+
 ## Installation
 
 Add to your `shard.yml`:
@@ -39,7 +44,7 @@ Add to your `shard.yml`:
 dependencies:
   fetcher:
     github: kritoke/fetcher.cr
-    version: "~> 0.5"
+    version: "~> 0.7"
 ```
 
 ## Usage
@@ -117,6 +122,36 @@ config = Fetcher::RequestConfig.new(
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
 ```
 
+### Circuit Breaker (v0.6.0+)
+
+For high-volume applications fetching thousands of feeds, the circuit breaker prevents cascading failures by automatically stopping requests to failing domains.
+
+```crystal
+# Configure circuit breaker (enabled by default)
+config = Fetcher::RequestConfig.new(
+  # Circuit breaker settings
+  circuit_breaker_enabled: true,           # Enable/disable (default: true)
+  circuit_breaker_failure_threshold: 5,    # Open circuit after 5 failures
+  circuit_breaker_recovery_timeout: 60.seconds  # Wait 60s before testing recovery
+)
+
+result = Fetcher.pull("https://failing-domain.com/feed.xml", config: config)
+
+# Monitor circuit breaker state
+states = Fetcher::CircuitBreaker::Registry.all_states
+states.each do |domain, (state, failure_count)|
+  puts "#{domain}: #{state} (#{failure_count} failures)"
+end
+```
+
+When a circuit breaker is open, requests to that domain are immediately rejected with a `CircuitOpenError` without making HTTP requests, reducing load on failing services.
+
+The circuit breaker follows a standard state machine:
+- **Closed**: Normal operation
+- **Open**: After threshold failures, reject all requests
+- **Half-Open**: After recovery timeout, allow one test request
+- **Closed**: If test request succeeds, return to normal operation
+
 ### Error Handling (v0.4.0+)
 
 ```crystal
@@ -165,6 +200,38 @@ headers = HTTP::Headers{
 }
 
 result = Fetcher.pull("https://example.com/feed.xml", headers: headers)
+```
+
+### Breaking Changes in v0.7.0
+
+The `*_async` methods have been removed. Crystal's native fiber support makes these wrapper methods redundant. Users who need async behavior should wrap calls in fibers directly:
+
+```crystal
+# Before (v0.6.x)
+channel = Fetcher.pull_async(url)
+result = channel.receive
+
+# After (v0.7.0+)
+channel = Channel(Fetcher::Result).new
+spawn { channel << Fetcher.pull(url) }
+result = channel.receive
+```
+
+Removed methods:
+- `Fetcher.pull_async(url, ...)`
+- `Fetcher.pull_rss_async(url, ...)`
+- `Fetcher.pull_reddit_async(url, ...)`
+- `Fetcher.pull_software_async(url, ...)`
+- `Fetcher.pull_json_feed_async(url, ...)`
+
+This change reduces API surface area and eliminates potential resource leaks from unreceived channels.
+
+```crystal
+# Force a specific driver instead of auto-detection
+result = Fetcher.pull_rss("https://example.com/feed.xml")
+result = Fetcher.pull_reddit("https://reddit.com/r/crystal")
+result = Fetcher.pull_software("https://github.com/crystal-lang/crystal/releases")
+result = Fetcher.pull_json_feed("https://example.com/feed.json")
 ```
 
 ### Explicit Driver Selection

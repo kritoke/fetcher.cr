@@ -5,7 +5,7 @@ require "./retry"
 require "./crest_http_client"
 require "./rss"
 require "./exceptions"
-require "./working_json_streaming_parser"
+require "./json_streaming_parser"
 
 module Fetcher
   module Reddit
@@ -57,8 +57,8 @@ module Fetcher
         if config.use_streaming_parser
           begin
             io = IO::Memory.new(response.body)
-            parser = Fetcher::WorkingJSONStreamingParser.new(limit)
-            items = parser.parse_entries(io, limit, config)
+            parser = Fetcher::JSONStreamingParser.new(limit)
+            items = parser.parse_entries(io, limit)
 
             site_link = "https://www.reddit.com/r/#{subreddit}"
             favicon = "https://www.reddit.com/favicon.ico"

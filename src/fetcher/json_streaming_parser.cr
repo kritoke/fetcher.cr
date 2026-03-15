@@ -94,11 +94,11 @@ module Fetcher
       post_data = parse_reddit_post_data
       return unless post_data
 
-      title = post_data[:title] || "Untitled"
-      post_url = post_data[:url] || ""
-      permalink = post_data[:permalink] || ""
-      created_utc = post_data[:created_utc] || 0.0
-      is_self = post_data[:is_self] || false
+      title = extract_string(post_data, :title, "Untitled")
+      post_url = extract_string(post_data, :url, "")
+      permalink = extract_string(post_data, :permalink, "")
+      created_utc = extract_float(post_data, :created_utc, 0.0)
+      is_self = extract_bool(post_data, :is_self, false)
 
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
@@ -111,6 +111,31 @@ module Fetcher
       )
     rescue
       nil
+    end
+
+    private def extract_string(data : Hash(Symbol, String | Float64 | Bool), key : Symbol, default : String) : String
+      value = data[key]?
+      case value
+      when String then value
+      else             default
+      end
+    end
+
+    private def extract_float(data : Hash(Symbol, String | Float64 | Bool), key : Symbol, default : Float64) : Float64
+      value = data[key]?
+      case value
+      when Float64 then value
+      when Int     then value.to_f64
+      else              default
+      end
+    end
+
+    private def extract_bool(data : Hash(Symbol, String | Float64 | Bool), key : Symbol, default : Bool) : Bool
+      value = data[key]?
+      case value
+      when Bool then value
+      else           default
+      end
     end
 
     private def next_json_feed_entry : Entry?
@@ -199,20 +224,17 @@ module Fetcher
     end
 
     private def parse_json_feed_item : Entry?
-      # Parse JSON Feed item from current pull parser position
-      # Expected format: {"id": "...", "url": "...", "title": "...", ...}
-
       item_data = parse_json_feed_item_data
       return unless item_data
 
-      # Extract item fields
-      title = item_data[:title] || "Untitled"
-      url = item_data[:url] || item_data[:id] || "#"
-      content_html = item_data[:content_html]
-      content_text = item_data[:content_text]
-      date_published = item_data[:date_published]
-      tags = item_data[:tags] || [] of String
-      authors_data = item_data[:authors] || [] of Hash(Symbol, String)
+      # Extract item fields with proper type handling
+      title = extract_string_value(item_data, :title, "Untitled")
+      url = extract_string_value(item_data, :url, extract_string_value(item_data, :id, "#"))
+      content_html = extract_string_value(item_data, :content_html, nil)
+      content_text = extract_string_value(item_data, :content_text, nil)
+      date_published = extract_string_value(item_data, :date_published, nil)
+      tags = extract_array_value(item_data, :tags)
+      authors_data = extract_authors_value(item_data, :authors)
 
       # Create content
       content = content_html.presence || content_text.presence || ""
@@ -228,8 +250,8 @@ module Fetcher
       author_url = nil
       if authors_data.size > 0
         first_author = authors_data[0]
-        author = first_author[:name]
-        author_url = first_author[:url]
+        author = first_author[:name]?
+        author_url = first_author[:url]?
       end
 
       Entry.create(
@@ -245,6 +267,30 @@ module Fetcher
     rescue
       # Skip malformed items
       nil
+    end
+
+    private def extract_string_value(data : Hash, key : Symbol, default : String?) : String?
+      value = data[key]?
+      case value
+      when String then value.empty? ? default : value
+      else             default
+      end
+    end
+
+    private def extract_array_value(data : Hash, key : Symbol) : Array(String)
+      value = data[key]?
+      case value
+      when Array(String) then value
+      else                    [] of String
+      end
+    end
+
+    private def extract_authors_value(data : Hash, key : Symbol) : Array(Hash(Symbol, String))
+      value = data[key]?
+      case value
+      when Array(Hash(Symbol, String)) then value
+      else                                  [] of Hash(Symbol, String)
+      end
     end
 
     private def parse_json_feed_item_data : Hash(Symbol, String | Array(String) | Array(Hash(Symbol, String)))?
@@ -291,16 +337,24 @@ module Fetcher
     private def parse_authors_array : Array(Hash(Symbol, String))
       authors = [] of Hash(Symbol, String)
       @pull.read_array do
-        author = {} of Symbol => String
+        name = nil
+        url = nil
         @pull.read_object do |key|
           case key
-          when "name", "url", "uri"
-            author[key.to_sym] = @pull.read_string
+          when "name"
+            name = @pull.read_string
+          when "url", "uri"
+            url = @pull.read_string
           else
             @pull.skip
           end
         end
-        authors << author unless author.empty?
+        if name || url
+          author = {} of Symbol => String
+          author[:name] = name if name
+          author[:url] = url if url
+          authors << author
+        end
       end
       authors
     rescue

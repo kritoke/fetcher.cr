@@ -31,11 +31,12 @@ module Fetcher
       entries = [] of Entry
       count = 0
       while !limit || count < limit
-        begin
-          entry = self.next
+        entry = self.next
+        case entry
+        when Entry
           entries << entry
           count += 1
-        rescue Iterator::Stop
+        when Iterator::Stop
           break
         end
       end

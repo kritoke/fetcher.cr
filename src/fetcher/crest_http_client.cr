@@ -1,6 +1,9 @@
 require "crest"
 require "./request_config"
 require "./token_bucket_rate_limiter"
+require "./circuit_breaker"
+require "./safe_feed_processor"
+require "./exceptions"
 
 module Fetcher
   class CrestHttpClient
@@ -10,24 +13,16 @@ module Fetcher
     class DNSError < Exception
     end
 
-    @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
-    @@limiters_lock = Mutex.new
+    class CircuitOpenError < Exception
+      getter domain : String
 
-    @@http_clients = {} of String => ::HTTP::Client
-    @@client_lock = Mutex.new
-
-    def self.get_http_client(host : String, config : RequestConfig) : ::HTTP::Client
-      @@client_lock.synchronize do
-        client = @@http_clients[host]?
-        unless client
-          client = ::HTTP::Client.new(URI.parse("https://#{host}"))
-          client.connect_timeout = config.connect_timeout
-          client.read_timeout = config.read_timeout
-          @@http_clients[host] = client
-        end
-        client
+      def initialize(@domain : String)
+        super("Circuit breaker open for domain: #{@domain}")
       end
     end
+
+    @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
+    @@limiters_lock = Mutex.new
 
     def self.get_token_bucket_limiter(domain : String, config : RequestConfig) : TokenBucketRateLimiter
       @@limiters_lock.synchronize do
@@ -42,54 +37,117 @@ module Fetcher
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
-      uri = URI.parse(url)
-      host = uri.host || "default"
+      domain = "default"
+      begin
+        domain = extract_domain(url)
 
-      domain = uri.host || "default"
-      rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
-      rate_limiter.acquire
+        check_circuit_breaker(domain)
 
-      http_client = self.class.get_http_client(host, @config)
-      crest_headers = build_crest_headers(headers)
+        rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
+        rate_limiter.acquire
 
-      response = Crest.head(url, headers: crest_headers, http_client: http_client)
-      convert_response(response)
-    rescue ex : URI::Error
-      raise DNSError.new("Invalid URL: #{ex.message}")
-    rescue ex : Socket::Error
-      raise DNSError.new("DNS/Connection error: #{ex.message}")
-    rescue ex : IO::TimeoutError
-      raise ex
-    rescue ex : Crest::RequestFailed
-      raise DNSError.new("HTTP error: #{ex.response.status_code}")
+        crest_headers = build_crest_headers(headers)
+
+        # Don't reuse HTTP clients - each request gets its own connection
+        # to avoid thread-safety issues with concurrent requests
+        response = Crest.head(
+          url,
+          headers: crest_headers,
+          connect_timeout: @config.connect_timeout,
+          read_timeout: @config.read_timeout
+        )
+        record_success(domain)
+        convert_response(response)
+      rescue ex : CircuitOpenError
+        raise ex
+      rescue ex
+        record_failure(domain) unless domain.empty?
+        handle_error(ex, url)
+      end
     end
 
     def get(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
-      uri = URI.parse(url)
-      host = uri.host || "default"
+      domain = "default"
+      begin
+        domain = extract_domain(url)
 
-      domain = uri.host || "default"
-      rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
-      rate_limiter.acquire
+        check_circuit_breaker(domain)
 
-      http_client = self.class.get_http_client(host, @config)
-      crest_headers = build_crest_headers(headers)
+        rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
+        rate_limiter.acquire
 
-      response = Crest.get(url, headers: crest_headers, http_client: http_client)
+        crest_headers = build_crest_headers(headers)
 
-      if response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
-        raise DNSError.new("Response too large (>#{SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")
+        # Don't reuse HTTP clients - each request gets its own connection
+        # to avoid thread-safety issues with concurrent requests
+        response = Crest.get(
+          url,
+          headers: crest_headers,
+          connect_timeout: @config.connect_timeout,
+          read_timeout: @config.read_timeout
+        )
+
+        if response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
+          raise DNSError.new("Response too large (>#{SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")
+        end
+
+        record_success(domain)
+        convert_response(response)
+      rescue ex : CircuitOpenError
+        raise ex
+      rescue ex
+        record_failure(domain)
+        handle_error(ex, url)
       end
+    end
 
-      convert_response(response)
-    rescue ex : URI::Error
-      raise DNSError.new("Invalid URL: #{ex.message}")
-    rescue ex : Socket::Error
-      raise DNSError.new("DNS/Connection error: #{ex.message}")
-    rescue ex : IO::TimeoutError
-      raise ex
-    rescue ex : Crest::RequestFailed
-      raise DNSError.new("HTTP error: #{ex.response.status_code}")
+    private def extract_domain(url : String) : String
+      uri = URI.parse(url)
+      uri.host || "default"
+    rescue
+      "default"
+    end
+
+    private def handle_error(ex : Exception, url : String)
+      case ex
+      when CircuitOpenError
+        raise ex
+      when URI::Error
+        raise DNSError.new("Invalid URL: #{ex.message}")
+      when Socket::Error
+        raise DNSError.new("DNS/Connection error: #{ex.message}")
+      when IO::TimeoutError
+        raise TimeoutError.new("Timeout: #{ex.message}")
+      when OpenSSL::SSL::Error
+        raise DNSError.new("SSL error: #{ex.message}")
+      when Crest::RequestFailed
+        raise DNSError.new("HTTP error: #{ex.response.status_code}")
+      else
+        raise DNSError.new("Request error: #{ex.message}")
+      end
+    end
+
+    private def check_circuit_breaker(domain : String) : Nil
+      return unless @config.circuit_breaker_enabled
+
+      circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
+      unless circuit_breaker.allow_request?
+        raise CircuitOpenError.new(domain)
+      end
+    end
+
+    private def record_success(domain : String) : Nil
+      return unless @config.circuit_breaker_enabled
+
+      circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
+      circuit_breaker.record_success
+    end
+
+    private def record_failure(domain : String) : Nil
+      return unless @config.circuit_breaker_enabled
+
+      circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
+      circuit_breaker.record_failure
     end
 
     private def convert_response(crest_response : Crest::Response) : ::HTTP::Client::Response

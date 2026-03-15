@@ -5,7 +5,7 @@ require "./crest_http_client"
 require "./exceptions"
 require "./json_feed_parser"
 require "./result_builder"
-require "./working_json_streaming_parser"
+require "./json_streaming_parser"
 
 module Fetcher
   module JSONFeed
@@ -57,8 +57,8 @@ module Fetcher
       if config.use_streaming_parser
         begin
           io = IO::Memory.new(body)
-          parser = Fetcher::WorkingJSONStreamingParser.new(limit)
-          entries = parser.parse_entries(io, limit, config)
+          parser = Fetcher::JSONStreamingParser.new(limit)
+          entries = parser.parse_entries(io, limit)
 
           # For JSON Feed, we need to extract metadata separately
           # For now, return minimal metadata

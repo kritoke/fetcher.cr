@@ -141,14 +141,27 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       request_headers = Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
 
-      result = try_gitlab_api(base_url, repo, limit, http_client, request_headers)
-      return result if result && result.success?
+      begin
+        result = try_gitlab_api(base_url, repo, limit, http_client, request_headers)
+        return result if result && result.success?
+      rescue ex : DNSError
+        # If SSL error occurs in API, don't fallback - it will likely happen again
+        return Fetcher.error_result(ErrorKind::DNSError, "GitLab API SSL error: #{ex.message}")
+      end
 
-      result = try_gitlab_releases_atom(base_url, repo, limit, http_client, request_headers)
-      return result if result && result.success?
+      begin
+        result = try_gitlab_releases_atom(base_url, repo, limit, http_client, request_headers)
+        return result if result && result.success?
+      rescue ex : DNSError
+        return Fetcher.error_result(ErrorKind::DNSError, "GitLab releases atom SSL error: #{ex.message}")
+      end
 
-      result = try_gitlab_tags_atom(base_url, repo, limit, http_client, request_headers)
-      return result if result
+      begin
+        result = try_gitlab_tags_atom(base_url, repo, limit, http_client, request_headers)
+        return result if result
+      rescue ex : DNSError
+        return Fetcher.error_result(ErrorKind::DNSError, "GitLab tags atom SSL error: #{ex.message}")
+      end
 
       Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: No releases or tags found", 404)
     end
@@ -178,6 +191,12 @@ module Fetcher
         )
       rescue JSON::ParseException
         nil
+      rescue ex : OpenSSL::SSL::Error
+        # Re-raise SSL errors to be handled properly
+        raise DNSError.new("GitLab SSL error: #{ex.message}")
+      rescue ex : FetchError
+        # Re-raise typed fetch errors
+        raise ex
       rescue
         nil
       end
@@ -224,6 +243,12 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
+      rescue ex : OpenSSL::SSL::Error
+        # Re-raise SSL errors to be handled properly
+        raise DNSError.new("GitLab releases atom SSL error: #{ex.message}")
+      rescue ex : FetchError
+        # Re-raise typed fetch errors
+        raise ex
       rescue
         nil
       end
@@ -248,6 +273,12 @@ module Fetcher
           site_link: "#{base_url}/#{repo}",
           favicon: "#{base_url}/favicon.ico"
         )
+      rescue ex : OpenSSL::SSL::Error
+        # Re-raise SSL errors to be handled properly
+        raise DNSError.new("GitLab tags atom SSL error: #{ex.message}")
+      rescue ex : FetchError
+        # Re-raise typed fetch errors
+        raise ex
       rescue
         nil
       end
@@ -259,11 +290,19 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       request_headers = Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
 
-      result = try_codeberg_api(repo, limit, http_client, request_headers)
-      return result if result && result.success?
+      begin
+        result = try_codeberg_api(repo, limit, http_client, request_headers)
+        return result if result && result.success?
+      rescue ex : DNSError
+        return Fetcher.error_result(ErrorKind::DNSError, "Codeberg API SSL error: #{ex.message}")
+      end
 
-      result = try_codeberg_releases_atom(repo, limit, http_client, request_headers)
-      return result if result
+      begin
+        result = try_codeberg_releases_atom(repo, limit, http_client, request_headers)
+        return result if result
+      rescue ex : DNSError
+        return Fetcher.error_result(ErrorKind::DNSError, "Codeberg releases atom SSL error: #{ex.message}")
+      end
 
       Fetcher.error_result(ErrorKind::HTTPError, "Codeberg fetch error: No releases found", 404)
     end
@@ -292,6 +331,12 @@ module Fetcher
         )
       rescue JSON::ParseException
         nil
+      rescue ex : OpenSSL::SSL::Error
+        # Re-raise SSL errors to be handled properly
+        raise DNSError.new("Codeberg API SSL error: #{ex.message}")
+      rescue ex : FetchError
+        # Re-raise typed fetch errors
+        raise ex
       rescue
         nil
       end
@@ -336,6 +381,12 @@ module Fetcher
           site_link: "https://codeberg.org/#{repo}",
           favicon: "https://codeberg.org/favicon.ico"
         )
+      rescue ex : OpenSSL::SSL::Error
+        # Re-raise SSL errors to be handled properly
+        raise DNSError.new("Codeberg releases atom SSL error: #{ex.message}")
+      rescue ex : FetchError
+        # Re-raise typed fetch errors
+        raise ex
       rescue
         nil
       end

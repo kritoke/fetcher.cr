@@ -11,6 +11,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.7.0] - 2026-03-15
+
+### BREAKING CHANGES
+
+#### Async API Removed
+All `*_async` methods have been removed. Crystal's native fiber support makes these wrappers redundant.
+
+**Migration:**
+```crystal
+# Before (v0.6.x)
+channel = Fetcher.pull_async(url)
+result = channel.receive
+
+# After (v0.7.0+)
+channel = Channel(Fetcher::Result).new
+spawn { channel << Fetcher.pull(url) }
+result = channel.receive
+
+# For multiple URLs:
+results = Array(Fetcher::Result).new
+channels = urls.map do |url|
+  ch = Channel(Fetcher::Result).new
+  spawn { ch << Fetcher.pull(url) }
+  ch
+end
+channels.each { |ch| results << ch.receive }
+```
+
+**Removed methods:**
+- `Fetcher.pull_async(url, ...)`
+- `Fetcher.pull_async(url, headers, etag, last_modified, ...)`
+- `Fetcher.pull_rss_async(url, ...)`
+- `Fetcher.pull_reddit_async(url, ...)`
+- `Fetcher.pull_software_async(url, ...)`
+- `Fetcher.pull_json_feed_async(url, ...)`
+
+### Added
+
+#### Circuit Breaker
+Production-grade circuit breaker for resilience when fetching thousands of feeds:
+- **Per-domain circuit breakers** - Tracks failures independently for each domain
+- **State machine** - Closed → Open → HalfOpen → Closed transitions
+- **Configurable thresholds** - Set via `RequestConfig`:
+  - `circuit_breaker_failure_threshold: Int32 = 5`
+  - `circuit_breaker_recovery_timeout: Time::Span = 60.seconds`
+  - `circuit_breaker_enabled: Bool = true`
+- **CircuitBreaker::Registry** - Access circuit breaker state for monitoring
+
+### Removed
+
+#### Dead Code Cleanup
+Removed ~500+ lines of over-engineered code:
+- `adaptive_concurrency_controller.cr` - System resource monitoring belongs in app code
+- `simple_json_streaming_parser.cr` - Fake streaming (used `JSON.parse`)
+- `working_json_streaming_parser.cr` - Fake streaming (used `gets_to_end`)
+- `simple_xml_streaming_parser.cr` - Duplicate/unused
+- `connection_pool.cr` - Unused, CrestHttpClient has its own client caching
+
+### Changed
+
+#### Simplified ConcurrentFetcher
+Replaced complex adaptive concurrency with simple semaphore pattern:
+- ~30 lines vs ~270 lines
+- Same external behavior
+- `max_concurrent` parameter (default: 16)
+
+#### Consolidated Streaming Parsers
+Single streaming parser per format:
+- `xml_streaming_parser.cr` - Real XML streaming with `XML::Reader`
+- `json_streaming_parser.cr` - Real JSON streaming with `JSON::PullParser`
+
+### Tests
+- Added 17 new circuit breaker tests
+- Total: 135 passing tests
+
 ## [0.6.4] - 2026-03-15
 
 ### Fixed
@@ -258,7 +333,9 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.6.3..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.7.0..HEAD
+[0.7.0]: https://github.com/kritoke/fetcher.cr/compare/v0.6.4..v0.7.0
+[0.6.4]: https://github.com/kritoke/fetcher.cr/compare/v0.6.3..v0.6.4
 [0.6.3]: https://github.com/kritoke/fetcher.cr/compare/v0.6.2..v0.6.3
 [0.6.2]: https://github.com/kritoke/fetcher.cr/compare/v0.6.1..v0.6.2
 [0.6.1]: https://github.com/kritoke/fetcher.cr/compare/v0.6.0..v0.6.1

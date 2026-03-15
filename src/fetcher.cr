@@ -17,6 +17,7 @@ require "./fetcher/rss_parser"
 require "./fetcher/json_feed_parser"
 require "./fetcher/result_builder"
 require "./fetcher/token_bucket_rate_limiter"
+require "./fetcher/circuit_breaker"
 require "./fetcher/safe_feed_processor"
 require "./fetcher/concurrent_fetcher"
 require "./fetcher/domain_batch_processor"
@@ -27,9 +28,6 @@ require "./fetcher/streaming_fallback"
 require "./fetcher/streaming_error_handling"
 require "./fetcher/xml_streaming_parser"
 require "./fetcher/json_streaming_parser"
-require "./fetcher/simple_xml_streaming_parser"
-require "./fetcher/simple_json_streaming_parser"
-require "./fetcher/working_json_streaming_parser"
 require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
@@ -127,21 +125,6 @@ module Fetcher
     end
   end
 
-  # Async version of pull
-  def self.pull_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull(url, headers, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
-  end
-
   def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     base_headers = Fetcher::CrestHttpClient.build_headers(headers)
     final_headers = Fetcher::CrestHttpClient.with_cache(base_headers, etag, last_modified)
@@ -160,94 +143,19 @@ module Fetcher
     end
   end
 
-  # Async version with cache headers
-  def self.pull_async(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull(url, headers, etag, last_modified, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
-  end
-
   def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     RSS.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
-  end
-
-  # Async version
-  def self.pull_rss_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull_rss(url, headers, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async RSS fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
   end
 
   def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     Reddit.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
-  # Async version
-  def self.pull_reddit_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull_reddit(url, headers, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async Reddit fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
-  end
-
   def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     Software.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
   end
 
-  # Async version
-  def self.pull_software_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull_software(url, headers, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async software fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
-  end
-
   def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     JSONFeed.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
-  end
-
-  # Async version
-  def self.pull_json_feed_async(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Channel(Result)
-    channel = Channel(Result).new
-    spawn do
-      begin
-        result = pull_json_feed(url, headers, limit, config)
-        channel.send(result)
-      rescue ex
-        error_result = Fetcher.error_result(ErrorKind::Unknown, "Async JSON feed fetch error: #{ex.message}")
-        channel.send(error_result)
-      end
-    end
-    channel
   end
 end

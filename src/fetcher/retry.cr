@@ -50,7 +50,7 @@ module Fetcher
   def self.transient_error?(ex : Exception) : Bool
     # Check for typed exceptions first
     case ex
-    when DNSError, TimeoutError, HTTPClientError
+    when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError
       return true
     when HTTPError
       # Client errors (4xx) are not transient, server errors (5xx) are
