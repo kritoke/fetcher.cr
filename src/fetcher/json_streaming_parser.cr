@@ -33,7 +33,7 @@ module Fetcher
     end
 
     protected def next_entry : Entry?
-      return nil if @entries_parsed >= @limit
+      return if @entries_parsed >= @limit
 
       # Determine feed type on first call
       unless @is_reddit || @is_json_feed
@@ -41,12 +41,9 @@ module Fetcher
       end
 
       if @is_reddit
-        return next_reddit_entry
+        next_reddit_entry
       elsif @is_json_feed
-        return next_json_feed_entry
-      else
-        # Unknown JSON format, skip
-        return nil
+        next_json_feed_entry
       end
     end
 
@@ -95,7 +92,7 @@ module Fetcher
 
     private def parse_reddit_post_data_and_create : Entry?
       post_data = parse_reddit_post_data
-      return nil unless post_data
+      return unless post_data
 
       title = post_data[:title] || "Untitled"
       post_url = post_data[:url] || ""
@@ -112,7 +109,7 @@ module Fetcher
         source_type: SourceType::Reddit,
         published_at: pub_date
       )
-    rescue ex
+    rescue
       nil
     end
 
@@ -146,7 +143,7 @@ module Fetcher
         end
       end
 
-      return nil unless post_data
+      return unless post_data
 
       # Extract post fields
       title = post_data[:title] || "Untitled"
@@ -167,7 +164,7 @@ module Fetcher
         source_type: SourceType::Reddit,
         published_at: pub_date
       )
-    rescue ex
+    rescue
       # Skip malformed posts
       nil
     end
@@ -193,7 +190,7 @@ module Fetcher
       end
 
       data.empty? ? nil : data
-    rescue ex
+    rescue
       nil
     end
 
@@ -206,7 +203,7 @@ module Fetcher
       # Expected format: {"id": "...", "url": "...", "title": "...", ...}
 
       item_data = parse_json_feed_item_data
-      return nil unless item_data
+      return unless item_data
 
       # Extract item fields
       title = item_data[:title] || "Untitled"
@@ -245,7 +242,7 @@ module Fetcher
         author_url: author_url,
         categories: tags
       )
-    rescue ex
+    rescue
       # Skip malformed items
       nil
     end
@@ -277,7 +274,7 @@ module Fetcher
       end
 
       data.empty? ? nil : data
-    rescue ex
+    rescue
       nil
     end
 
@@ -287,7 +284,7 @@ module Fetcher
         tags << @pull.read_string
       end
       tags
-    rescue ex
+    rescue
       [] of String
     end
 
@@ -306,7 +303,7 @@ module Fetcher
         authors << author unless author.empty?
       end
       authors
-    rescue ex
+    rescue
       [] of Hash(Symbol, String)
     end
   end

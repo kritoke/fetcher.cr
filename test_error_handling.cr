@@ -7,13 +7,13 @@ puts "\n📊 Test 1: Memory limit enforcement"
 
 # Create a large XML feed (simulate 15MB feed with 5MB limit)
 large_rss = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <title>Large Test Feed</title>
-    <link>https://example.com</link>
-    <description>Test feed for memory limit</description>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0">
+    <channel>
+      <title>Large Test Feed</title>
+      <link>https://example.com</link>
+      <description>Test feed for memory limit</description>
+  XML
 
 # Add many items to make it larger
 1000.times do |i|
@@ -52,11 +52,10 @@ puts "  JSON::ParseException: #{json_error.class}"
 puts "  MemoryLimitExceeded: #{memory_error.class}"
 
 # Test error handling
-config_test = Fetcher::RequestConfig.new(debug_streaming: true)
 
 begin
   raise memory_error
-rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
+rescue Fetcher::StreamingErrorHandling::MemoryLimitExceeded
   puts "  ✅ Successfully caught MemoryLimitExceeded"
 end
 
@@ -76,19 +75,19 @@ puts "  Max streaming memory: #{config_fallback.max_streaming_memory} bytes"
 puts "\n✅ Test 5: Normal operation with streaming"
 
 normal_rss = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <title>Normal Test Feed</title>
-    <link>https://example.com</link>
-    <description>Test feed</description>
-    <item>
-      <title>Test Item</title>
-      <link>https://example.com/item1</link>
-    </item>
-  </channel>
-</rss>
-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <rss version="2.0">
+    <channel>
+      <title>Normal Test Feed</title>
+      <link>https://example.com</link>
+      <description>Test feed</description>
+      <item>
+        <title>Test Item</title>
+        <link>https://example.com/item1</link>
+      </item>
+    </channel>
+  </rss>
+  XML
 
 config_normal = Fetcher::RequestConfig.new(
   use_streaming_parser: true,

@@ -34,9 +34,9 @@ module Fetcher
         end
 
         # Unknown format
-        return [] of Entry
+        [] of Entry
       rescue JSON::ParseException
-        return [] of Entry
+        [] of Entry
       end
     end
 
@@ -69,7 +69,7 @@ module Fetcher
     end
 
     private def parse_reddit_post_from_json(child : JSON::Any) : Entry?
-      post_data = child["data"]? || return nil
+      post_data = child["data"]? || return
 
       title = post_data["title"]?.try(&.as_s) || "Untitled"
       post_url = post_data["url"]?.try(&.as_s) || ""

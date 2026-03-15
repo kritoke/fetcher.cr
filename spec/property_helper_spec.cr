@@ -16,9 +16,9 @@ module PropertyTestHelper
   # Test that empty feeds return empty results
   def self.test_empty_feed(parser : Fetcher::EntryParser)
     empty_rss = <<-XML
-    <?xml version="1.0"?>
-    <rss version="2.0"><channel><title>Empty</title></channel></rss>
-    XML
+      <?xml version="1.0"?>
+      <rss version="2.0"><channel><title>Empty</title></channel></rss>
+      XML
 
     result = parser.parse_entries(empty_rss, 10)
     result.size.should eq(0)

@@ -2,18 +2,20 @@ require "xml"
 require "./src/fetcher/time_parser"
 
 # Simulate Reddit Atom feed entry parsing
-atom_xml = %(<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom">
-  <entry>
-    <author><name>/u/test</name></author>
-    <id>t3_1dtqh5c</id>
-    <link href="https://www.reddit.com/r/Crystal/comments/1dtqh5c/test/"/>
-    <updated>2024-07-02T16:45:46+00:00</updated>
-    <published>2024-07-02T16:45:46+00:00</published>
-    <title>Test Post</title>
-    <content type="html">Test content</content>
-  </entry>
-</feed>)
+atom_xml = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <feed xmlns="http://www.w3.org/2005/Atom">
+    <entry>
+      <author><name>/u/test</name></author>
+      <id>t3_1dtqh5c</id>
+      <link href="https://www.reddit.com/r/Crystal/comments/1dtqh5c/test/"/>
+      <updated>2024-07-02T16:45:46+00:00</updated>
+      <published>2024-07-02T16:45:46+00:00</published>
+      <title>Test Post</title>
+      <content type="html">Test content</content>
+    </entry>
+  </feed>
+XML
 
 xml = XML.parse(atom_xml)
 entry = xml.xpath_node("//*[local-name()='entry']")

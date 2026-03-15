@@ -1,7 +1,8 @@
 require "./src/fetcher/rss"
 
 # Simulate what RSS.perform_fetch does
-reddit_xml = %(<?xml version="1.0" encoding="UTF-8"?>
+reddit_xml = <<XML
+<?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
   <title>Crystal</title>
   <link rel="alternate" href="https://old.reddit.com/r/crystal/hot"/>
@@ -14,7 +15,8 @@ reddit_xml = %(<?xml version="1.0" encoding="UTF-8"?>
     <title>Test Post</title>
     <content type="html">Test content</content>
   </entry>
-</feed>)
+</feed>
+XML
 
 # Simulate the parse_feed logic from rss.cr:49-71
 xml = XML.parse(reddit_xml, options: XML::ParserOptions::RECOVER |

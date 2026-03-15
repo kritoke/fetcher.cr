@@ -29,10 +29,10 @@ module Fetcher
     def self.get_connection(domain : String) : HTTP::Client?
       @@lock.synchronize do
         pool = @@pools[domain]?
-        return nil unless pool
+        return unless pool
 
-        conn = pool.find { |c| !c.client.closed? }
-        return nil unless conn
+        conn = pool.find { |connection| !connection.client.closed? }
+        return unless conn
 
         conn.mark_used
         conn.client
@@ -54,7 +54,7 @@ module Fetcher
 
     def self.cleanup_idle(timeout_ms : Int = @@connection_timeout)
       @@lock.synchronize do
-        @@pools.each do |domain, pool|
+        @@pools.each do |_, pool|
           pool.reject! do |conn|
             idle = conn.idle_time_ms > timeout_ms
             conn.client.close if idle
@@ -68,7 +68,7 @@ module Fetcher
     def self.clear
       @@lock.synchronize do
         @@pools.each_value do |pool|
-          pool.each { |conn| conn.client.close }
+          pool.each(&.client.close)
         end
         @@pools.clear
       end

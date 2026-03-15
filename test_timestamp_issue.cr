@@ -2,28 +2,30 @@ require "./src/fetcher"
 
 # Test 1: Parse actual Reddit Atom feed format
 puts "=== Test 1: Reddit Atom Feed ==="
-reddit_atom = %(<?xml version="1.0" encoding="UTF-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
-  <title>r/crystal</title>
-  <link rel="alternate" href="https://www.reddit.com/r/crystal/hot"/>
-  <entry>
-    <author><name>/u/testuser</name></author>
-    <id>t3_test123</id>
-    <link href="https://www.reddit.com/r/crystal/comments/test123/"/>
-    <updated>2024-07-02T16:45:46+00:00</updated>
-    <published>2024-07-02T16:45:46+00:00</published>
-    <title>Test Post Title</title>
-    <content type="html">Test content here</content>
-  </entry>
-  <entry>
-    <author><name>/u/testuser2</name></author>
-    <id>tst_test456</id>
-    <link href="https://www.reddit.com/r/crystal/comments/test456/"/>
-    <updated>2024-06-15T10:30:00+00:00</updated>
-    <title>Post without published field</title>
-    <content type="html">Should use updated field</content>
-  </entry>
-</feed>)
+reddit_atom = <<-XML
+  <?xml version="1.0" encoding="UTF-8"?>
+  <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
+    <title>r/crystal</title>
+    <link rel="alternate" href="https://www.reddit.com/r/crystal/hot"/>
+    <entry>
+      <author><name>/u/testuser</name></author>
+      <id>t3_test123</id>
+      <link href="https://www.reddit.com/r/crystal/comments/test123/"/>
+      <updated>2024-07-02T16:45:46+00:00</updated>
+      <published>2024-07-02T16:45:46+00:00</published>
+      <title>Test Post Title</title>
+      <content type="html">Test content here</content>
+    </entry>
+    <entry>
+      <author><name>/u/testuser2</name></author>
+      <id>tst_test456</id>
+      <link href="https://www.reddit.com/r/crystal/comments/test456/"/>
+      <updated>2024-06-15T10:30:00+00:00</updated>
+      <title>Post without published field</title>
+      <content type="html">Should use updated field</content>
+    </entry>
+  </feed>
+XML
 
 # Test using the actual RSS module internals via XML parsing
 xml = XML.parse(reddit_atom, options: XML::ParserOptions::RECOVER |
@@ -53,22 +55,24 @@ end
 
 # Test 2: RSS 2.0 format (in case Reddit returns this)
 puts "=== Test 2: RSS 2.0 Format ==="
-rss_xml = %(<?xml version="1.0"?>
-<rss version="2.0">
-  <channel>
-    <title>Test Feed</title>
-    <link>https://example.com</link>
-    <item>
-      <title>Test Article</title>
-      <link>https://example.com/article</link>
-      <pubDate>Wed, 15 Jan 2024 10:30:00 +0000</pubDate>
-    </item>
-    <item>
-      <title>Article without pubDate</title>
-      <link>https://example.com/article2</link>
-    </item>
-  </channel>
-</rss>)
+rss_xml = <<-XML
+  <?xml version="1.0"?>
+  <rss version="2.0">
+    <channel>
+      <title>Test Feed</title>
+      <link>https://example.com</link>
+      <item>
+        <title>Test Article</title>
+        <link>https://example.com/article</link>
+        <pubDate>Wed, 15 Jan 2024 10:30:00 +0000</pubDate>
+      </item>
+      <item>
+        <title>Article without pubDate</title>
+        <link>https://example.com/article2</link>
+      </item>
+    </channel>
+  </rss>
+XML
 
 xml = XML.parse(rss_xml)
 channel = xml.xpath_node("//*[local-name()='channel']")

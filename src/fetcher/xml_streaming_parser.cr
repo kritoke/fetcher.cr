@@ -84,7 +84,7 @@ module Fetcher
       reader = XML::Reader.new(io)
       parser = StreamingRSSParser.new
       parser.parse_entries(reader, actual_limit)
-    rescue ex : XML::Error
+    rescue
       [] of Entry
     end
 
@@ -118,8 +118,6 @@ module Fetcher
         entry = @entries[@current_index]
         @current_index += 1
         entry
-      else
-        nil
       end
     end
   end

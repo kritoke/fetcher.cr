@@ -9,7 +9,7 @@ describe Fetcher::SafeFeedProcessor do
     large_content = "x" * (Fetcher::SafeFeedProcessor::MAX_FEED_SIZE + 1)
 
     expect_raises(Fetcher::InvalidFormatError, "Feed too large") do
-      Fetcher::SafeFeedProcessor.process_feed(large_content, 10) do |content|
+      Fetcher::SafeFeedProcessor.process_feed(large_content, 10) do |_|
         [] of Fetcher::Entry
       end
     end
@@ -18,7 +18,7 @@ describe Fetcher::SafeFeedProcessor do
   it "processes feeds within size limit" do
     small_content = "x" * (Fetcher::SafeFeedProcessor::MAX_FEED_SIZE - 1)
 
-    result = Fetcher::SafeFeedProcessor.process_feed(small_content, 10) do |content|
+    result = Fetcher::SafeFeedProcessor.process_feed(small_content, 10) do |_|
       [Fetcher::Entry.create("Test", "https://example.com", Fetcher::SourceType::RSS)]
     end
 
@@ -27,17 +27,17 @@ describe Fetcher::SafeFeedProcessor do
 
   it "handles XML parsing with size limit" do
     xml_content = <<-XML
-    <?xml version="1.0"?>
-    <rss version="2.0">
-      <channel>
-        <title>Test</title>
-        <item>
-          <title>Item 1</title>
-          <link>https://example.com</link>
-        </item>
-      </channel>
-    </rss>
-    XML
+      <?xml version="1.0"?>
+      <rss version="2.0">
+        <channel>
+          <title>Test</title>
+          <item>
+            <title>Item 1</title>
+            <link>https://example.com</link>
+          </item>
+        </channel>
+      </rss>
+      XML
 
     result = Fetcher::SafeFeedProcessor.process_feed(xml_content, 10) do |content|
       # Parse XML content normally

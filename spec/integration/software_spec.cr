@@ -54,9 +54,8 @@ describe "Integration Tests - Software" do
 
       releases = Array(JSON::Any).from_json(github_json)
       release = releases[0]
-      body = release["body"]?
-      body.should_not be_nil
-      body.not_nil!.as_s.should contain("Changes")
+      body = release["body"]
+      body.as_s.should contain("Changes")
     end
   end
 
@@ -109,7 +108,7 @@ describe "Integration Tests - Software" do
       version_patterns.each do |input, expected|
         match = input.match(/v?\d+\.\d+(?:\.\d+)?(?:[-._]?\w+)?/)
         match.should_not be_nil
-        match.not_nil![0].should eq(expected)
+         match.as(Regex::MatchData)[0].should eq(expected)
       end
     end
 

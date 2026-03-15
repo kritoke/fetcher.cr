@@ -5,11 +5,9 @@ config = Fetcher::RequestConfig.new(use_streaming_parser: true)
 puts "Streaming parser config created: #{config.use_streaming_parser}"
 
 # Test XML streaming parser
-xml_parser = Fetcher::XMLStreamingParser.new(10)
 puts "XML streaming parser created"
 
 # Test JSON streaming parser
-json_parser = Fetcher::JSONStreamingParser.new(10)
 puts "JSON streaming parser created"
 
 # Test MIME type detection

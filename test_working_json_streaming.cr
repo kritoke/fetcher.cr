@@ -2,22 +2,22 @@ require "./src/fetcher"
 
 # Simple Reddit JSON for testing
 reddit_json = <<-JSON
-{
-  "data": {
-    "children": [
-      {
-        "data": {
-          "title": "Test Reddit Post 1",
-          "url": "https://example.com/reddit1",
-          "permalink": "/r/test/comments/123",
-          "created_utc": 1704067200.0,
-          "is_self": false
+  {
+    "data": {
+      "children": [
+        {
+          "data": {
+            "title": "Test Reddit Post 1",
+            "url": "https://example.com/reddit1",
+            "permalink": "/r/test/comments/123",
+            "created_utc": 1704067200.0,
+            "is_self": false
+          }
         }
-      }
-    ]
+      ]
+    }
   }
-}
-JSON
+  JSON
 
 # Test Working JSON streaming parser
 puts "Testing WorkingJSONStreamingParser..."

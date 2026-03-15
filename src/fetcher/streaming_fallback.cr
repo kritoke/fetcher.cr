@@ -13,10 +13,10 @@ module Fetcher
         begin
           streaming_result = streaming_block.call
           if streaming_result.success?
-            return streaming_result
+            streaming_result
           else
             # Streaming succeeded but returned error - return as-is
-            return streaming_result
+            streaming_result
           end
         rescue ex
           # Log warning about fallback (only in debug mode)

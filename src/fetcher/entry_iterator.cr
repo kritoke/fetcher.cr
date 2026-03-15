@@ -30,7 +30,7 @@ module Fetcher
     def to_a(limit : Int32? = nil) : Array(Entry)
       entries = [] of Entry
       count = 0
-      while (!limit || count < limit)
+      while !limit || count < limit
         begin
           entry = self.next
           entries << entry

@@ -29,14 +29,14 @@ module Fetcher
 
       # Fallback to URL-based detection
       if url.includes?("reddit.com")
-        return :reddit
+        :reddit
       elsif url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")
-        return :json_feed
+        :json_feed
       elsif url.ends_with?(".xml") || url.includes?("/feed") || url.includes?("/feeds")
-        return :rss
+        :rss
       else
         # Default to RSS for unknown types
-        return :rss
+        :rss
       end
     end
   end

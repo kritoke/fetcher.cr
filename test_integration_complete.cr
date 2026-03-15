@@ -4,25 +4,6 @@ require "./src/fetcher"
 puts "Testing streaming parser integration..."
 
 # Test 1: RSS with streaming enabled
-rss_xml = <<-XML
-<?xml version="1.0" encoding="UTF-8"?>
-<rss version="2.0">
-  <channel>
-    <title>Test RSS Feed</title>
-    <link>https://example.com</link>
-    <description>Test feed</description>
-    <item>
-      <title>RSS Item 1</title>
-      <link>https://example.com/item1</link>
-      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
-      <description>Test item</description>
-    </item>
-  </channel>
-</rss>
-XML
-
-config_streaming = Fetcher::RequestConfig.new(use_streaming_parser: true)
-config_dom = Fetcher::RequestConfig.new(use_streaming_parser: false)
 
 # Create mock HTTP client response
 class MockResponse

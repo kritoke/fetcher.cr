@@ -39,7 +39,7 @@ module Fetcher
       end
     rescue ex : StreamingErrorHandling::MemoryLimitExceeded
       raise ex
-    rescue ex : JSON::ParseException
+    rescue
       [] of Entry
     end
 
