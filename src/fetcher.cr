@@ -112,16 +112,23 @@ module Fetcher
   def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
     final_headers = Fetcher::CrestHttpClient.build_headers(headers)
     driver = detect_driver(url, final_headers, config)
+    
+    puts "DEBUG: Pulling URL #{url} with driver #{driver}" if ENV["FETCHER_DEBUG"]?
 
-    case driver
-    in .rss?
-      RSS.pull(url, final_headers, limit, config)
-    in .reddit?
-      Reddit.pull(url, final_headers, limit, config)
-    in .software?
-      Software.pull(url, final_headers, limit, config)
-    in .json_feed?
-      JSONFeed.pull(url, final_headers, limit, config)
+    begin
+      case driver
+      in .rss?
+        RSS.pull(url, final_headers, limit, config)
+      in .reddit?
+        Reddit.pull(url, final_headers, limit, config)
+      in .software?
+        Software.pull(url, final_headers, limit, config)
+      in .json_feed?
+        JSONFeed.pull(url, final_headers, limit, config)
+      end
+    rescue ex
+      puts "DEBUG: Main pull error for #{url}: #{ex.class} - #{ex.message}" if ENV["FETCHER_DEBUG"]?
+      raise ex
     end
   end
 
