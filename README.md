@@ -384,11 +384,44 @@ record RequestConfig,
 - `date_published` and `date_modified`
 - Feed metadata (title, description, language, icon, favicon)
 
+## Debugging
+
+### Debug Logging
+
+Set the `FETCHER_DEBUG` environment variable to enable detailed debug logging for troubleshooting:
+
+```bash
+FETCHER_DEBUG=1 ./your_application
+```
+
+This will output:
+- Driver selection for each URL
+- Specific exception details when errors occur
+- Error context for better diagnosis
+
+Debug logging is particularly useful for diagnosing issues with:
+- Reddit API failures
+- Feed parsing errors  
+- Network connectivity problems
+- Rate limiting scenarios
+
+### Monitoring Circuit Breaker State
+
+For high-volume applications, monitor circuit breaker states to understand which domains are failing:
+
+```crystal
+# Check all circuit breaker states
+states = Fetcher::CircuitBreaker::Registry.all_states
+states.each do |domain, (state, failure_count)|
+  puts "#{domain}: #{state} (#{failure_count} failures)"
+end
+```
+
 ## Development
 
 ```bash
 crystal deps
-crystal spec  # 101 tests
+crystal spec  # 147 tests
 ```
 
 ## Contributing

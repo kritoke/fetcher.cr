@@ -16,21 +16,23 @@ module Fetcher
     ) : Array(Result)
       semaphore = Channel(Nil).new(max_concurrent)
       results = Channel(Result).new
+      result_array = [] of Result
 
       urls.each do |url|
         spawn do
           semaphore.send(nil)
           begin
-            results << Fetcher.pull(url, headers, limit, config)
+            results.send(Fetcher.pull(url, headers, limit, config))
           rescue ex
-            results << Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error: #{ex.message}")
+            results.send(Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error: #{ex.message}"))
           ensure
             semaphore.receive rescue nil
           end
         end
       end
 
-      urls.size.times { results.receive }
+      urls.size.times { result_array << results.receive }
+      result_array
     end
   end
 end
