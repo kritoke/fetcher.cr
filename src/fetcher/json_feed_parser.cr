@@ -5,6 +5,7 @@ require "./entry_parser"
 require "./time_parser"
 require "./author"
 require "./attachment"
+require "./link_resolver"
 
 module Fetcher
   # JSON Feed parser implementation
@@ -93,6 +94,8 @@ module Fetcher
       author = authors_json.try(&.first?).try(&.["name"]?.try(&.as_s))
       author_url = authors_json.try(&.first?).try(&.["url"]?.try(&.as_s))
 
+      link_data = LinkResolver.resolve_from_url(url)
+
       Entry.create(
         title: title,
         url: url,
@@ -102,7 +105,10 @@ module Fetcher
         author_url: author_url,
         published_at: pub_date,
         categories: tags,
-        attachments: attachments
+        attachments: attachments,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     end
 

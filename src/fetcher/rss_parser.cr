@@ -6,6 +6,7 @@ require "./time_parser"
 require "./author"
 require "./attachment"
 require "./safe_feed_processor"
+require "./link_resolver"
 
 module Fetcher
   # RSS and Atom feed parser implementation
@@ -140,6 +141,8 @@ module Fetcher
         Attachment.new(url: url, mime_type: type, size_in_bytes: length)
       end
 
+      link_data = LinkResolver.resolve(node, link)
+
       Entry.create(
         title: title,
         url: link,
@@ -148,7 +151,10 @@ module Fetcher
         author: author,
         published_at: pub_date,
         categories: categories,
-        attachments: attachments
+        attachments: attachments,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     end
 
@@ -226,6 +232,8 @@ module Fetcher
         cat["term"]?.try(&.strip).presence
       end
 
+      link_data = LinkResolver.resolve(node, link)
+
       Entry.create(
         title: title,
         url: link,
@@ -234,7 +242,10 @@ module Fetcher
         author: author,
         author_url: author_url,
         published_at: pub_date,
-        categories: categories
+        categories: categories,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     end
 

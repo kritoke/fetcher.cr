@@ -17,7 +17,10 @@ module Fetcher
     published_at : Time? = nil,
     categories : Array(String) = [] of String,
     attachments : Array(Attachment) = [] of Attachment,
-    version : String? = nil do
+    version : String? = nil,
+    comment_url : String? = nil,
+    commentary_url : String? = nil,
+    is_discussion_url : Bool = false do
     def self.create(title : String,
                     url : String,
                     source_type : SourceType,
@@ -28,7 +31,10 @@ module Fetcher
                     published_at : Time? = nil,
                     categories : Array(String) = [] of String,
                     attachments : Array(Attachment) = [] of Attachment,
-                    version : String? = nil) : Entry
+                    version : String? = nil,
+                    comment_url : String? = nil,
+                    commentary_url : String? = nil,
+                    is_discussion_url : Bool = false) : Entry
       EntryFactory.create(
         title: title,
         url: url,
@@ -40,7 +46,10 @@ module Fetcher
         published_at: published_at,
         categories: categories,
         attachments: attachments,
-        version: version
+        version: version,
+        comment_url: comment_url,
+        commentary_url: commentary_url,
+        is_discussion_url: is_discussion_url
       )
     end
 

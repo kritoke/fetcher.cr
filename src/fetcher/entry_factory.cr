@@ -16,6 +16,9 @@ module Fetcher
       categories : Array(String) = [] of String,
       attachments : Array(Attachment) = [] of Attachment,
       version : String? = nil,
+      comment_url : String? = nil,
+      commentary_url : String? = nil,
+      is_discussion_url : Bool = false,
     ) : Entry
       safe_url = URLValidator.valid?(url) ? url : "#"
       Entry.new(
@@ -29,7 +32,10 @@ module Fetcher
         published_at: published_at,
         categories: categories,
         attachments: attachments,
-        version: version
+        version: version,
+        comment_url: comment_url,
+        commentary_url: commentary_url,
+        is_discussion_url: is_discussion_url
       )
     end
 

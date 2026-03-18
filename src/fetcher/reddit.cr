@@ -6,6 +6,7 @@ require "./crest_http_client"
 require "./rss"
 require "./exceptions"
 require "./json_streaming_parser"
+require "./link_resolver"
 
 module Fetcher
   module Reddit
@@ -163,7 +164,13 @@ module Fetcher
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
-      Entry.create(title: title, url: link, source_type: SourceType::Reddit, published_at: pub_date)
+      Entry.create(
+        title: title,
+        url: link,
+        source_type: SourceType::Reddit,
+        published_at: pub_date,
+        is_discussion_url: true
+      )
     end
 
     private def self.resolve_reddit_link(post_url : String, permalink : String, is_self : Bool) : String

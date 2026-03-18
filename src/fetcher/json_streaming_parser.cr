@@ -2,6 +2,7 @@ require "json"
 require "./entry"
 require "./result"
 require "./time_parser"
+require "./link_resolver"
 
 module Fetcher
   # JSON streaming parser using JSON::PullParser with lazy iterator pattern
@@ -103,11 +104,16 @@ module Fetcher
       link = resolve_reddit_link(post_url, permalink, is_self)
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
+      link_data = LinkResolver.resolve_from_url(link)
+
       Entry.create(
         title: title,
         url: link,
         source_type: SourceType::Reddit,
-        published_at: pub_date
+        published_at: pub_date,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     rescue
       nil
@@ -183,11 +189,16 @@ module Fetcher
       # Create published date
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
+      link_data = LinkResolver.resolve_from_url(link)
+
       Entry.create(
         title: title,
         url: link,
         source_type: SourceType::Reddit,
-        published_at: pub_date
+        published_at: pub_date,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     rescue
       # Skip malformed posts
@@ -254,6 +265,8 @@ module Fetcher
         author_url = first_author[:url]?
       end
 
+      link_data = LinkResolver.resolve_from_url(url)
+
       Entry.create(
         title: title,
         url: url,
@@ -262,7 +275,10 @@ module Fetcher
         published_at: pub_date,
         author: author,
         author_url: author_url,
-        categories: tags
+        categories: tags,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     rescue
       # Skip malformed items

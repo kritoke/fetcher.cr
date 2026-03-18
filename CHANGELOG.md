@@ -11,6 +11,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.8.0] - 2026-03-18
+
+### Added
+- `comment_url : String?` field to Entry - link to discussion thread
+- `commentary_url : String?` field to Entry - link to publisher's commentary
+- `is_discussion_url : Bool` field to Entry - true if main URL IS a discussion thread
+- `LinkResolver` module for extracting comment/commentary links from feeds
+- Support for `<link rel="replies">` and `<link rel="comments">` in RSS/Atom
+- Support for `<link rel="related">` in Atom (Daring Fireball pattern)
+- Automatic detection of discussion URLs by pattern (`/comments/`, `/item?id=`, `/s/`, etc.)
+
+### Changed
+- Reddit entries now have `is_discussion_url = true`
+
+### Backward Compatibility
+All new fields have default values (`nil` or `false`), so existing code works unchanged.
+
 ## [0.7.0] - 2026-03-15
 
 ### BREAKING CHANGES
