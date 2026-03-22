@@ -6,6 +6,7 @@ require "./exceptions"
 require "./json_feed_parser"
 require "./result_builder"
 require "./json_streaming_parser"
+require "./error_handler"
 
 module Fetcher
   module JSONFeed
@@ -19,37 +20,11 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(url, headers)
 
-      case response.status_code
-      when 304
-        ResultBuilder.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)
-      when 200..299
+      ErrorHandler.handle_response(response, url) do
         parse_feed(response.body, limit, config)
-      when 500..599
-        error = Error.server_error(response.status_code, "Server error: #{response.status_code}", url)
-        raise HTTPServerError.new(error.message, response.status_code, error)
-      else
-        error = Error.http(response.status_code, "HTTP #{response.status_code}", url)
-        raise HTTPError.new(error.message, response.status_code, error)
       end
-    rescue ex : IO::TimeoutError
-      error = Error.timeout("Timeout: #{ex.message}", url)
-      raise TimeoutError.new(error.message, error)
-    rescue ex : CrestHttpClient::DNSError
-      error = Error.dns("DNS error: #{ex.message}", url)
-      raise DNSError.new(error.message, error)
-    rescue ex : JSON::ParseException
-      error = Error.invalid_format("JSON parsing error: #{ex.message}", url)
-      raise InvalidFormatError.new(error.message, error)
-    rescue ex : FetchError
-      # Re-raise typed exceptions
-      raise ex
-    rescue ex
-      if Fetcher.transient_error?(ex)
-        error = Error.unknown(ex.message || "Unknown error", url)
-        raise UnknownError.new(error.message, error)
-      end
-      error = Error.unknown("#{ex.class}: #{ex.message}", url)
-      Fetcher.error_result(error)
+    rescue ex : Exception
+      ErrorHandler.handle_network_error(ex, url)
     end
 
     private def self.parse_feed(body : String, limit : Int32, config : RequestConfig) : Result

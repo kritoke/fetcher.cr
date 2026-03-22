@@ -7,9 +7,13 @@ require "./retry"
 require "./crest_http_client"
 require "./time_parser"
 require "./exceptions"
+require "./error_handler"
 
 module Fetcher
   module Software
+    # Pre-compiled regex patterns for performance
+    GITLAB_RELEASES_PATTERN = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
+    
     alias ProviderInfo = NamedTuple(provider: String, base_url: String, repo: String)
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
@@ -36,7 +40,7 @@ module Fetcher
         return {provider: "github", base_url: "https://github.com", repo: repo} if repo
       end
 
-      gitlab_match = url.match(%r{https?://([^/]+)/([^/]+/[^/]+)/-/releases})
+      gitlab_match = url.match(GITLAB_RELEASES_PATTERN)
       if gitlab_match
         return {provider: "gitlab", base_url: "https://#{gitlab_match[1]}", repo: gitlab_match[2]}
       end
@@ -57,7 +61,6 @@ module Fetcher
 
     private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       repo = extract_repo_path(url, "github.com")
-      error_url = url
       return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitHub repo URL", nil) unless repo
 
       api_url = "https://api.github.com/repos/#{repo}/releases"
@@ -74,44 +77,31 @@ module Fetcher
         raise RateLimitError.new(error.message, error)
       end
 
-      return Fetcher.error_result(ErrorKind::HTTPError, "GitHub API error: #{response.status_code}", response.status_code) unless (200..299).includes?(response.status_code)
+      ErrorHandler.handle_response(response, api_url) do
+        begin
+          releases = Array(JSON::Any).from_json(response.body)
+        rescue ex : JSON::ParseException
+          error = Error.invalid_format("Invalid JSON from GitHub: #{ex.message}", api_url)
+          raise InvalidFormatError.new(error.message, error)
+        end
 
-      begin
-        releases = Array(JSON::Any).from_json(response.body)
-      rescue ex : JSON::ParseException
-        error = Error.invalid_format("Invalid JSON from GitHub: #{ex.message}", api_url)
-        raise InvalidFormatError.new(error.message, error)
-      end
+        stable_releases = releases.reject do |release|
+          release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
+        end
 
-      stable_releases = releases.reject do |release|
-        release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
-      end
+        entries = stable_releases.first(limit).map do |release|
+          parse_github_release(release, repo)
+        end
 
-      entries = stable_releases.first(limit).map do |release|
-        parse_github_release(release, repo)
+        Result.success(
+          entries: entries,
+          etag: response.headers["ETag"]?,
+          site_link: "https://github.com/#{repo}",
+          favicon: "https://github.com/favicon.ico"
+        )
       end
-
-      Result.success(
-        entries: entries,
-        etag: response.headers["ETag"]?,
-        site_link: "https://github.com/#{repo}",
-        favicon: "https://github.com/favicon.ico"
-      )
-    rescue ex : IO::TimeoutError
-      error = Error.timeout("Timeout: #{ex.message}", error_url)
-      raise TimeoutError.new(error.message, error)
-    rescue ex : CrestHttpClient::DNSError
-      error = Error.dns("DNS error: #{ex.message}", error_url)
-      raise DNSError.new(error.message, error)
-    rescue ex : FetchError
-      raise ex
-    rescue ex
-      if Fetcher.transient_error?(ex)
-        error = Error.unknown(ex.message || "Unknown error", error_url)
-        raise UnknownError.new(error.message, error)
-      end
-      error = Error.unknown("#{ex.class}: #{ex.message}", error_url)
-      Fetcher.error_result(error)
+    rescue ex : Exception
+      ErrorHandler.handle_network_error(ex, url)
     end
 
     private def self.parse_github_release(release : JSON::Any, repo : String) : Entry

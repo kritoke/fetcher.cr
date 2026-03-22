@@ -19,6 +19,8 @@ module Fetcher
         InvalidURLError.new(error.message, error)
       when .invalid_format?
         InvalidFormatError.new(error.message, error)
+      when .too_large?
+        ResponseTooLargeError.new(error.message, nil, nil, error)
       when .http_error?, .server_error?
         create_http_error(error)
       when .rate_limited?

@@ -8,7 +8,8 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 
 - **RSS/Atom Feeds** - Standard RSS and Atom feed parsing with content extraction
 - **JSON Feed** - Full JSON Feed v1.1 support
-- **Reddit** - Fetch posts from subreddits  
+- **Reddit** - Fetch posts from subreddits
+- **YouTube** - Fetch videos from YouTube channels
 - **Software Releases** - Track GitHub, GitLab, and Codeberg releases
 - **Content Extraction** - Extract full content, authors, categories, and attachments
 - **Feed Metadata** - Extract feed-level information (title, description, language, authors)
@@ -232,6 +233,7 @@ result = Fetcher.pull_rss("https://example.com/feed.xml")
 result = Fetcher.pull_reddit("https://reddit.com/r/crystal")
 result = Fetcher.pull_software("https://github.com/crystal-lang/crystal/releases")
 result = Fetcher.pull_json_feed("https://example.com/feed.json")
+result = Fetcher.pull_youtube("https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxx")
 ```
 
 ### Explicit Driver Selection
@@ -242,6 +244,7 @@ result = Fetcher.pull_rss("https://example.com/feed.xml")
 result = Fetcher.pull_reddit("https://reddit.com/r/crystal")
 result = Fetcher.pull_software("https://github.com/crystal-lang/crystal/releases")
 result = Fetcher.pull_json_feed("https://example.com/feed.json")
+result = Fetcher.pull_youtube("https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxx")
 ```
 
 ## Automatic Driver Detection
@@ -250,6 +253,7 @@ The library automatically detects the feed type based on the URL:
 
 | URL Pattern | Driver |
 |-------------|--------|
+| `youtube.com/channel/` | YouTube |
 | `reddit.com/r/` | Reddit |
 | `github.com/.../releases` | Software |
 | `any-domain/.../-/releases` | Software (GitLab, including self-hosted) |
@@ -289,6 +293,34 @@ result.entries.first.version  # => "v1.2.3"
 
 # Codeberg
 result = Fetcher.pull("https://codeberg.org/user/repo/releases")
+```
+
+## YouTube Channels
+
+The YouTube driver fetches videos from YouTube channels using their RSS feed.
+
+### Supported URL Format
+
+Only direct channel ID URLs are supported:
+- `youtube.com/channel/UC...` ✓
+
+Other formats (handles, custom URLs, usernames) are not supported.
+
+### Example
+
+```crystal
+# Auto-detected
+result = Fetcher.pull("https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxx")
+
+# Explicit driver
+result = Fetcher.pull_youtube("https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxx")
+
+result.entries.each do |entry|
+  puts "Title: #{entry.title}"
+  puts "URL: #{entry.url}"
+  puts "Published: #{entry.published_at}"
+  puts "Author: #{entry.author}"  # Channel name
+end
 ```
 
 ## Result Structure

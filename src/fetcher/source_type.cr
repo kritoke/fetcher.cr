@@ -7,6 +7,7 @@ module Fetcher
     GitHub
     GitLab
     Codeberg
+    YouTube
 
     def to_s : String
       super.downcase
@@ -21,6 +22,7 @@ module Fetcher
       when "github"                then GitHub
       when "gitlab"                then GitLab
       when "codeberg"              then Codeberg
+      when "youtube"               then YouTube
       else                              RSS
       end
     end

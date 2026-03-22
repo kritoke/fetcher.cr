@@ -2,12 +2,6 @@ require "./fetch_error"
 require "./exceptions"
 
 module Fetcher
-  # Retry configuration is now part of RequestConfig
-  DEFAULT_RETRY_CONFIG_MAX_RETRIES      = 3
-  DEFAULT_RETRY_CONFIG_BASE_DELAY       = 1.second
-  DEFAULT_RETRY_CONFIG_MAX_DELAY        = 30.seconds
-  DEFAULT_RETRY_CONFIG_EXPONENTIAL_BASE = 2.0
-
   class RetriableError < Exception
     def initialize(message : String)
       super(message)

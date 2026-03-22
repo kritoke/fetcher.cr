@@ -120,7 +120,7 @@ module Fetcher
         raise UnknownError.new(error.message, error)
       end
       error = Error.unknown("#{ex.class}: #{ex.message}", url)
-      puts "DEBUG: Reddit fetch error for #{url}: #{ex.class} - #{ex.message}" if ENV["FETCHER_DEBUG"]?
+      ::Log.for("fetcher.reddit").debug { "Reddit fetch error for #{url}: #{ex.class} - #{ex.message}" } if ENV["FETCHER_DEBUG"]?
       Fetcher.error_result(error)
     end
 

@@ -198,12 +198,12 @@ module Fetcher
         return ""
       end
 
-      text = ""
+      builder = String::Builder.new
       depth = 0
       while reader.read
         case reader.node_type
         when :text, :cdata
-          text += reader.value
+          builder << reader.value
         when :element
           depth += 1
         when :end_element
@@ -211,7 +211,7 @@ module Fetcher
           break if depth < 0
         end
       end
-      text
+      builder.to_s
     end
 
     private def parse_enclosure_attributes(reader : XML::Reader) : Attachment?

@@ -4,6 +4,7 @@ require "./token_bucket_rate_limiter"
 require "./circuit_breaker"
 require "./safe_feed_processor"
 require "./exceptions"
+require "./config"
 
 module Fetcher
   class CrestHttpClient
@@ -24,12 +25,9 @@ module Fetcher
     @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
     @@limiters_lock = Mutex.new
 
-    def self.get_token_bucket_limiter(domain : String, config : RequestConfig) : TokenBucketRateLimiter
+    def self.clear_rate_limiters : Nil
       @@limiters_lock.synchronize do
-        @@token_bucket_limiters[domain] ||= TokenBucketRateLimiter.new(
-          config.rate_limit_capacity,
-          config.rate_limit_refill_rate
-        )
+        @@token_bucket_limiters.clear
       end
     end
 
@@ -88,7 +86,7 @@ module Fetcher
         )
 
         if response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
-          raise DNSError.new("Response too large (>#{SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)")
+          raise DNSError.new("Response too large (#{response.body.bytesize} bytes, max: #{SafeFeedProcessor::MAX_FEED_SIZE} bytes)")
         end
 
         record_success(domain)
@@ -192,6 +190,21 @@ module Fetcher
       result["If-None-Match"] = etag if etag
       result["If-Modified-Since"] = last_modified if last_modified
       result
+    end
+    def self.get_token_bucket_limiter(domain : String, config : RequestConfig) : TokenBucketRateLimiter
+      @@limiters_lock.synchronize do
+        @@token_bucket_limiters[domain] ||= TokenBucketRateLimiter.new(
+          config.rate_limit_capacity,
+          config.rate_limit_refill_rate
+        )
+      end
+    end
+
+    # Reset global state for testing
+    def self.clear_rate_limiters : Nil
+      @@limiters_lock.synchronize do
+        @@token_bucket_limiters.clear
+      end
     end
   end
 end

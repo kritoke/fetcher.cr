@@ -1,4 +1,5 @@
 require "http/client"
+require "./fetcher/config"
 require "./fetcher/attachment"
 require "./fetcher/author"
 require "./fetcher/entry"
@@ -28,17 +29,26 @@ require "./fetcher/streaming_fallback"
 require "./fetcher/streaming_error_handling"
 require "./fetcher/xml_streaming_parser"
 require "./fetcher/json_streaming_parser"
+require "./fetcher/error_handler"
 require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
 require "./fetcher/json_feed"
+require "./fetcher/youtube"
 
 module Fetcher
+  # Pre-compiled regex patterns for performance
+  REDDIT_URL_PATTERN = %r{://(www\.)?reddit\.com/r/}i
+  GITHUB_RELEASES_PATTERN = %r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i
+  CODEBERG_RELEASES_PATTERN = %r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i
+  YOUTUBE_CHANNEL_PATTERN = %r{://(www\.)?youtube\.com/channel/}i
+
   enum DriverType
     RSS
     Reddit
     Software
     JSONFeed
+    YouTube
   end
 
   def self.detect_driver(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, config : RequestConfig = RequestConfig.new) : DriverType
@@ -55,14 +65,16 @@ module Fetcher
   end
 
   private def self.detect_by_url_pattern(url : String) : DriverType?
-    if url.matches?(%r{://(www\.)?reddit\.com/r/}i)
+    if url.matches?(REDDIT_URL_PATTERN)
       DriverType::Reddit
-    elsif url.matches?(%r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i)
+    elsif url.matches?(GITHUB_RELEASES_PATTERN)
       DriverType::Software
     elsif url.matches?(%r{://[^/]+/[^/]+/[^/]+/-/releases}i)
       DriverType::Software
-    elsif url.matches?(%r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i)
+    elsif url.matches?(CODEBERG_RELEASES_PATTERN)
       DriverType::Software
+    elsif url.matches?(YOUTUBE_CHANNEL_PATTERN)
+      DriverType::YouTube
     end
   end
 
@@ -109,60 +121,71 @@ module Fetcher
     end
   end
 
-  def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+  def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
     final_headers = Fetcher::CrestHttpClient.build_headers(headers)
+    actual_limit = Math.min(limit, Config::MAX_LIMIT)
+    
     driver = detect_driver(url, final_headers, config)
     
-    puts "DEBUG: Pulling URL #{url} with driver #{driver}" if ENV["FETCHER_DEBUG"]?
+    ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" } if ENV["FETCHER_DEBUG"]?
 
     begin
       case driver
       in .rss?
-        RSS.pull(url, final_headers, limit, config)
+        RSS.pull(url, final_headers, actual_limit, config)
       in .reddit?
-        Reddit.pull(url, final_headers, limit, config)
+        Reddit.pull(url, final_headers, actual_limit, config)
       in .software?
-        Software.pull(url, final_headers, limit, config)
+        Software.pull(url, final_headers, actual_limit, config)
       in .json_feed?
-        JSONFeed.pull(url, final_headers, limit, config)
+        JSONFeed.pull(url, final_headers, actual_limit, config)
+      in .you_tube?
+        YouTube.pull(url, final_headers, actual_limit, config)
       end
     rescue ex
-      puts "DEBUG: Main pull error for #{url}: #{ex.class} - #{ex.message}" if ENV["FETCHER_DEBUG"]?
+      ::Log.for("fetcher").debug { "Main pull error for #{url}: #{ex.class} - #{ex.message}" } if ENV["FETCHER_DEBUG"]?
       raise ex
     end
   end
 
-  def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+  def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
     base_headers = Fetcher::CrestHttpClient.build_headers(headers)
     final_headers = Fetcher::CrestHttpClient.with_cache(base_headers, etag, last_modified)
+    actual_limit = Math.min(limit, Config::MAX_LIMIT)
 
     driver = detect_driver(url, final_headers, config)
 
     case driver
     in .rss?
-      RSS.pull(url, final_headers, limit, config)
+      RSS.pull(url, final_headers, actual_limit, config)
     in .reddit?
-      Reddit.pull(url, final_headers, limit, config)
+      Reddit.pull(url, final_headers, actual_limit, config)
     in .software?
-      Software.pull(url, final_headers, limit, config)
+      Software.pull(url, final_headers, actual_limit, config)
     in .json_feed?
-      JSONFeed.pull(url, final_headers, limit, config)
+      JSONFeed.pull(url, final_headers, actual_limit, config)
+    in .you_tube?
+      YouTube.pull(url, final_headers, actual_limit, config)
     end
   end
 
-  def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    RSS.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
+  def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+    RSS.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
   end
 
-  def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Reddit.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
+  def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+    Reddit.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
   end
 
-  def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    Software.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
+  def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+    Software.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
   end
 
-  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-    JSONFeed.pull(url, Fetcher::CrestHttpClient.build_headers(headers), limit, config)
+  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+    JSONFeed.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
+  end
+
+  def self.pull_youtube(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+    YouTube.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
   end
 end

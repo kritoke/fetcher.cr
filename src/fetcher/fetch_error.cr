@@ -54,9 +54,17 @@ module Fetcher
       )
     end
 
-    def self.unknown(message : String, url : String? = nil) : Error
-      new(kind: ErrorKind::Unknown, message: message, url: url)
-    end
+  def self.unknown(message : String, url : String? = nil) : Error
+    new(kind: ErrorKind::Unknown, message: message, url: url)
+  end
+
+  def self.too_large(size : Int64, max_size : Int64, url : String? = nil) : Error
+    new(
+      kind: ErrorKind::TooLarge,
+      message: "Response too large: #{size} bytes (max: #{max_size})",
+      url: url
+    )
+  end
 
     def to_s : String
       message
