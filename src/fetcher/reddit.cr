@@ -23,14 +23,28 @@ module Fetcher
       sort = extract_sort(url)
       actual_limit = Math.min(limit, 25)
 
-      Fetcher.with_retry(config) do
+      cache_key = Cache.generate_key(subreddit, sort, actual_limit)
+
+      if config.cache_enabled
+        if cached = Cache.get(cache_key)
+          return cached
+        end
+      end
+
+      result = Fetcher.with_retry(config) do
         begin
           fetch_reddit(subreddit, sort, actual_limit, headers, config)
         rescue FetchError
-          # Fallback to RSS if JSON API fails for any reason
           fetch_reddit_rss(subreddit, sort, actual_limit, headers, config)
         end
       end
+
+      if config.cache_enabled && result.success?
+        ttl = Cache.ttl_for_sort(sort)
+        Cache.set(cache_key, result, ttl)
+      end
+
+      result
     end
 
     private def self.fetch_reddit_rss(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
@@ -161,20 +175,18 @@ module Fetcher
       created_utc = post["created_utc"]?.try(&.as_f) || 0.0
       is_self = post["is_self"]?.try(&.as_bool) || false
 
-      link = resolve_reddit_link(post_url, permalink, is_self)
+      discussion_url = "https://www.reddit.com#{permalink}"
+      external_url = is_self || post_url.empty? ? nil : post_url
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
       Entry.create(
         title: title,
-        url: link,
+        url: discussion_url,
         source_type: SourceType::Reddit,
         published_at: pub_date,
-        is_discussion_url: true
+        is_discussion_url: true,
+        comment_url: external_url
       )
-    end
-
-    private def self.resolve_reddit_link(post_url : String, permalink : String, is_self : Bool) : String
-      is_self || post_url.empty? ? "https://www.reddit.com#{permalink}" : post_url
     end
   end
 end

@@ -15,6 +15,7 @@ bin/
 *.dylib
 *.dll
 *.exe
+/fetcher
 
 # Logs
 *.log
@@ -29,19 +30,12 @@ bin/
 .env
 .env.*
 !.env.example
+
 # Local developer overrides
 flake.private.nix
 .devshell-private.sh
+
+# Local development
 lib/
-
-# Local ticket storage
-.tickets/
-
-# Build artifacts
-/fetcher$
-
 .opencode/
 SPEC*
-TODO.md
-openspec/
-/fetcher

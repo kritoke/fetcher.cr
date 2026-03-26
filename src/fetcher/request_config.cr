@@ -20,7 +20,11 @@ module Fetcher
     # Streaming parser configuration for memory efficiency
     use_streaming_parser : Bool = false,
     max_streaming_memory : Int32 = 10_485_760, # 10MB default
-    debug_streaming : Bool = false do
+    debug_streaming : Bool = false,
+    # Cache configuration for Reddit fetches
+    cache_enabled : Bool = true,
+    cache_max_size : Int32 = 1000,
+    cache_default_ttl : Time::Span = Cache::DEFAULT_TTL do
     def delay_for_attempt(attempt : Int32) : Time::Span
       delay = base_delay * (exponential_base ** attempt)
       delay > max_delay ? max_delay : delay

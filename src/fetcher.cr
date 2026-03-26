@@ -19,6 +19,7 @@ require "./fetcher/json_feed_parser"
 require "./fetcher/result_builder"
 require "./fetcher/token_bucket_rate_limiter"
 require "./fetcher/circuit_breaker"
+require "./fetcher/cache"
 require "./fetcher/safe_feed_processor"
 require "./fetcher/concurrent_fetcher"
 require "./fetcher/domain_batch_processor"
@@ -38,10 +39,10 @@ require "./fetcher/youtube"
 
 module Fetcher
   # Pre-compiled regex patterns for performance
-  REDDIT_URL_PATTERN = %r{://(www\.)?reddit\.com/r/}i
-  GITHUB_RELEASES_PATTERN = %r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i
+  REDDIT_URL_PATTERN        = %r{://(www\.)?reddit\.com/r/}i
+  GITHUB_RELEASES_PATTERN   = %r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i
   CODEBERG_RELEASES_PATTERN = %r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i
-  YOUTUBE_CHANNEL_PATTERN = %r{://(www\.)?youtube\.com/channel/}i
+  YOUTUBE_CHANNEL_PATTERN   = %r{://(www\.)?youtube\.com/channel/}i
 
   enum DriverType
     RSS
@@ -124,9 +125,9 @@ module Fetcher
   def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
     final_headers = Fetcher::CrestHttpClient.build_headers(headers)
     actual_limit = Math.min(limit, Config::MAX_LIMIT)
-    
+
     driver = detect_driver(url, final_headers, config)
-    
+
     ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" } if ENV["FETCHER_DEBUG"]?
 
     begin

@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.8.1] - 2026-03-26
+
+### Added
+- In-memory LRU cache for Reddit fetches with sort-specific TTL values
+  - new/rising posts: 30 second TTL
+  - hot posts: 2 minute TTL
+  - top/controversial posts: 10 minute TTL
+- `Fetcher::Cache` module for cache management (get, set, clear, stats)
+- Cache statistics tracking (hits, misses, evictions, hit ratio)
+- `Fetcher::CacheStats` struct for cache performance monitoring
+- `cache_enabled`, `cache_max_size`, `cache_default_ttl` configuration options in RequestConfig
+- Reddit posts now return both discussion URL (entry.url) and external URL (entry.comment_url)
+- 22 new tests for cache functionality
+
+### Changed
+- Reddit link resolution now always returns discussion permalink as primary URL
+- External link (for link posts) moved to `comment_url` field
+- Cache disabled by default for non-Reddit fetchers
+
+### Backward Compatibility
+- All new fields have default values, existing code works unchanged
+- Reddit entries now have additional `comment_url` field populated for link posts
+
 ## [0.8.0] - 2026-03-18
 
 ### Added
