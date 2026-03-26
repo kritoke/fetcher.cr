@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.8.1.1] - 2026-03-26
+
+### Fixed
+- Reddit URL assignment corrected:
+  - `url` is now the external article URL (or Reddit permalink for self-posts)
+  - `comment_url` is now the Reddit discussion URL
+  - `is_discussion_url` is now `false` for Reddit entries (since `url` is not a discussion)
+
 ## [0.8.1] - 2026-03-26
 
 ### Added

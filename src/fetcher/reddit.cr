@@ -181,11 +181,11 @@ module Fetcher
 
       Entry.create(
         title: title,
-        url: discussion_url,
+        url: external_url || discussion_url,
         source_type: SourceType::Reddit,
         published_at: pub_date,
-        is_discussion_url: true,
-        comment_url: external_url
+        is_discussion_url: false,
+        comment_url: discussion_url
       )
     end
   end
