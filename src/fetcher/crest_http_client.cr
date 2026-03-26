@@ -35,10 +35,9 @@ module Fetcher
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
-      domain = "default"
-      begin
-        domain = extract_domain(url)
+      domain = extract_domain(url)
 
+      begin
         check_circuit_breaker(domain)
 
         rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
@@ -65,10 +64,9 @@ module Fetcher
     end
 
     def get(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
-      domain = "default"
-      begin
-        domain = extract_domain(url)
+      domain = extract_domain(url)
 
+      begin
         check_circuit_breaker(domain)
 
         rate_limiter = self.class.get_token_bucket_limiter(domain, @config)
@@ -191,19 +189,13 @@ module Fetcher
       result["If-Modified-Since"] = last_modified if last_modified
       result
     end
+
     def self.get_token_bucket_limiter(domain : String, config : RequestConfig) : TokenBucketRateLimiter
       @@limiters_lock.synchronize do
         @@token_bucket_limiters[domain] ||= TokenBucketRateLimiter.new(
           config.rate_limit_capacity,
           config.rate_limit_refill_rate
         )
-      end
-    end
-
-    # Reset global state for testing
-    def self.clear_rate_limiters : Nil
-      @@limiters_lock.synchronize do
-        @@token_bucket_limiters.clear
       end
     end
   end

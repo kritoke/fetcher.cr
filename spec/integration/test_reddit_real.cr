@@ -1,5 +1,4 @@
 require "xml"
-require "./src/fetcher/time_parser"
 
 # Actual Reddit feed structure from old.reddit.com/r/crystal/hot.rss
 reddit_xml = <<-XML

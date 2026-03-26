@@ -26,7 +26,7 @@ describe Fetcher::CircuitBreaker do
       cb.record_failure
       cb.record_failure
       cb.failure_count.should eq 2
-      
+
       cb.record_success
       cb.failure_count.should eq 0
     end
@@ -35,11 +35,11 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 1.second)
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
-      
+
       cb.last_failure_time = Time.utc - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
-      
+
       cb.record_success
       cb.state.should eq Fetcher::CircuitBreaker::State::Closed
     end
@@ -56,7 +56,7 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 2)
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Closed
-      
+
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
     end
@@ -65,11 +65,11 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 1.second)
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
-      
+
       cb.last_failure_time = Time.utc - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
-      
+
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
     end
@@ -85,7 +85,7 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 60.seconds)
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
-      
+
       cb.allow_request?.should be_false
     end
 
@@ -93,7 +93,7 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 1.second)
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
-      
+
       cb.last_failure_time = Time.utc - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
@@ -103,7 +103,7 @@ describe Fetcher::CircuitBreaker do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 1.second)
       cb.record_failure
       cb.last_failure_time = Time.utc - 2.seconds
-      
+
       cb.allow_request?.should be_true
     end
   end
@@ -119,7 +119,7 @@ describe Fetcher::CircuitBreaker::Registry do
       config = Fetcher::RequestConfig.new
       cb1 = Fetcher::CircuitBreaker::Registry.get("example.com", config)
       cb2 = Fetcher::CircuitBreaker::Registry.get("example.com", config)
-      
+
       cb1.should be(cb2)
     end
 
@@ -127,7 +127,7 @@ describe Fetcher::CircuitBreaker::Registry do
       config = Fetcher::RequestConfig.new
       cb1 = Fetcher::CircuitBreaker::Registry.get("example.com", config)
       cb2 = Fetcher::CircuitBreaker::Registry.get("other.com", config)
-      
+
       cb1.should_not be(cb2)
     end
 
@@ -137,7 +137,7 @@ describe Fetcher::CircuitBreaker::Registry do
         circuit_breaker_recovery_timeout: 120.seconds
       )
       cb = Fetcher::CircuitBreaker::Registry.get("example.com", config)
-      
+
       cb.failure_threshold.should eq 10
       cb.recovery_timeout.should eq 120.seconds
     end
@@ -148,9 +148,9 @@ describe Fetcher::CircuitBreaker::Registry do
       config = Fetcher::RequestConfig.new
       Fetcher::CircuitBreaker::Registry.get("example.com", config)
       Fetcher::CircuitBreaker::Registry.get("other.com", config)
-      
+
       Fetcher::CircuitBreaker::Registry.clear
-      
+
       Fetcher::CircuitBreaker::Registry.all_states.empty?.should be_true
     end
   end
@@ -158,10 +158,10 @@ describe Fetcher::CircuitBreaker::Registry do
   describe ".all_states" do
     it "returns states for all domains" do
       config = Fetcher::RequestConfig.new(circuit_breaker_failure_threshold: 1)
-      
+
       cb = Fetcher::CircuitBreaker::Registry.get("failing.com", config)
       cb.record_failure
-      
+
       states = Fetcher::CircuitBreaker::Registry.all_states
       states.has_key?("failing.com").should be_true
       states["failing.com"][0].should eq Fetcher::CircuitBreaker::State::Open

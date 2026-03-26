@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Test streaming parser integration with configuration
 puts "Testing streaming parser integration..."

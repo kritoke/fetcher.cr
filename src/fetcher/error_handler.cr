@@ -1,6 +1,6 @@
 module Fetcher
   module ErrorHandler
-    def self.handle_response(response : ::HTTP::Client::Response, url : String, &block : -> Result) : Result
+    def self.handle_response(response : ::HTTP::Client::Response, url : String, & : -> Result) : Result
       case response.status_code
       when 304
         ResultBuilder.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)

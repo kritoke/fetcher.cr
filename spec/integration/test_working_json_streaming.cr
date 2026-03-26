@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Simple Reddit JSON for testing
 reddit_json = <<-JSON

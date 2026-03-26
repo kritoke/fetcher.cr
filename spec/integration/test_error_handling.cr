@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 puts "Testing comprehensive error handling..."
 

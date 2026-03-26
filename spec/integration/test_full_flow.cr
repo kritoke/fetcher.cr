@@ -1,7 +1,7 @@
 require "./src/fetcher/rss"
 
 # Simulate what RSS.perform_fetch does
-reddit_xml = <<XML
+reddit_xml = <<-XML
 <?xml version="1.0" encoding="UTF-8"?>
 <feed xmlns="http://www.w3.org/2005/Atom" xmlns:media="http://search.yahoo.com/mrss/">
   <title>Crystal</title>

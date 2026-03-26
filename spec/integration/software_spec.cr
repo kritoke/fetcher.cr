@@ -108,7 +108,7 @@ describe "Integration Tests - Software" do
       version_patterns.each do |input, expected|
         match = input.match(/v?\d+\.\d+(?:\.\d+)?(?:[-._]?\w+)?/)
         match.should_not be_nil
-         match.as(Regex::MatchData)[0].should eq(expected)
+        match.as(Regex::MatchData)[0].should eq(expected)
       end
     end
 

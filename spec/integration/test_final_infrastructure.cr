@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Test streaming parser configuration and infrastructure
 config = Fetcher::RequestConfig.new(

@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Test 1: Parse actual Reddit Atom feed format
 puts "=== Test 1: Reddit Atom Feed ==="

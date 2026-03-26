@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Test integration with existing RSS module
 config = Fetcher::RequestConfig.new(use_streaming_parser: true)

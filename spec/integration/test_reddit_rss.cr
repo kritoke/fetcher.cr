@@ -1,5 +1,4 @@
 require "xml"
-require "./src/fetcher/time_parser"
 
 # Simulate Reddit Atom feed entry parsing
 atom_xml = <<-XML

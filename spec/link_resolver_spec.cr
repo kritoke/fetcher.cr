@@ -53,7 +53,7 @@ describe Fetcher::LinkResolver do
           <link>https://example.com/article</link>
           <link rel="replies" href="https://news.ycombinator.com/item?id=12345"/>
         </item>
-      XML
+        XML
 
       node = XML.parse(xml).xpath_node("//item")
       result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
@@ -67,7 +67,7 @@ describe Fetcher::LinkResolver do
           <link>https://example.com/article</link>
           <link rel="comments" href="https://example.com/comments/123"/>
         </item>
-      XML
+        XML
 
       node = XML.parse(xml).xpath_node("//item")
       result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
@@ -81,7 +81,7 @@ describe Fetcher::LinkResolver do
           <link>https://example.com/article</link>
           <link rel="related" href="https://daringfireball.net/linked/2024/01/article"/>
         </item>
-      XML
+        XML
 
       node = XML.parse(xml).xpath_node("//item")
       result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
@@ -95,7 +95,7 @@ describe Fetcher::LinkResolver do
           <link rel="alternate" href="https://x.com/mlbonfox/status/123"/>
           <link rel="related" href="https://daringfireball.net/linked/2026/03/17/fox-sports-wbc-immersive"/>
         </entry>
-      XML
+        XML
 
       node = XML.parse(xml).xpath_node("//entry")
       result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://x.com/mlbonfox/status/123")
@@ -109,7 +109,7 @@ describe Fetcher::LinkResolver do
           <title>Test</title>
           <link>https://news.ycombinator.com/item?id=12345</link>
         </item>
-      XML
+        XML
 
       node = XML.parse(xml).xpath_node("//item")
       result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://news.ycombinator.com/item?id=12345")

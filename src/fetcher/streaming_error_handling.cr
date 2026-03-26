@@ -18,7 +18,7 @@ module Fetcher
         ex
       when IO::Error
         # I/O errors - may be transient or permanent
-        if is_transient_io_error?(ex)
+        if transient_io_error?(ex)
           log_fallback(config, "transient I/O", feed_type, url, ex)
           ex
         else
@@ -38,7 +38,7 @@ module Fetcher
     end
 
     # Check if an I/O error is likely transient
-    private def self.is_transient_io_error?(ex : IO::Error) : Bool
+    private def self.transient_io_error?(ex : IO::Error) : Bool
       # Common transient errors
       message = ex.message.to_s.downcase
       message.includes?("timeout") ||

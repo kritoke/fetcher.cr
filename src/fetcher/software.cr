@@ -13,7 +13,7 @@ module Fetcher
   module Software
     # Pre-compiled regex patterns for performance
     GITLAB_RELEASES_PATTERN = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
-    
+
     alias ProviderInfo = NamedTuple(provider: String, base_url: String, repo: String)
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result

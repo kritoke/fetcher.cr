@@ -1,4 +1,4 @@
-require "./src/fetcher"
+require "../../src/fetcher"
 
 # Simple RSS feed for testing
 rss_xml = <<-XML
