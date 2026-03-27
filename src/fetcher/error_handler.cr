@@ -47,5 +47,19 @@ module Fetcher
         Fetcher.error_result(error)
       end
     end
+
+    def self.log_error(url : String, ex : Exception, config : RequestConfig = RequestConfig.new)
+      return unless ENV["FETCHER_DEBUG"]?
+
+      logger = ::Log.for("fetcher")
+      case config.error_detail_level
+      when .minimal?
+        logger.debug { "Error fetching #{url}" }
+      when .normal?
+        logger.debug { "Error fetching #{url}: #{ex.class}" }
+      when .debug?
+        logger.debug { "Error for #{url}: #{ex.class} - #{ex.message}" }
+      end
+    end
   end
 end

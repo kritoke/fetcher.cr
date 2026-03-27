@@ -25,6 +25,8 @@ module Fetcher
     @@token_bucket_limiters = {} of String => TokenBucketRateLimiter
     @@limiters_lock = Mutex.new
 
+    @request_semaphore : Channel(Nil)?
+
     def self.clear_rate_limiters : Nil
       @@limiters_lock.synchronize do
         @@token_bucket_limiters.clear
@@ -32,11 +34,35 @@ module Fetcher
     end
 
     def initialize(@config : RequestConfig = RequestConfig.new)
+      @request_semaphore = create_semaphore
+    end
+
+    private def create_semaphore : Channel(Nil)?
+      limit = @config.max_concurrent_requests
+      return unless limit && limit > 0
+
+      sem = Channel(Nil).new(limit)
+      # Pre-fill the semaphore with tokens
+      limit.times { sem.send(nil) }
+      sem
+    end
+
+    private def acquire_semaphore : Nil
+      sem = @request_semaphore
+      return unless sem
+      sem.receive
+    end
+
+    private def release_semaphore : Nil
+      sem = @request_semaphore
+      return unless sem
+      sem.send(nil)
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
       domain = extract_domain(url)
 
+      acquire_semaphore
       begin
         check_circuit_breaker(domain)
 
@@ -60,12 +86,15 @@ module Fetcher
       rescue ex
         record_failure(domain) unless domain.empty?
         handle_error(ex, url)
+      ensure
+        release_semaphore
       end
     end
 
     def get(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
       domain = extract_domain(url)
 
+      acquire_semaphore
       begin
         check_circuit_breaker(domain)
 
@@ -94,6 +123,8 @@ module Fetcher
       rescue ex
         record_failure(domain)
         handle_error(ex, url)
+      ensure
+        release_semaphore
       end
     end
 
@@ -106,8 +137,6 @@ module Fetcher
 
     private def handle_error(ex : Exception, url : String)
       case ex
-      when CircuitOpenError
-        raise ex
       when URI::Error
         raise DNSError.new("Invalid URL: #{ex.message}")
       when Socket::Error

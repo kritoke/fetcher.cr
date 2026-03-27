@@ -11,6 +11,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.8.2] - 2026-03-26
+
+### Added
+- Structured configuration with composable sub-configs:
+  - `TimeoutConfig` for connection/read timeouts
+  - `RetryConfig` for retry behavior
+  - `CircuitBreakerConfig` for circuit breaker settings
+  - `RateLimitConfig` for rate limiting parameters
+  - `StreamingConfig` for streaming parser options
+  - `CacheConfig` for caching options
+- `driver_detection_mode` option with modes: `Auto`, `ContentType`, `UrlOnly`, `ExplicitOnly`
+  - `UrlOnly` mode skips HEAD requests for faster detection
+- `error_detail_level` option with levels: `Minimal`, `Normal`, `Debug`
+  - Controls verbosity of debug logging to prevent sensitive data leakage
+- `max_concurrent_requests` option for request semaphore
+  - Prevents resource exhaustion and deadlocks in high-volume scenarios
+  - Uses Channel-based semaphore pattern for thread safety
+- Deprecation warning for `http_client_pool_size` parameter (silently ignored)
+
+### Changed
+- `RequestConfig` refactored from record to class with backward-compatible constructors
+- Consistent error handling across all `pull` method overloads
+- Removed unreachable `CircuitOpenError` case from `handle_error`
+
+### Backward Compatibility
+- All existing flat-parameter constructors continue to work
+- New structured configuration is optional
+- No breaking changes to public API
+
 ## [0.8.1.1] - 2026-03-26
 
 ### Fixed

@@ -53,16 +53,26 @@ module Fetcher
   end
 
   def self.detect_driver(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, config : RequestConfig = RequestConfig.new) : DriverType
-    # First, try to detect based on URL patterns for known sources
-    driver = detect_by_url_pattern(url)
-    return driver if driver
+    case config.driver_detection_mode
+    when .explicit_only?
+      error = Error.invalid_format("Explicit driver required - auto-detection disabled", url)
+      raise InvalidFormatError.new(error.message, error)
+    when .url_only?
+      detect_by_url_pattern(url) || detect_by_url_extension(url)
+    when .content_type?
+      detect_by_content_type(url, headers, config) || detect_by_url_extension(url)
+    else # :auto
+      # First, try to detect based on URL patterns for known sources
+      driver = detect_by_url_pattern(url)
+      return driver if driver
 
-    # For other URLs, use content-type detection
-    driver = detect_by_content_type(url, headers, config)
-    return driver if driver
+      # For other URLs, use content-type detection
+      driver = detect_by_content_type(url, headers, config)
+      return driver if driver
 
-    # Final fallback based on URL extension/patterns
-    detect_by_url_extension(url)
+      # Final fallback based on URL extension/patterns
+      detect_by_url_extension(url)
+    end
   end
 
   private def self.detect_by_url_pattern(url : String) : DriverType?
@@ -144,7 +154,7 @@ module Fetcher
         YouTube.pull(url, final_headers, actual_limit, config)
       end
     rescue ex
-      ::Log.for("fetcher").debug { "Main pull error for #{url}: #{ex.class} - #{ex.message}" } if ENV["FETCHER_DEBUG"]?
+      ErrorHandler.log_error(url, ex, config)
       raise ex
     end
   end
@@ -156,17 +166,24 @@ module Fetcher
 
     driver = detect_driver(url, final_headers, config)
 
-    case driver
-    in .rss?
-      RSS.pull(url, final_headers, actual_limit, config)
-    in .reddit?
-      Reddit.pull(url, final_headers, actual_limit, config)
-    in .software?
-      Software.pull(url, final_headers, actual_limit, config)
-    in .json_feed?
-      JSONFeed.pull(url, final_headers, actual_limit, config)
-    in .you_tube?
-      YouTube.pull(url, final_headers, actual_limit, config)
+    ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" } if ENV["FETCHER_DEBUG"]?
+
+    begin
+      case driver
+      in .rss?
+        RSS.pull(url, final_headers, actual_limit, config)
+      in .reddit?
+        Reddit.pull(url, final_headers, actual_limit, config)
+      in .software?
+        Software.pull(url, final_headers, actual_limit, config)
+      in .json_feed?
+        JSONFeed.pull(url, final_headers, actual_limit, config)
+      in .you_tube?
+        YouTube.pull(url, final_headers, actual_limit, config)
+      end
+    rescue ex
+      ErrorHandler.log_error(url, ex, config)
+      raise ex
     end
   end
 

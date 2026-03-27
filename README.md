@@ -45,7 +45,7 @@ Add to your `shard.yml`:
 dependencies:
   fetcher:
     github: kritoke/fetcher.cr
-    version: "~> 0.7"
+    version: "~> 0.8"
 ```
 
 ## Usage
@@ -246,6 +246,26 @@ result = Fetcher.pull_software("https://github.com/crystal-lang/crystal/releases
 result = Fetcher.pull_json_feed("https://example.com/feed.json")
 result = Fetcher.pull_youtube("https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxx")
 ```
+
+### Structured Configuration (v0.8.0+)
+
+For better organization, you can use the structured configuration approach with sub-configs:
+
+```crystal
+# Using structured configuration
+config = Fetcher::RequestConfig.new(
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds),
+  retry: Fetcher::RetryConfig.new(max_retries: 5, base_delay: 2.seconds),
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(enabled: true, failure_threshold: 10),
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: 10),
+  driver_detection_mode: Fetcher::DriverDetectionMode::UrlOnly,
+  error_detail_level: Fetcher::ErrorDetailLevel::Normal
+)
+
+result = Fetcher.pull("https://example.com/feed.xml", config: config)
+```
+
+The structured configuration is fully backward compatible - you can continue using the flat parameter style if preferred.
 
 ## Automatic Driver Detection
 
