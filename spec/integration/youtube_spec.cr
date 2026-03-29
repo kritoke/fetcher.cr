@@ -24,7 +24,7 @@ describe "Integration Tests - YouTube" do
       result = Fetcher.pull_youtube(url)
       result.success?.should be_false
       result.error_message.should_not be_nil
-      result.error_message.not_nil!.should contain("Not a valid YouTube channel URL")
+      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
     end
 
     it "rejects /c/ custom URLs" do
@@ -32,7 +32,7 @@ describe "Integration Tests - YouTube" do
       result = Fetcher.pull_youtube(url)
       result.success?.should be_false
       result.error_message.should_not be_nil
-      result.error_message.not_nil!.should contain("Not a valid YouTube channel URL")
+      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
     end
 
     it "rejects /user/ URLs" do
@@ -40,7 +40,7 @@ describe "Integration Tests - YouTube" do
       result = Fetcher.pull_youtube(url)
       result.success?.should be_false
       result.error_message.should_not be_nil
-      result.error_message.not_nil!.should contain("Not a valid YouTube channel URL")
+      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
     end
   end
 

@@ -366,5 +366,141 @@ describe "Integration Tests - RSS" do
         result.feed_authors.should be_empty
       end
     end
+
+    describe "RSS 2.0 comments element extraction" do
+      it "extracts comments element via DOM parser" do
+        rss_xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>Test Article</title>
+                <link>https://example.com/article</link>
+                <comments>https://example.com/article/comments</comments>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        parser = Fetcher::RSSParser.new
+        entries = parser.parse_entries(rss_xml, 10)
+        entries.size.should eq(1)
+        entries[0].comment_url.should eq("https://example.com/article/comments")
+      end
+
+      it "extracts comments element via streaming parser" do
+        xml_with_whitespace = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>Test Article</title>
+                <link>https://example.com/article</link>
+                <comments>https://example.com/article/comments</comments>
+              </item>
+            </channel>
+          </rss>
+        XML
+        rss_xml = xml_with_whitespace.lstrip
+
+        reader = XML::Reader.new(rss_xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(1)
+        entries[0].comment_url.should eq("https://example.com/article/comments")
+      end
+
+      it "comments element is used as fallback when no link rel=comments via DOM parser" do
+        rss_xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>Test Article</title>
+                <link>https://example.com/article</link>
+                <comments>https://example.com/native-comments</comments>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        parser = Fetcher::RSSParser.new
+        entries = parser.parse_entries(rss_xml, 10)
+        entries.size.should eq(1)
+        entries[0].comment_url.should eq("https://example.com/native-comments")
+      end
+
+      it "link rel=comments takes precedence over comments element via DOM parser" do
+        rss_xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>Test Article</title>
+                <link>https://example.com/article</link>
+                <link rel="comments" href="https://example.com/rel-comments"/>
+                <comments>https://example.com/native-comments</comments>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        parser = Fetcher::RSSParser.new
+        entries = parser.parse_entries(rss_xml, 10)
+        entries.size.should eq(1)
+        entries[0].comment_url.should eq("https://example.com/rel-comments")
+      end
+
+      it "streaming parser uses comments element as fallback when no discussion URL" do
+        xml_with_whitespace = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>Test Article</title>
+                <link>https://example.com/article</link>
+                <comments>https://example.com/article/comments</comments>
+              </item>
+            </channel>
+          </rss>
+        XML
+        rss_xml = xml_with_whitespace.lstrip
+
+        reader = XML::Reader.new(rss_xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(1)
+        entries[0].is_discussion_url.should be_false
+        entries[0].comment_url.should eq("https://example.com/article/comments")
+      end
+
+      it "streaming parser detects discussion URL from link" do
+        xml_with_whitespace = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test Feed</title>
+              <item>
+                <title>HN Post</title>
+                <link>https://news.ycombinator.com/item?id=12345</link>
+              </item>
+            </channel>
+          </rss>
+        XML
+        rss_xml = xml_with_whitespace.lstrip
+
+        reader = XML::Reader.new(rss_xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(1)
+        entries[0].is_discussion_url.should be_true
+        entries[0].comment_url.should eq("https://news.ycombinator.com/item?id=12345")
+      end
+    end
   end
 end

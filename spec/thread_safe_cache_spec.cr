@@ -96,7 +96,7 @@ describe Fetcher::ThreadSafeCache do
           end
           42
         end
-      rescue ex
+      rescue
         results.send(-1)
       else
         results.send(42)
@@ -109,7 +109,7 @@ describe Fetcher::ThreadSafeCache do
           mutex.synchronize { attempt_count += 1 }
           42
         end
-      rescue ex
+      rescue
         results.send(-1)
       else
         results.send(42)
@@ -199,7 +199,7 @@ describe Fetcher::ThreadSafeCache do
         spawn do
           key = "key#{i % 50}"
           begin
-            result = cache.get_or_compute(key) do
+            cache.get_or_compute(key) do
               sleep(rand(1..5).milliseconds)
               i
             end

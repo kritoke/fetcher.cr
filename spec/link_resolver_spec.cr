@@ -56,7 +56,7 @@ describe Fetcher::LinkResolver do
         XML
 
       node = XML.parse(xml).xpath_node("//item")
-      result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
+      result = Fetcher::LinkResolver.resolve(node || raise("node should not be nil"), "https://example.com/article")
       result.comment_url.should eq("https://news.ycombinator.com/item?id=12345")
     end
 
@@ -70,7 +70,7 @@ describe Fetcher::LinkResolver do
         XML
 
       node = XML.parse(xml).xpath_node("//item")
-      result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
+      result = Fetcher::LinkResolver.resolve(node || raise("node should not be nil"), "https://example.com/article")
       result.comment_url.should eq("https://example.com/comments/123")
     end
 
@@ -84,7 +84,7 @@ describe Fetcher::LinkResolver do
         XML
 
       node = XML.parse(xml).xpath_node("//item")
-      result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://example.com/article")
+      result = Fetcher::LinkResolver.resolve(node || raise("node should not be nil"), "https://example.com/article")
       result.commentary_url.should eq("https://daringfireball.net/linked/2024/01/article")
     end
 
@@ -98,7 +98,7 @@ describe Fetcher::LinkResolver do
         XML
 
       node = XML.parse(xml).xpath_node("//entry")
-      result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://x.com/mlbonfox/status/123")
+      result = Fetcher::LinkResolver.resolve(node || raise("node should not be nil"), "https://x.com/mlbonfox/status/123")
       result.commentary_url.should eq("https://daringfireball.net/linked/2026/03/17/fox-sports-wbc-immersive")
       result.is_discussion_url.should be_false
     end
@@ -112,7 +112,7 @@ describe Fetcher::LinkResolver do
         XML
 
       node = XML.parse(xml).xpath_node("//item")
-      result = Fetcher::LinkResolver.resolve(node.not_nil!, "https://news.ycombinator.com/item?id=12345")
+      result = Fetcher::LinkResolver.resolve(node || raise("node should not be nil"), "https://news.ycombinator.com/item?id=12345")
       result.is_discussion_url.should be_true
       result.comment_url.should eq("https://news.ycombinator.com/item?id=12345")
     end

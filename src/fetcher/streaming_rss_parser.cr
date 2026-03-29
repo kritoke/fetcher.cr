@@ -4,6 +4,7 @@ require "./result"
 require "./time_parser"
 require "./author"
 require "./attachment"
+require "./link_resolver"
 
 module Fetcher
   # Streaming RSS/Atom parser using XML::Reader
@@ -11,30 +12,17 @@ module Fetcher
     def parse_entries(reader : XML::Reader, limit : Int32) : Array(Entry)
       entries = [] of Entry
 
-      # Determine if it's RSS or Atom based on root element
-      is_rss = false
-      is_atom = false
-
-      while reader.read && (reader.node_type == :element || reader.node_type == :end_element)
-        if reader.node_type == :element
+      while reader.read && entries.size < limit
+        if reader.node_type == XML::Reader::Type::ELEMENT
           case reader.name
-          when "rss", "RDF"
-            is_rss = true
-            break
-          when "feed"
-            is_atom = true
-            break
+          when "item"
+            entry = parse_rss_item_streaming(reader)
+            entries << entry if entry
+          when "entry"
+            entry = parse_atom_entry_streaming(reader)
+            entries << entry if entry
           end
         end
-      end
-
-      # Reset reader to beginning
-      reader = XML::Reader.new(reader.to_s)
-
-      if is_rss
-        parse_rss_streaming(reader, limit, entries)
-      elsif is_atom
-        parse_atom_streaming(reader, limit, entries)
       end
 
       entries
@@ -42,7 +30,7 @@ module Fetcher
 
     private def parse_rss_streaming(reader : XML::Reader, limit : Int32, entries : Array(Entry))
       while reader.read && entries.size < limit
-        if reader.node_type == :element && reader.name == "item"
+        if reader.node_type == XML::Reader::Type::ELEMENT && reader.name == "item"
           entry = parse_rss_item_streaming(reader)
           entries << entry if entry
         end
@@ -51,7 +39,7 @@ module Fetcher
 
     private def parse_atom_streaming(reader : XML::Reader, limit : Int32, entries : Array(Entry))
       while reader.read && entries.size < limit
-        if reader.node_type == :element && reader.name == "entry"
+        if reader.node_type == XML::Reader::Type::ELEMENT && reader.name == "entry"
           entry = parse_atom_entry_streaming(reader)
           entries << entry if entry
         end
@@ -67,11 +55,12 @@ module Fetcher
       author = ""
       categories = [] of String
       attachments = [] of Attachment
+      comments_link = ""
 
       depth = 0
       while reader.read
         case reader.node_type
-        when :element
+        when XML::Reader::Type::ELEMENT
           depth += 1
           case reader.name
           when "title"
@@ -92,15 +81,20 @@ module Fetcher
           when "enclosure"
             attachment = parse_enclosure_attributes(reader)
             attachments << attachment if attachment
+          when "comments"
+            comments_link = read_text_content(reader)
           end
-        when :end_element
+        when XML::Reader::Type::END_ELEMENT
           depth -= 1
-          break if depth < 0 && reader.name == "item"
+          break if depth == 0 && reader.name == "item"
         end
       end
 
       # Use content:encoded if available, otherwise description
       final_content = content.presence || description
+
+      link_data = LinkResolver.resolve_from_url(link)
+      final_comment_url = link_data.comment_url || comments_link.presence
 
       Entry.create(
         title: Entry.sanitize_title(title),
@@ -110,7 +104,10 @@ module Fetcher
         author: author.presence,
         published_at: TimeParser.parse(pub_date_str),
         categories: categories,
-        attachments: attachments
+        attachments: attachments,
+        comment_url: final_comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     rescue
       nil
@@ -129,7 +126,7 @@ module Fetcher
       depth = 0
       while reader.read
         case reader.node_type
-        when :element
+        when XML::Reader::Type::ELEMENT
           depth += 1
           case reader.name
           when "title"
@@ -151,7 +148,7 @@ module Fetcher
             author_depth = 0
             while reader.read
               case reader.node_type
-              when :element
+              when XML::Reader::Type::ELEMENT
                 author_depth += 1
                 case reader.name
                 when "name"
@@ -159,7 +156,7 @@ module Fetcher
                 when "uri"
                   author_uri = read_text_content(reader)
                 end
-              when :end_element
+              when XML::Reader::Type::END_ELEMENT
                 author_depth -= 1
                 break if author_depth < 0 && reader.name == "author"
               end
@@ -170,14 +167,16 @@ module Fetcher
               categories << term
             end
           end
-        when :end_element
+        when XML::Reader::Type::END_ELEMENT
           depth -= 1
-          break if depth < 0 && reader.name == "entry"
+          break if depth == 0 && reader.name == "entry"
         end
       end
 
       # Use content if available, otherwise summary
       final_content = content.presence || summary
+
+      link_data = LinkResolver.resolve_from_url(link)
 
       Entry.create(
         title: Entry.sanitize_title(title),
@@ -187,14 +186,17 @@ module Fetcher
         author: author_name.presence,
         author_url: author_uri.presence,
         published_at: TimeParser.parse(published_str),
-        categories: categories
+        categories: categories,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     rescue
       nil
     end
 
     private def read_text_content(reader : XML::Reader) : String
-      if reader.node_type == :element && reader.empty_element?
+      if reader.node_type == XML::Reader::Type::ELEMENT && reader.empty_element?
         return ""
       end
 
@@ -202,11 +204,11 @@ module Fetcher
       depth = 0
       while reader.read
         case reader.node_type
-        when :text, :cdata
+        when XML::Reader::Type::TEXT, XML::Reader::Type::CDATA
           builder << reader.value
-        when :element
+        when XML::Reader::Type::ELEMENT
           depth += 1
-        when :end_element
+        when XML::Reader::Type::END_ELEMENT
           depth -= 1
           break if depth < 0
         end

@@ -141,6 +141,7 @@ module Fetcher
         Attachment.new(url: url, mime_type: type, size_in_bytes: length)
       end
 
+      comments_link = node.xpath_node("./*[local-name()='comments']").try(&.text).try(&.strip).presence
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -152,7 +153,7 @@ module Fetcher
         published_at: pub_date,
         categories: categories,
         attachments: attachments,
-        comment_url: link_data.comment_url,
+        comment_url: link_data.comment_url || comments_link,
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )

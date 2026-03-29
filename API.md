@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.5.1.
+Technical API documentation for Fetcher v0.8.3.
 
 ## Table of Contents
 
@@ -115,7 +115,12 @@ record Entry,
   author_url : String?,       # Author URL
   categories : Array(String), # Tags/categories
   attachments : Array(Attachment), # Media files
-  
+   
+  # Discussion/comment fields (v0.8.0+)
+  comment_url : String?,      # URL to discussion/comments
+  commentary_url : String?,   # Related link (e.g., Daring Fireball style)
+  is_discussion_url : Bool,   # True if main URL IS a discussion thread
+   
   # Existing fields
   published_at : Time?,
   version : String?           # For software releases
@@ -302,7 +307,14 @@ result = Fetcher.pull(
 - `dc:creator` → `Entry.author`
 - `enclosure` → `Entry.attachments`
 - `category` → `Entry.categories`
+- `<comments>` → `Entry.comment_url` (v0.8.3+)
 - Channel metadata → `Result.feed_*` fields
+
+**Comment URL extraction (v0.8.0+):**
+- `<link rel="comments">` → `Entry.comment_url`
+- `<link rel="replies">` → `Entry.comment_url`
+- `<comments>url</comments>` → `Entry.comment_url` (fallback)
+- URL pattern detection: `/comments/`, `/item?id=`, `/s/`, `/discuss`, `/r/`
 
 **Also supports:**
 - RSS 1.0/RDF (basic support)
@@ -317,6 +329,8 @@ result = Fetcher.pull(
 - `summary` → `Entry.content` (fallback)
 - `author/name`, `author/uri` → `Entry.author`, `Entry.author_url`
 - `category[@term]` → `Entry.categories`
+- `<link rel="related">` → `Entry.commentary_url` (Daring Fireball pattern)
+- `<link rel="comments">`, `<link rel="replies">` → `Entry.comment_url`
 - Feed metadata → `Result.feed_*` fields
 
 ### JSON Feed 1.0/1.1
@@ -424,6 +438,8 @@ end
 
 ## Version History
 
+- **v0.8.3** - Fixed RSS 2.0 `<comments>` element extraction, fixed streaming parser bugs
+- **v0.8.0** - Added comment_url, commentary_url, is_discussion_url fields, LinkResolver module
 - **v0.4.0** - Structured error handling, SourceType enum, rate limiting, enhanced security
 - **v0.3.0** - Added content extraction, JSON Feed support, RequestConfig
 - **v0.2.1** - Bug fixes and cleanup

@@ -11,6 +11,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.8.3] - 2026-03-28
+
+### Fixed
+- **RSS 2.0 `<comments>` element extraction** - The `<comments>` element is now properly extracted as a fallback when no `<link rel="comments">` or `<link rel="replies">` is present
+  - DOM parser (`RSSParser`) now extracts `<comments>` element
+  - Streaming parser (`StreamingRSSParser`) now extracts `<comments>` element
+  - `comment_url` field is populated from `<comments>` element as fallback
+- **Streaming parser bug fixes** - Fixed pre-existing bugs that prevented streaming parser from working:
+  - Fixed `node_type` comparison (was comparing enum to Symbol)
+  - Fixed depth tracking for item/entry parsing
+  - Added missing `comment_url`, `commentary_url`, and `is_discussion_url` fields
+
+### Code Quality
+- Fixed `not_nil!` usage in tests (replaced with `try` and `as(String)`)
+- Fixed unused rescue variables in thread_safe_cache_spec
+- Fixed useless variable assignment in thread_safe_cache_spec
+- Resolved heredoc indentation issues in test files
+- Added `.ameba.yml` configuration for lint exclusions
+- All 199 tests passing
+
+### Tests Added
+- 6 new tests for `<comments>` element extraction in RSS feeds
+- Tests cover both DOM and streaming parsers
+- Tests cover fallback behavior and URL pattern detection
+
 ## [0.8.2] - 2026-03-26
 
 ### Added

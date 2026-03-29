@@ -20,7 +20,7 @@ describe "Fetcher::Cache" do
 
       cached = Fetcher::Cache.get("test_key")
       cached.should_not be_nil
-      cached.not_nil!.site_link.should eq("https://example.com")
+      cached.try(&.site_link).should eq("https://example.com")
     end
 
     it "updates existing entry" do
@@ -31,7 +31,8 @@ describe "Fetcher::Cache" do
       Fetcher::Cache.set("test_key", result2, 5.minutes)
 
       cached = Fetcher::Cache.get("test_key")
-      cached.not_nil!.site_link.should eq("https://example2.com")
+      cached.should_not be_nil
+      cached.try(&.site_link).should eq("https://example2.com")
     end
   end
 
