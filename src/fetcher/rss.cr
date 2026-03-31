@@ -39,18 +39,14 @@ module Fetcher
           parser = Fetcher::XMLStreamingParser.new(limit)
           result = parser.parse_complete(io, limit, config)
 
-          # If streaming parser returns success, use it
           return result if result.success?
 
-          # If streaming parser fails but doesn't raise, fallback to DOM
-          puts "Streaming parser returned error, falling back to DOM parser" if config.debug_streaming
-        rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
-          # Don't fallback for memory issues - this would cause OOM
-          puts "Streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
+          ::Log.for("fetcher.rss").debug { "Streaming parser returned error, falling back to DOM parser" }
+        rescue ex : Fetcher::MemoryLimitExceeded
+          ::Log.for("fetcher.rss").debug { "Streaming parser memory limit exceeded, cannot fallback" }
           return Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Feed too large for streaming parser")
         rescue ex
-          # Log fallback if debug enabled
-          puts "Streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
+          ::Log.for("fetcher.rss").debug { "Streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" }
         end
       end
 

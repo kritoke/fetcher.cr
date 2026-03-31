@@ -4,6 +4,7 @@ require "./retry"
 require "./crest_http_client"
 require "./rss"
 require "./exceptions"
+require "./error_handler"
 
 module Fetcher
   module YouTube
@@ -55,21 +56,11 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(rss_url, headers)
 
-      case response.status_code
-      when 200..299
+      ErrorHandler.handle_response(response, rss_url) do
         parse_youtube_feed(response.body, channel_id, limit)
-      when 404
-        error = Error.invalid_url("YouTube channel not found", rss_url)
-        raise InvalidURLError.new(error.message, error)
-      else
-        error = Error.http(response.status_code, "HTTP error #{response.status_code}", rss_url)
-        raise HTTPError.new(error.message, response.status_code, error)
       end
-    rescue ex : FetchError
-      raise ex
-    rescue ex
-      error = Error.unknown("#{ex.class}: #{ex.message}", rss_url)
-      Fetcher.error_result(error)
+    rescue ex : Exception
+      ErrorHandler.handle_network_error(ex, rss_url)
     end
 
     private def self.extract_channel_id(url : String) : String?

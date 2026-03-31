@@ -74,6 +74,7 @@ module Fetcher
     end
 
     # Backward compatibility initializer with flat parameters
+    # Deprecated: Use the structured constructor with TimeoutConfig, RetryConfig, etc.
     def initialize(
       connect_timeout : Time::Span = Config::DEFAULT_CONNECT_TIMEOUT,
       read_timeout : Time::Span = Config::DEFAULT_READ_TIMEOUT,
@@ -101,6 +102,7 @@ module Fetcher
       driver_detection_mode : DriverDetectionMode = DriverDetectionMode::Auto,
       error_detail_level : ErrorDetailLevel = ErrorDetailLevel::Debug,
     )
+      ::Log.for("fetcher").warn { "RequestConfig flat constructor is deprecated - use structured configuration with TimeoutConfig, RetryConfig, etc." }
       if http_client_pool_size
         ::Log.for("fetcher").warn { "http_client_pool_size is deprecated and ignored - each request creates a new HTTP client" }
       end

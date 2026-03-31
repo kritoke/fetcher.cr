@@ -8,49 +8,103 @@ require "./crest_http_client"
 require "./time_parser"
 require "./exceptions"
 require "./error_handler"
+require "./rss_parser"
 
 module Fetcher
   module Software
     # Pre-compiled regex patterns for performance
     GITLAB_RELEASES_PATTERN = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
 
-    alias ProviderInfo = NamedTuple(provider: String, base_url: String, repo: String)
+    struct SoftwareProvider
+      getter name : String
+      getter base_url : String
+      getter repo : String
+      getter source_type : SourceType
+      getter api_url : String
+      getter atom_url : String
+      getter atom_fallback_urls : Array(String)
 
-    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-      info = detect_provider(url)
-      return Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider") unless info
-
-      Fetcher.with_retry(config) do
-        case info[:provider]
-        when "github"
-          pull_github(url, headers, limit, config)
-        when "gitlab"
-          pull_gitlab(info, headers, limit, config)
-        when "codeberg"
-          pull_codeberg(info, headers, limit, config)
-        else
-          Fetcher.error_result(ErrorKind::InvalidURL, "Unsupported provider")
-        end
+      def initialize(
+        @name : String,
+        @base_url : String,
+        @repo : String,
+        @source_type : SourceType,
+        @api_url : String,
+        @atom_url : String,
+        @atom_fallback_urls : Array(String) = [] of String,
+      )
       end
     end
 
-    private def self.detect_provider(url : String) : ProviderInfo?
+    def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
+      provider = detect_provider(url)
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider") unless provider
+
+      Fetcher.with_retry(config) do
+        pull_releases(provider, headers, limit, config)
+      end
+    end
+
+    private def self.detect_provider(url : String) : SoftwareProvider?
       if url.includes?("github.com") && url.includes?("/releases")
+        return unless valid_domain?(url, "github.com")
+
         repo = extract_repo_path(url, "github.com")
-        return {provider: "github", base_url: "https://github.com", repo: repo} if repo
+        if repo
+          return SoftwareProvider.new(
+            name: "github",
+            base_url: "https://github.com",
+            repo: repo,
+            source_type: SourceType::GitHub,
+            api_url: "https://api.github.com/repos/#{repo}/releases",
+            atom_url: "https://github.com/#{repo}/releases.atom",
+          )
+        end
       end
 
       gitlab_match = url.match(GITLAB_RELEASES_PATTERN)
       if gitlab_match
-        return {provider: "gitlab", base_url: "https://#{gitlab_match[1]}", repo: gitlab_match[2]}
+        gitlab_domain = gitlab_match[1]
+        return unless valid_domain?(url, gitlab_domain)
+
+        repo = gitlab_match[2]
+        base_url = "https://#{gitlab_domain}"
+        return SoftwareProvider.new(
+          name: "gitlab",
+          base_url: base_url,
+          repo: repo,
+          source_type: SourceType::GitLab,
+          api_url: "#{base_url}/api/v4/projects/#{URI.encode_path(repo)}/releases",
+          atom_url: "#{base_url}/#{repo}/-/releases.atom",
+          atom_fallback_urls: ["#{base_url}/#{repo}/-/tags?format=atom"],
+        )
       end
 
       if url.includes?("codeberg.org") && url.includes?("/releases")
+        return unless valid_domain?(url, "codeberg.org")
+
         repo = extract_repo_path(url, "codeberg.org")
-        return {provider: "codeberg", base_url: "https://codeberg.org", repo: repo} if repo
+        if repo
+          return SoftwareProvider.new(
+            name: "codeberg",
+            base_url: "https://codeberg.org",
+            repo: repo,
+            source_type: SourceType::Codeberg,
+            api_url: "https://codeberg.org/api/v1/repos/#{repo}/releases",
+            atom_url: "https://codeberg.org/#{repo}/releases.atom",
+          )
+        end
       end
 
       nil
+    end
+
+    private def self.valid_domain?(url : String, expected_domain : String) : Bool
+      uri = URI.parse(url)
+      host = uri.host.try(&.downcase)
+      host == expected_domain.downcase
+    rescue URI::Error
+      false
     end
 
     private def self.extract_repo_path(url : String, domain : String) : String?
@@ -59,292 +113,147 @@ module Fetcher
       match ? match[1] : nil
     end
 
-    private def self.pull_github(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-      repo = extract_repo_path(url, "github.com")
-      return Fetcher.error_result(ErrorKind::InvalidURL, "Invalid GitHub repo URL", nil) unless repo
+    private def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
+      case provider.name
+      when "github"
+        pull_github_releases(provider, headers, limit, config)
+      else
+        pull_generic_releases(provider, headers, limit, config)
+      end
+    end
 
-      api_url = "https://api.github.com/repos/#{repo}/releases"
-
+    private def self.pull_github_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       github_headers = ::HTTP::Headers.new
       github_headers["Accept"] = "application/vnd.github.v3+json"
       merged = Fetcher::CrestHttpClient.build_headers(github_headers)
 
       http_client = Fetcher::CrestHttpClient.new(config)
-      response = http_client.get(api_url, merged)
+      response = http_client.get(provider.api_url, merged)
 
       if response.status_code == 429
-        error = Error.rate_limited("GitHub rate limited", api_url)
+        error = Error.rate_limited("GitHub rate limited", provider.api_url)
         raise RateLimitError.new(error.message, error)
       end
 
-      ErrorHandler.handle_response(response, api_url) do
-        begin
-          releases = Array(JSON::Any).from_json(response.body)
-        rescue ex : JSON::ParseException
-          error = Error.invalid_format("Invalid JSON from GitHub: #{ex.message}", api_url)
-          raise InvalidFormatError.new(error.message, error)
-        end
-
+      ErrorHandler.handle_response(response, provider.api_url) do
+        releases = parse_json_releases(response.body, provider.api_url)
         stable_releases = releases.reject do |release|
           release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
         end
 
         entries = stable_releases.first(limit).map do |release|
-          parse_github_release(release, repo)
+          parse_release_entry(release, provider)
         end
 
         Result.success(
           entries: entries,
           etag: response.headers["ETag"]?,
-          site_link: "https://github.com/#{repo}",
-          favicon: "https://github.com/favicon.ico"
+          site_link: "#{provider.base_url}/#{provider.repo}",
+          favicon: "#{provider.base_url}/favicon.ico"
         )
       end
     rescue ex : Exception
-      ErrorHandler.handle_network_error(ex, url)
+      ErrorHandler.handle_network_error(ex, provider.api_url)
     end
 
-    private def self.parse_github_release(release : JSON::Any, repo : String) : Entry
-      tag = release["tag_name"]?.try(&.as_s) || ""
-      name = release["name"]?.try(&.as_s).presence || tag
-      html_url = release["html_url"]?.try(&.as_s) || ""
-      published = release["published_at"]?.try(&.as_s)
-      body = release["body"]?.try(&.as_s) || ""
-
-      pub_date = TimeParser.parse_iso8601(published)
-
-      Entry.create(
-        title: "#{repo} #{name}",
-        url: html_url,
-        source_type: SourceType::GitHub,
-        content: body,
-        content_html: body.presence,
-        published_at: pub_date,
-        version: tag
-      )
-    end
-
-    private def self.pull_gitlab(info : ProviderInfo, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-      base_url = info[:base_url]
-      repo = info[:repo]
-
+    private def self.pull_generic_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       http_client = Fetcher::CrestHttpClient.new(config)
       request_headers = Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
 
-      begin
-        result = try_gitlab_api(base_url, repo, limit, http_client, request_headers)
-        return result if result && result.success?
-      rescue ex : DNSError
-        # If SSL error occurs in API, don't fallback - it will likely happen again
-        return Fetcher.error_result(ErrorKind::DNSError, "GitLab API SSL error: #{ex.message}")
-      end
+      result = try_provider_api(provider, limit, http_client, request_headers)
+      return result if result && result.success?
 
-      begin
-        result = try_gitlab_releases_atom(base_url, repo, limit, http_client, request_headers)
-        return result if result && result.success?
-      rescue ex : DNSError
-        return Fetcher.error_result(ErrorKind::DNSError, "GitLab releases atom SSL error: #{ex.message}")
-      end
-
-      begin
-        result = try_gitlab_tags_atom(base_url, repo, limit, http_client, request_headers)
-        return result if result
-      rescue ex : DNSError
-        return Fetcher.error_result(ErrorKind::DNSError, "GitLab tags atom SSL error: #{ex.message}")
-      end
-
-      Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: No releases or tags found", 404)
-    end
-
-    private def self.try_gitlab_api(base_url : String, repo : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
-      encoded_path = URI.encode_path(repo)
-      api_url = "#{base_url}/api/v4/projects/#{encoded_path}/releases"
-
-      begin
-        response = http_client.get(api_url, headers)
-
-        return if response.status_code == 404
-        return unless (200..299).includes?(response.status_code)
-
-        releases = Array(JSON::Any).from_json(response.body)
-        return if releases.empty?
-
-        entries = releases.first(limit).map do |release|
-          parse_gitlab_release(release, repo, base_url)
+      # Try primary atom URL
+      atom_urls = [provider.atom_url] + provider.atom_fallback_urls
+      atom_urls.each do |atom_url|
+        begin
+          atom_result = try_provider_atom(provider, atom_url, limit, http_client, request_headers)
+          return atom_result if atom_result && atom_result.success?
+        rescue ex : DNSError
+          return Fetcher.error_result(ErrorKind::DNSError, "#{provider.name} SSL error: #{ex.message}")
         end
-
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          site_link: "#{base_url}/#{repo}",
-          favicon: "#{base_url}/favicon.ico"
-        )
-      rescue JSON::ParseException
-        nil
-      rescue ex : OpenSSL::SSL::Error
-        # Re-raise SSL errors to be handled properly
-        raise DNSError.new("GitLab SSL error: #{ex.message}")
-      rescue ex : FetchError
-        # Re-raise typed fetch errors
-        raise ex
-      rescue
-        nil
       end
+
+      Fetcher.error_result(ErrorKind::HTTPError, "#{provider.name} fetch error: No releases found", 404)
     end
 
-    private def self.parse_gitlab_release(release : JSON::Any, repo : String, base_url : String) : Entry
-      tag = release["tag_name"]?.try(&.as_s) || ""
-      name = release["name"]?.try(&.as_s).presence || tag
-      released_at = release["released_at"]? || release["created_at"]?
-      description = release["description"]?.try(&.as_s) || ""
+    private def self.try_provider_api(provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
+      response = http_client.get(provider.api_url, headers)
 
-      links = release["_links"]?.try(&.as_h?)
-      html_url = links.try(&.["self"]?).try(&.as_s) || "#{base_url}/#{repo}/-/releases/#{tag}"
+      return if response.status_code == 404
+      return unless (200..299).includes?(response.status_code)
 
-      pub_date = TimeParser.parse_iso8601(released_at.try(&.as_s))
+      releases = Array(JSON::Any).from_json(response.body)
+      return if releases.empty?
 
-      Entry.create(
-        title: "#{repo} #{name}",
-        url: html_url,
-        source_type: SourceType::GitLab,
-        content: description,
-        content_html: description.presence,
-        published_at: pub_date,
-        version: tag
+      entries = releases.first(limit).map do |release|
+        parse_release_entry(release, provider)
+      end
+
+      Result.success(
+        entries: entries,
+        etag: response.headers["ETag"]?,
+        site_link: "#{provider.base_url}/#{provider.repo}",
+        favicon: "#{provider.base_url}/favicon.ico"
       )
+    rescue JSON::ParseException
+      ::Log.for("fetcher.software").debug { "#{provider.name} API JSON parse failed, trying fallback: #{provider.api_url}" }
+      nil
+    rescue ex : OpenSSL::SSL::Error
+      raise DNSError.new("#{provider.name} SSL error: #{ex.message}")
+    rescue ex : FetchError
+      raise ex
+    rescue ex
+      ::Log.for("fetcher.software").debug { "#{provider.name} API request failed, trying fallback: #{ex.class} - #{ex.message}" }
+      nil
     end
 
-    private def self.try_gitlab_releases_atom(base_url : String, repo : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
-      atom_url = "#{base_url}/#{repo}/-/releases.atom"
+    private def self.try_provider_atom(provider : SoftwareProvider, atom_url : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
+      response = http_client.get(atom_url, headers)
 
-      begin
-        response = http_client.get(atom_url, headers)
+      return if response.status_code == 404
+      return unless (200..299).includes?(response.status_code)
 
-        return if response.status_code == 404
-        return unless (200..299).includes?(response.status_code)
+      entries = parse_software_atom_entries(response.body, provider.source_type, limit)
+      return if entries.empty?
 
-        entries = parse_atom_entries(response.body, "gitlab", limit)
-        return if entries.empty?
-
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          last_modified: response.headers["Last-Modified"]?,
-          site_link: "#{base_url}/#{repo}",
-          favicon: "#{base_url}/favicon.ico"
-        )
-      rescue ex : OpenSSL::SSL::Error
-        # Re-raise SSL errors to be handled properly
-        raise DNSError.new("GitLab releases atom SSL error: #{ex.message}")
-      rescue ex : FetchError
-        # Re-raise typed fetch errors
-        raise ex
-      rescue
-        nil
-      end
+      Result.success(
+        entries: entries,
+        etag: response.headers["ETag"]?,
+        last_modified: response.headers["Last-Modified"]?,
+        site_link: "#{provider.base_url}/#{provider.repo}",
+        favicon: "#{provider.base_url}/favicon.ico"
+      )
+    rescue ex : OpenSSL::SSL::Error
+      raise DNSError.new("#{provider.name} SSL error: #{ex.message}")
+    rescue ex : FetchError
+      raise ex
+    rescue ex
+      ::Log.for("fetcher.software").debug { "#{provider.name} atom feed failed: #{ex.class} - #{ex.message}" }
+      nil
     end
 
-    private def self.try_gitlab_tags_atom(base_url : String, repo : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
-      tags_url = "#{base_url}/#{repo}/-/tags?format=atom"
-
-      begin
-        response = http_client.get(tags_url, headers)
-
-        return if response.status_code == 404
-        return unless (200..299).includes?(response.status_code)
-
-        entries = parse_atom_entries(response.body, "gitlab", limit)
-        return if entries.empty?
-
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          last_modified: response.headers["Last-Modified"]?,
-          site_link: "#{base_url}/#{repo}",
-          favicon: "#{base_url}/favicon.ico"
-        )
-      rescue ex : OpenSSL::SSL::Error
-        # Re-raise SSL errors to be handled properly
-        raise DNSError.new("GitLab tags atom SSL error: #{ex.message}")
-      rescue ex : FetchError
-        # Re-raise typed fetch errors
-        raise ex
-      rescue
-        nil
-      end
+    private def self.parse_json_releases(body : String, url : String) : Array(JSON::Any)
+      Array(JSON::Any).from_json(body)
+    rescue ex : JSON::ParseException
+      error = Error.invalid_format("Invalid JSON from #{url}: #{ex.message}", url)
+      raise InvalidFormatError.new(error.message, error)
     end
 
-    private def self.pull_codeberg(info : ProviderInfo, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-      repo = info[:repo]
-
-      http_client = Fetcher::CrestHttpClient.new(config)
-      request_headers = Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
-
-      begin
-        result = try_codeberg_api(repo, limit, http_client, request_headers)
-        return result if result && result.success?
-      rescue ex : DNSError
-        return Fetcher.error_result(ErrorKind::DNSError, "Codeberg API SSL error: #{ex.message}")
-      end
-
-      begin
-        result = try_codeberg_releases_atom(repo, limit, http_client, request_headers)
-        return result if result
-      rescue ex : DNSError
-        return Fetcher.error_result(ErrorKind::DNSError, "Codeberg releases atom SSL error: #{ex.message}")
-      end
-
-      Fetcher.error_result(ErrorKind::HTTPError, "Codeberg fetch error: No releases found", 404)
-    end
-
-    private def self.try_codeberg_api(repo : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
-      api_url = "https://codeberg.org/api/v1/repos/#{repo}/releases"
-
-      begin
-        response = http_client.get(api_url, headers)
-
-        return if response.status_code == 404
-        return unless (200..299).includes?(response.status_code)
-
-        releases = Array(JSON::Any).from_json(response.body)
-        return if releases.empty?
-
-        entries = releases.first(limit).map do |release|
-          parse_codeberg_release(release, repo)
-        end
-
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          site_link: "https://codeberg.org/#{repo}",
-          favicon: "https://codeberg.org/favicon.ico"
-        )
-      rescue JSON::ParseException
-        nil
-      rescue ex : OpenSSL::SSL::Error
-        # Re-raise SSL errors to be handled properly
-        raise DNSError.new("Codeberg API SSL error: #{ex.message}")
-      rescue ex : FetchError
-        # Re-raise typed fetch errors
-        raise ex
-      rescue
-        nil
-      end
-    end
-
-    private def self.parse_codeberg_release(release : JSON::Any, repo : String) : Entry
+    private def self.parse_release_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
       tag = release["tag_name"]?.try(&.as_s) || ""
       name = release["name"]?.try(&.as_s).presence || tag
-      html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
-      published_at = release["published_at"]? || release["created_at"]?
-      body = release["body"]?.try(&.as_s) || ""
+      published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
+      body = release["body"]?.try(&.as_s) || release["description"]?.try(&.as_s) || ""
 
       pub_date = TimeParser.parse_iso8601(published_at.try(&.as_s))
 
+      html_url = extract_release_url(release, provider)
+
       Entry.create(
-        title: "#{repo} #{name}",
+        title: "#{provider.repo} #{name}",
         url: html_url,
-        source_type: SourceType::Codeberg,
+        source_type: provider.source_type,
         content: body,
         content_html: body.presence,
         published_at: pub_date,
@@ -352,73 +261,56 @@ module Fetcher
       )
     end
 
-    private def self.try_codeberg_releases_atom(repo : String, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
-      atom_url = "https://codeberg.org/#{repo}/releases.atom"
-
-      begin
-        response = http_client.get(atom_url, headers)
-
-        return if response.status_code == 404
-        return unless (200..299).includes?(response.status_code)
-
-        entries = parse_atom_entries(response.body, "codeberg", limit)
-        return if entries.empty?
-
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          last_modified: response.headers["Last-Modified"]?,
-          site_link: "https://codeberg.org/#{repo}",
-          favicon: "https://codeberg.org/favicon.ico"
-        )
-      rescue ex : OpenSSL::SSL::Error
-        # Re-raise SSL errors to be handled properly
-        raise DNSError.new("Codeberg releases atom SSL error: #{ex.message}")
-      rescue ex : FetchError
-        # Re-raise typed fetch errors
-        raise ex
-      rescue
-        nil
+    private def self.extract_release_url(release : JSON::Any, provider : SoftwareProvider) : String
+      case provider.name
+      when "github"
+        release["html_url"]?.try(&.as_s) || ""
+      when "gitlab"
+        links = release["_links"]?.try(&.as_h?)
+        tag = release["tag_name"]?.try(&.as_s) || ""
+        links.try(&.["self"]?).try(&.as_s) || "#{provider.base_url}/#{provider.repo}/-/releases/#{tag}"
+      else
+        release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
       end
     end
 
-    private def self.parse_atom_entries(body : String, source : String, limit : Int32) : Array(Entry)
-      xml = XML.parse(body, options: XML::ParserOptions::RECOVER |
-                                     XML::ParserOptions::NOENT |
-                                     XML::ParserOptions::NONET)
-
-      xml.xpath_nodes("//*[local-name()='entry']").first(limit).map do |entry|
-        parse_atom_entry(entry, source)
+    private def self.parse_software_atom_entries(body : String, source_type : SourceType, limit : Int32) : Array(Entry)
+      parser = RSSParser.new
+      entries = parser.parse_entries(body, limit)
+      entries.map do |entry|
+        # Add version from title if not already present
+        version = entry.version || extract_version_from_title(entry.title)
+        if version != entry.version
+          Entry.create(
+            title: entry.title,
+            url: entry.url,
+            source_type: source_type,
+            content: entry.content,
+            content_html: entry.content_html,
+            author: entry.author,
+            author_url: entry.author_url,
+            published_at: entry.published_at,
+            categories: entry.categories,
+            attachments: entry.attachments,
+            version: version,
+          )
+        else
+          Entry.create(
+            title: entry.title,
+            url: entry.url,
+            source_type: source_type,
+            content: entry.content,
+            content_html: entry.content_html,
+            author: entry.author,
+            author_url: entry.author_url,
+            published_at: entry.published_at,
+            categories: entry.categories,
+            attachments: entry.attachments,
+          )
+        end
       end
     rescue XML::Error
       [] of Entry
-    end
-
-    private def self.parse_atom_entry(entry : XML::Node, source : String) : Entry
-      title_node = entry.xpath_node("./*[local-name()='title']")
-      title = title_node.nil? ? "Untitled" : Entry.sanitize_title(title_node.text)
-
-      link_node = entry.xpath_node("./*[local-name()='link']")
-      link = link_node.try(&.[]?("href")).try(&.strip).presence ||
-             link_node.try(&.text).try(&.strip).presence || ""
-
-      published_node = entry.xpath_node("./*[local-name()='published']") || entry.xpath_node("./*[local-name()='updated']")
-      pub_date = TimeParser.parse(published_node.try(&.text))
-
-      content_node = entry.xpath_node("./*[local-name()='content']")
-      content = content_node.try(&.text).try(&.strip) || ""
-
-      version = extract_version_from_title(title)
-
-      Entry.create(
-        title: title,
-        url: link,
-        source_type: SourceType.from_string(source),
-        content: content,
-        content_html: content.presence,
-        published_at: pub_date,
-        version: version
-      )
     end
 
     private def self.extract_version_from_title(title : String) : String?

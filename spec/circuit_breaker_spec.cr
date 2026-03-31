@@ -1,6 +1,5 @@
 require "spec"
-require "../src/fetcher/circuit_breaker"
-require "../src/fetcher/request_config"
+require "../src/fetcher"
 
 describe Fetcher::CircuitBreaker do
   describe "#initialize" do

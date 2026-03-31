@@ -46,10 +46,11 @@ module Fetcher
   end
 
   module Cache
-    @@data = {} of String => CacheEntry
-    @@access_order = [] of String
-    @@mutex = Mutex.new
-    @@stats = CacheStats.new
+    @@data : Hash(String, CacheEntry) = {} of String => CacheEntry
+    @@access_order : Deque(String) = Deque(String).new
+    @@positions : Hash(String, Int32) = {} of String => Int32
+    @@mutex : Mutex = Mutex.new
+    @@stats : CacheStats = CacheStats.new
     @@max_size : Int32 = 1000
     @@enabled : Bool = true
 
@@ -108,6 +109,7 @@ module Fetcher
           evict_if_needed
           @@data[key] = CacheEntry.new(value, Time.utc, ttl)
           @@access_order << key
+          @@positions[key] = @@access_order.size - 1
         end
       end
     end
@@ -116,6 +118,7 @@ module Fetcher
       @@mutex.synchronize do
         @@data.clear
         @@access_order.clear
+        @@positions.clear
         @@stats = CacheStats.new
       end
     end
@@ -162,20 +165,41 @@ module Fetcher
     end
 
     private def self.update_access_order(key : String)
-      @@access_order.delete(key)
-      @@access_order << key
+      if pos = @@positions[key]?
+        @@access_order.delete_at(pos)
+        @@access_order << key
+        @@positions[key] = @@access_order.size - 1
+      else
+        @@access_order << key
+        @@positions[key] = @@access_order.size - 1
+      end
     end
 
     private def self.remove_entry(key : String)
       @@data.delete(key)
-      @@access_order.delete(key)
+      pos = @@positions.delete(key)
+      if pos
+        @@access_order.delete_at(pos)
+        reindex_positions
+      end
+    end
+
+    private def self.reindex_positions
+      @@positions.clear
+      @@access_order.each_with_index do |key, idx|
+        @@positions[key] = idx
+      end
     end
 
     private def self.evict_if_needed
       while @@data.size >= @@max_size && !@@access_order.empty?
-        oldest_key = @@access_order.shift
-        remove_entry(oldest_key)
-        @@stats.record_eviction
+        oldest_key = @@access_order.shift?
+        if oldest_key
+          @@positions.delete(oldest_key)
+          @@data.delete(oldest_key)
+          @@stats.record_eviction
+          reindex_positions
+        end
       end
     end
   end

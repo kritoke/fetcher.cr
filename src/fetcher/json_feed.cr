@@ -46,12 +46,11 @@ module Fetcher
             feed_language: nil,
             feed_authors: [] of Author
           )
-        rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
-          # Don't fallback for memory issues
-          puts "JSON Feed streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
+        rescue ex : Fetcher::MemoryLimitExceeded
+          ::Log.for("fetcher.jsonfeed").debug { "JSON Feed streaming parser memory limit exceeded, cannot fallback" }
           return Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Feed too large")
         rescue ex
-          puts "JSON Feed streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
+          ::Log.for("fetcher.jsonfeed").debug { "JSON Feed streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" }
         end
       end
 

@@ -9,6 +9,11 @@ module Fetcher
       HalfOpen
     end
 
+    record RegistryEntry,
+      breaker : CircuitBreaker,
+      last_accessed : Time,
+      ttl : Time::Span
+
     getter failure_threshold : Int32
     getter recovery_timeout : Time::Span
     getter failure_count : Int32 = 0
@@ -16,6 +21,8 @@ module Fetcher
     property last_failure_time : Time? = nil
 
     @mutex : Mutex = Mutex.new
+
+    DEFAULT_TTL = 5.minutes
 
     def initialize(
       @failure_threshold : Int32 = 5,
@@ -70,27 +77,68 @@ module Fetcher
     module Registry
       extend self
 
-      @@circuit_breakers = {} of String => CircuitBreaker
+      @@entries = {} of String => RegistryEntry
       @@lock = Mutex.new
+      @@cleanup_channel = Channel(Nil).new(1)
+      @@cleanup_running = false
+      DEFAULT_TTL = 5.minutes
 
       def get(domain : String, config) : CircuitBreaker
         @@lock.synchronize do
-          @@circuit_breakers[domain] ||= CircuitBreaker.new(
+          entry = @@entries[domain]?
+          if entry
+            @@entries[domain] = RegistryEntry.new(
+              breaker: entry.breaker,
+              last_accessed: Time.utc,
+              ttl: entry.ttl
+            )
+            return entry.breaker
+          end
+
+          breaker = CircuitBreaker.new(
             failure_threshold: config.circuit_breaker_failure_threshold,
             recovery_timeout: config.circuit_breaker_recovery_timeout
           )
+          entry = RegistryEntry.new(
+            breaker: breaker,
+            last_accessed: Time.utc,
+            ttl: DEFAULT_TTL
+          )
+          @@entries[domain] = entry
+          start_cleanup_if_needed
+          breaker
         end
       end
 
       def clear : Nil
         @@lock.synchronize do
-          @@circuit_breakers.clear
+          @@entries.clear
         end
       end
 
       def all_states : Hash(String, {State, Int32})
         @@lock.synchronize do
-          @@circuit_breakers.transform_values { |breaker| {breaker.state, breaker.failure_count} }
+          @@entries.transform_values { |entry| {entry.breaker.state, entry.breaker.failure_count} }
+        end
+      end
+
+      def cleanup : Nil
+        @@lock.synchronize do
+          now = Time.utc
+          @@entries.reject! do |_, entry|
+            now - entry.last_accessed > entry.ttl
+          end
+        end
+      end
+
+      private def start_cleanup_if_needed : Nil
+        return if @@cleanup_running
+        @@cleanup_running = true
+        spawn do
+          loop do
+            sleep 60.seconds
+            cleanup
+          end
         end
       end
     end

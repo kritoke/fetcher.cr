@@ -24,10 +24,7 @@ require "./fetcher/safe_feed_processor"
 require "./fetcher/concurrent_fetcher"
 require "./fetcher/domain_batch_processor"
 require "./fetcher/request_config"
-require "./fetcher/streaming_parser"
 require "./fetcher/entry_iterator"
-require "./fetcher/streaming_fallback"
-require "./fetcher/streaming_error_handling"
 require "./fetcher/xml_streaming_parser"
 require "./fetcher/json_streaming_parser"
 require "./fetcher/error_handler"
@@ -43,6 +40,7 @@ module Fetcher
   GITHUB_RELEASES_PATTERN   = %r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i
   CODEBERG_RELEASES_PATTERN = %r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i
   YOUTUBE_CHANNEL_PATTERN   = %r{://(www\.)?youtube\.com/channel/}i
+  GITLAB_RELEASES_PATTERN   = %r{://[^/]+/[^/]+/[^/]+/-/releases}i
 
   enum DriverType
     RSS
@@ -80,7 +78,7 @@ module Fetcher
       DriverType::Reddit
     elsif url.matches?(GITHUB_RELEASES_PATTERN)
       DriverType::Software
-    elsif url.matches?(%r{://[^/]+/[^/]+/[^/]+/-/releases}i)
+    elsif url.matches?(GITLAB_RELEASES_PATTERN)
       DriverType::Software
     elsif url.matches?(CODEBERG_RELEASES_PATTERN)
       DriverType::Software
@@ -104,8 +102,8 @@ module Fetcher
           return DriverType::RSS
         end
       end
-    rescue
-      # If HEAD request fails, return nil to use fallback
+    rescue ex
+      ::Log.for("fetcher").debug { "Content-type detection failed for #{url}: #{ex.class} - #{ex.message}" }
     end
 
     nil
@@ -133,53 +131,33 @@ module Fetcher
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    final_headers = Fetcher::CrestHttpClient.build_headers(headers)
-    actual_limit = Math.min(limit, Config::MAX_LIMIT)
-
-    driver = detect_driver(url, final_headers, config)
-
-    ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" } if ENV["FETCHER_DEBUG"]?
-
-    begin
-      case driver
-      in .rss?
-        RSS.pull(url, final_headers, actual_limit, config)
-      in .reddit?
-        Reddit.pull(url, final_headers, actual_limit, config)
-      in .software?
-        Software.pull(url, final_headers, actual_limit, config)
-      in .json_feed?
-        JSONFeed.pull(url, final_headers, actual_limit, config)
-      in .you_tube?
-        YouTube.pull(url, final_headers, actual_limit, config)
-      end
-    rescue ex
-      ErrorHandler.log_error(url, ex, config)
-      raise ex
-    end
+    execute_pull(url, headers, limit, config)
   end
 
   def self.pull(url : String, headers : ::HTTP::Headers, etag : String?, last_modified : String?, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
     base_headers = Fetcher::CrestHttpClient.build_headers(headers)
     final_headers = Fetcher::CrestHttpClient.with_cache(base_headers, etag, last_modified)
+    execute_pull(url, final_headers, limit, config)
+  end
+
+  private def self.execute_pull(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
     actual_limit = Math.min(limit, Config::MAX_LIMIT)
+    driver = detect_driver(url, headers, config)
 
-    driver = detect_driver(url, final_headers, config)
-
-    ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" } if ENV["FETCHER_DEBUG"]?
+    ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" }
 
     begin
       case driver
       in .rss?
-        RSS.pull(url, final_headers, actual_limit, config)
+        RSS.pull(url, headers, actual_limit, config)
       in .reddit?
-        Reddit.pull(url, final_headers, actual_limit, config)
+        Reddit.pull(url, headers, actual_limit, config)
       in .software?
-        Software.pull(url, final_headers, actual_limit, config)
+        Software.pull(url, headers, actual_limit, config)
       in .json_feed?
-        JSONFeed.pull(url, final_headers, actual_limit, config)
+        JSONFeed.pull(url, headers, actual_limit, config)
       in .you_tube?
-        YouTube.pull(url, final_headers, actual_limit, config)
+        YouTube.pull(url, headers, actual_limit, config)
       end
     rescue ex
       ErrorHandler.log_error(url, ex, config)

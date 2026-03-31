@@ -28,6 +28,15 @@ module Fetcher
       entries
     end
 
+    # Parse a single entry from the current reader position
+    # Reader must be positioned at an "item" or "entry" element
+    def parse_single_entry(reader : XML::Reader) : Entry?
+      case reader.name
+      when "item"  then parse_rss_item_streaming(reader)
+      when "entry" then parse_atom_entry_streaming(reader)
+      end
+    end
+
     private def parse_rss_streaming(reader : XML::Reader, limit : Int32, entries : Array(Entry))
       while reader.read && entries.size < limit
         if reader.node_type == XML::Reader::Type::ELEMENT && reader.name == "item"
@@ -109,7 +118,8 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse RSS item: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -191,7 +201,8 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse Atom entry: #{ex.class} - #{ex.message}" }
       nil
     end
 

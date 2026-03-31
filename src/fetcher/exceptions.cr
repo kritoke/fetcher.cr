@@ -95,6 +95,15 @@ module Fetcher
     end
   end
 
+  # Circuit breaker
+  class CircuitOpenError < FetchError
+    getter domain : String
+
+    def initialize(@domain : String, original_error : Error? = nil)
+      super("Circuit breaker open for domain: #{@domain}", original_error)
+    end
+  end
+
   # Rate limiting
   class RateLimitError < FetchError
     def initialize(message : String, original_error : Error? = nil)
@@ -106,6 +115,13 @@ module Fetcher
   class UnknownError < FetchError
     def initialize(message : String, original_error : Error? = nil)
       super(message, original_error)
+    end
+  end
+
+  # Streaming errors
+  class MemoryLimitExceeded < FetchError
+    def initialize(message : String = "Memory limit exceeded during streaming parsing")
+      super(message)
     end
   end
 end

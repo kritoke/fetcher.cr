@@ -39,3 +39,4 @@ flake.private.nix
 lib/
 .opencode/
 SPEC*
+openspec/

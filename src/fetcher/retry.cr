@@ -14,16 +14,20 @@ module Fetcher
     &operation : -> Result
   ) : Result
     attempt = 0
+    max_retries = config.max_retries
+    max_retries = 0 if max_retries < 0
     loop do
       begin
         return operation.call
       rescue ex
         if is_retriable.call(ex)
           attempt += 1
+          if attempt > max_retries
+            return error_result(Error.unknown("Max retries (#{max_retries}) exceeded: #{ex.class}: #{ex.message}"))
+          end
           delay = config.base_delay * (config.exponential_base ** attempt)
           delay = config.max_delay if delay > config.max_delay
-          # Add jitter (±10% of the delay)
-          jitter_factor = 0.9 + (Random.rand * 0.2) # 0.9 to 1.1
+          jitter_factor = 0.9 + (Random.rand * 0.2)
           actual_delay = delay * jitter_factor
           sleep(actual_delay)
         else

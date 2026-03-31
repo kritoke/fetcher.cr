@@ -70,8 +70,8 @@ module Fetcher
             @pull.skip
           end
         end
-      rescue
-        # If we can't determine type, leave both as false
+      rescue ex
+        ::Log.for("fetcher.streaming").debug { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
       end
 
       # Reset pull parser to beginning
@@ -115,7 +115,8 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse Reddit post: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -200,8 +201,8 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
-    rescue
-      # Skip malformed posts
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse Reddit post: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -226,7 +227,8 @@ module Fetcher
       end
 
       data.empty? ? nil : data
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse Reddit post data: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -280,8 +282,8 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
-    rescue
-      # Skip malformed items
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse JSON Feed item: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -336,7 +338,8 @@ module Fetcher
       end
 
       data.empty? ? nil : data
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse JSON Feed item data: #{ex.class} - #{ex.message}" }
       nil
     end
 
@@ -346,7 +349,8 @@ module Fetcher
         tags << @pull.read_string
       end
       tags
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse string array: #{ex.class} - #{ex.message}" }
       [] of String
     end
 
@@ -373,7 +377,8 @@ module Fetcher
         end
       end
       authors
-    rescue
+    rescue ex
+      ::Log.for("fetcher.streaming").debug { "Failed to parse authors array: #{ex.class} - #{ex.message}" }
       [] of Hash(Symbol, String)
     end
   end

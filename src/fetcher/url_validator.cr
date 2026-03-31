@@ -25,6 +25,27 @@ module Fetcher
       url.to_s
     end
 
+    def self.resolve_and_validate(url : String) : Bool
+      uri = URI.parse(url)
+      return false unless validate_uri(uri)
+
+      host = uri.host
+      return true if host.nil? || host.empty?
+
+      ip_address = Socket::IPAddress.new(host, 80)
+      !ip_address.private? && !ip_address.loopback? && !link_local?(ip_address) &&
+        !ipv6_unique_local?(ip_address) && !ipv6_site_local?(ip_address) &&
+        !ipv6_mapped_ipv4_private?(ip_address)
+    rescue Socket::Error
+      true
+    rescue URI::Error
+      true
+    end
+
+    def self.valid_redirect?(redirect_url : String) : Bool
+      valid?(redirect_url) && resolve_and_validate(redirect_url)
+    end
+
     private def self.validate_uri(uri : URI) : Bool
       # Validate scheme
       scheme = uri.scheme.try(&.downcase)

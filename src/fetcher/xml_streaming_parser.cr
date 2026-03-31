@@ -69,7 +69,7 @@ module Fetcher
     rescue ex : XML::Error
       error = Error.invalid_format("XML parsing error: #{ex.message}", "streaming")
       Fetcher.error_result(ErrorKind::InvalidFormat, error.message)
-    rescue ex : StreamingErrorHandling::MemoryLimitExceeded
+    rescue ex : MemoryLimitExceeded
       # Don't fallback for memory issues - raise immediately
       raise ex
     rescue ex : Exception
@@ -93,7 +93,7 @@ module Fetcher
 
       # Check if IO size exceeds memory limit
       if io.responds_to?(:size) && io.size > config.max_streaming_memory
-        raise StreamingErrorHandling::MemoryLimitExceeded.new(
+        raise MemoryLimitExceeded.new(
           "Feed size (#{io.size} bytes) exceeds memory limit (#{config.max_streaming_memory} bytes)"
         )
       end
@@ -106,19 +106,23 @@ module Fetcher
       super()
       @reader = XML::Reader.new(@io)
       @parser = StreamingRSSParser.new
-      @entries = nil
-      @current_index = 0
+      @entries_yielded = 0
     end
 
     protected def next_entry : Entry?
-      # Parse all entries on first call (not truly lazy, but works for now)
-      @entries ||= @parser.parse_entries(@reader, @limit)
+      return if @entries_yielded >= @limit
 
-      if @current_index < @entries.size
-        entry = @entries[@current_index]
-        @current_index += 1
-        entry
+      while @reader.read
+        if @reader.node_type == XML::Reader::Type::ELEMENT
+          case @reader.name
+          when "item", "entry"
+            @entries_yielded += 1
+            return @parser.parse_single_entry(@reader)
+          end
+        end
       end
+
+      nil
     end
   end
 end

@@ -31,13 +31,7 @@ module Fetcher
         end
       end
 
-      result = Fetcher.with_retry(config) do
-        begin
-          fetch_reddit(subreddit, sort, actual_limit, headers, config)
-        rescue FetchError
-          fetch_reddit_rss(subreddit, sort, actual_limit, headers, config)
-        end
-      end
+      result = fetch_with_reddit_fallback(subreddit, sort, actual_limit, headers, config)
 
       if config.cache_enabled && result.success?
         ttl = Cache.ttl_for_sort(sort)
@@ -52,6 +46,14 @@ module Fetcher
       rss_headers = headers.dup
       rss_headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
       RSS.pull(rss_url, rss_headers, limit, config)
+    end
+
+    private def self.fetch_with_reddit_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+      Fetcher.with_retry(config) do
+        fetch_reddit(subreddit, sort, limit, headers, config)
+      end
+    rescue FetchError
+      fetch_reddit_rss(subreddit, sort, limit, headers, config)
     end
 
     private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
@@ -83,7 +85,7 @@ module Fetcher
               site_link: site_link,
               favicon: favicon
             )
-          rescue ex : Fetcher::StreamingErrorHandling::MemoryLimitExceeded
+          rescue ex : Fetcher::MemoryLimitExceeded
             # Don't fallback for memory issues
             puts "Reddit streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
             error = Error.invalid_format(ex.message || "Feed too large", url)

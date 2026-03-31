@@ -8,16 +8,13 @@ module Fetcher
         yield
       when 500..599
         error = Error.server_error(response.status_code, "Server error: #{response.status_code}", url)
-        raise HTTPServerError.new(error.message, response.status_code, error)
+        Result.error(error)
+      when 400..499
+        error = Error.http(response.status_code, "HTTP #{response.status_code}", url)
+        Result.error(error)
       else
         error = Error.http(response.status_code, "HTTP #{response.status_code}", url)
-        if (400..499).includes?(response.status_code)
-          # Client errors are not retriable
-          Fetcher.error_result(error)
-        else
-          # Other errors might be retriable
-          raise HTTPError.new(error.message, response.status_code, error)
-        end
+        Result.error(error)
       end
     end
 
@@ -25,32 +22,30 @@ module Fetcher
       case ex
       when IO::TimeoutError
         error = Error.timeout("Timeout: #{ex.message}", url)
-        raise TimeoutError.new(error.message, error)
-      when CrestHttpClient::DNSError
+        Result.error(error)
+      when DNSError
         error = Error.dns("DNS error: #{ex.message}", url)
-        raise DNSError.new(error.message, error)
+        Result.error(error)
       when JSON::ParseException
         error = Error.invalid_format("JSON parsing error: #{ex.message}", url)
-        raise InvalidFormatError.new(error.message, error)
+        Result.error(error)
       when XML::Error
         error = Error.invalid_format("XML parsing error: #{ex.message}", url)
-        raise InvalidFormatError.new(error.message, error)
+        Result.error(error)
       when FetchError
-        # Re-raise typed exceptions
-        raise ex
+        Result.error(Error.new(kind: ErrorKind::Unknown, message: ex.message || "Fetch error", url: url))
       else
         if Fetcher.transient_error?(ex)
           error = Error.unknown(ex.message || "Unknown error", url)
-          raise UnknownError.new(error.message, error)
+          Result.error(error)
+        else
+          error = Error.unknown("#{ex.class}: #{ex.message}", url)
+          Result.error(error)
         end
-        error = Error.unknown("#{ex.class}: #{ex.message}", url)
-        Fetcher.error_result(error)
       end
     end
 
     def self.log_error(url : String, ex : Exception, config : RequestConfig = RequestConfig.new)
-      return unless ENV["FETCHER_DEBUG"]?
-
       logger = ::Log.for("fetcher")
       case config.error_detail_level
       when .minimal?
