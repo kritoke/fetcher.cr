@@ -58,10 +58,9 @@ module Fetcher
       # Check memory limit before parsing
       check_memory_limit(io, config)
 
-      # Use existing StreamingRSSParser for now
-      reader = XML::Reader.new(io)
-      parser = StreamingRSSParser.new
-      entries = parser.parse_entries(reader, actual_limit)
+      # Use lazy iterator to avoid buffering all entries
+      iterator = XMLStreamingIterator.new(io, actual_limit)
+      entries = iterator.to_a
 
       # Create minimal metadata (feed metadata extraction will be added later)
       metadata = FeedMetadata.new
