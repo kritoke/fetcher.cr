@@ -61,9 +61,8 @@ module Fetcher
       # Use lazy iterator to avoid buffering all entries
       iterator = XMLStreamingIterator.new(io, actual_limit)
       entries = iterator.to_a
+      metadata = iterator.metadata
 
-      # Create minimal metadata (feed metadata extraction will be added later)
-      metadata = FeedMetadata.new
       metadata.to_result(entries)
     rescue ex : XML::Error
       error = Error.invalid_format("XML parsing error: #{ex.message}", "streaming")
@@ -106,22 +105,102 @@ module Fetcher
       @reader = XML::Reader.new(@io)
       @parser = StreamingRSSParser.new
       @entries_yielded = 0
+      @metadata = FeedMetadata.new
+      @in_feed = false
+      @feed_depth = 0
     end
+
+    getter metadata : FeedMetadata { @metadata }
 
     protected def next_entry : Entry?
       return if @entries_yielded >= @limit
 
       while @reader.read
-        if @reader.node_type == XML::Reader::Type::ELEMENT
-          case @reader.name
-          when "item", "entry"
+        case @reader.node_type
+        when XML::Reader::Type::ELEMENT
+          depth = @reader.depth
+          name = @reader.name
+
+          if name == "channel" || name == "feed"
+            @in_feed = true
+            @feed_depth = depth
+          elsif @in_feed && depth <= @feed_depth && (name == "item" || name == "entry")
             @entries_yielded += 1
             return @parser.parse_single_entry(@reader)
+          elsif @in_feed && depth == @feed_depth + 1
+            extract_metadata(name)
+          end
+        when XML::Reader::Type::END_ELEMENT
+          if @reader.name == "channel" || @reader.name == "feed"
+            @in_feed = false
           end
         end
       end
 
       nil
+    end
+
+    private def extract_metadata(name : String) : Nil
+      value = case name
+              when "title"                   then @reader.read_string
+              when "description", "subtitle" then @reader.read_string
+              when "language"                then @reader.read_string
+              when "icon", "logo"            then @reader.read_string
+              when "link"
+                @reader["href"]?
+              end
+
+      return unless value
+
+      case name
+      when "title"
+        @metadata = FeedMetadata.new(
+          site_link: @metadata.site_link,
+          favicon: @metadata.favicon,
+          feed_title: value.to_s,
+          feed_description: @metadata.feed_description,
+          feed_language: @metadata.feed_language,
+          feed_authors: @metadata.feed_authors
+        )
+      when "description", "subtitle"
+        @metadata = FeedMetadata.new(
+          site_link: @metadata.site_link,
+          favicon: @metadata.favicon,
+          feed_title: @metadata.feed_title,
+          feed_description: value.to_s,
+          feed_language: @metadata.feed_language,
+          feed_authors: @metadata.feed_authors
+        )
+      when "language"
+        @metadata = FeedMetadata.new(
+          site_link: @metadata.site_link,
+          favicon: @metadata.favicon,
+          feed_title: @metadata.feed_title,
+          feed_description: @metadata.feed_description,
+          feed_language: value.to_s,
+          feed_authors: @metadata.feed_authors
+        )
+      when "icon", "logo"
+        @metadata = FeedMetadata.new(
+          site_link: @metadata.site_link,
+          favicon: value.to_s,
+          feed_title: @metadata.feed_title,
+          feed_description: @metadata.feed_description,
+          feed_language: @metadata.feed_language,
+          feed_authors: @metadata.feed_authors
+        )
+      when "link"
+        if href = value.to_s.presence
+          @metadata = FeedMetadata.new(
+            site_link: @metadata.site_link || href,
+            favicon: @metadata.favicon,
+            feed_title: @metadata.feed_title,
+            feed_description: @metadata.feed_description,
+            feed_language: @metadata.feed_language,
+            feed_authors: @metadata.feed_authors
+          )
+        end
+      end
     end
   end
 end

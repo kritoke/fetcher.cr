@@ -31,6 +31,7 @@ Metrics/CyclomaticComplexity:
   - src/fetcher/rss.cr
   - src/fetcher/streaming_parser.cr
   - src/fetcher/streaming_rss_parser.cr
+  - src/fetcher/xml_streaming_parser.cr
 
 Style/HeredocIndent:
   Excluded:
