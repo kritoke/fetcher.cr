@@ -110,7 +110,9 @@ module Fetcher
       @feed_depth = 0
     end
 
-    getter metadata : FeedMetadata { @metadata }
+    def metadata : FeedMetadata
+      @metadata
+    end
 
     protected def next_entry : Entry?
       return if @entries_yielded >= @limit
@@ -142,10 +144,10 @@ module Fetcher
 
     private def extract_metadata(name : String) : Nil
       value = case name
-              when "title"                   then @reader.read_string
-              when "description", "subtitle" then @reader.read_string
-              when "language"                then @reader.read_string
-              when "icon", "logo"            then @reader.read_string
+              when "title"                   then read_text_content
+              when "description", "subtitle" then read_text_content
+              when "language"                then read_text_content
+              when "icon", "logo"            then read_text_content
               when "link"
                 @reader["href"]?
               end
@@ -201,6 +203,27 @@ module Fetcher
           )
         end
       end
+    end
+
+    private def read_text_content : String
+      if @reader.node_type == XML::Reader::Type::ELEMENT && @reader.empty_element?
+        return ""
+      end
+
+      builder = String::Builder.new
+      depth = 0
+      while @reader.read
+        case @reader.node_type
+        when XML::Reader::Type::TEXT, XML::Reader::Type::CDATA
+          builder << @reader.value
+        when XML::Reader::Type::ELEMENT
+          depth += 1
+        when XML::Reader::Type::END_ELEMENT
+          depth -= 1
+          break if depth < 0
+        end
+      end
+      builder.to_s
     end
   end
 end
