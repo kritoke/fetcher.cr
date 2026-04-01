@@ -36,17 +36,17 @@ module Fetcher
 
       cache_key = generate_cache_key(subreddit, sort, actual_limit)
 
-      if config.cache_enabled
-        if cached = Cache.get(cache_key)
+      if config.cache_config.enabled
+        if cached = config.cache.get(cache_key)
           return cached
         end
       end
 
       result = fetch_with_reddit_fallback(subreddit, sort, actual_limit, headers, config)
 
-      if config.cache_enabled && result.success?
+      if config.cache_config.enabled && result.success?
         ttl = ttl_for_sort(sort)
-        Cache.set(cache_key, result, ttl)
+        config.cache.set(cache_key, result, ttl)
       end
 
       result
@@ -68,7 +68,7 @@ module Fetcher
 
       # Fall back to RSS for transient errors (excluding rate limiting)
       error = result.error
-      if error && transient_error_kind?(error.kind) && !error.rate_limited?
+      if error && transient_error_kind?(error.kind) && error.kind != ErrorKind::RateLimited
         fetch_reddit_rss(subreddit, sort, limit, headers, config)
       else
         result
@@ -116,7 +116,7 @@ module Fetcher
       error = Error.invalid_format("JSON parsing error: #{ex.message}", api_url)
       raise RedditFetchError.new(error.message, InvalidFormatError.new(error.message, error))
     rescue ex : RedditFetchError
-      raise
+      raise ex
     rescue ex : FetchError
       raise RedditFetchError.new(ex.message || "Reddit API failed", ex)
     rescue ex
@@ -124,7 +124,7 @@ module Fetcher
     end
 
     private def self.try_streaming_parse(body : String, subreddit : String, limit : Int32, config : RequestConfig) : Result?
-      return unless config.use_streaming_parser
+      return unless config.streaming.enabled
 
       io = IO::Memory.new(body)
       parser = Fetcher::JSONStreamingParser.new(limit)
@@ -132,11 +132,11 @@ module Fetcher
 
       build_reddit_result(items, subreddit)
     rescue ex : Fetcher::MemoryLimitExceeded
-      ::Log.for("fetcher.reddit").debug { "Streaming parser memory limit exceeded, cannot fallback" } if config.debug_streaming
+      ::Log.for("fetcher.reddit").debug { "Streaming parser memory limit exceeded, cannot fallback" } if config.streaming.debug
       error = Error.invalid_format(ex.message || "Feed too large", "#{REDDIT_API_BASE}/r/#{subreddit}")
       Result.error(error)
     rescue ex
-      ::Log.for("fetcher.reddit").debug { "Streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" } if config.debug_streaming
+      ::Log.for("fetcher.reddit").debug { "Streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" } if config.streaming.debug
       nil
     end
 
@@ -175,8 +175,8 @@ module Fetcher
       end
     end
 
-    def self.clear_cache(subreddit : String) : Nil
-      Cache.clear_by_prefix("reddit:#{subreddit}:")
+    def self.clear_cache(subreddit : String, config : RequestConfig = RequestConfig.new) : Nil
+      config.cache.clear_by_prefix("reddit:#{subreddit}:")
     end
 
     private def self.transient_error_kind?(kind : ErrorKind?) : Bool

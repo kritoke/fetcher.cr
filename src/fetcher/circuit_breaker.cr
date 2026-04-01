@@ -98,8 +98,8 @@ module Fetcher
           end
 
           breaker = CircuitBreaker.new(
-            failure_threshold: config.circuit_breaker_failure_threshold,
-            recovery_timeout: config.circuit_breaker_recovery_timeout
+            failure_threshold: config.circuit_breaker.failure_threshold,
+            recovery_timeout: config.circuit_breaker.recovery_timeout
           )
           entry = RegistryEntry.new(
             breaker: breaker,
@@ -135,10 +135,7 @@ module Fetcher
 
       private def start_cleanup_if_needed : Nil
         return if @@cleanup_running
-        @@lock.synchronize do
-          return if @@cleanup_running
-          @@cleanup_running = true
-        end
+        @@cleanup_running = true
         spawn do
           loop do
             sleep 60.seconds

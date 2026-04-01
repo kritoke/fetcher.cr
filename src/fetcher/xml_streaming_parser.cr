@@ -77,9 +77,9 @@ module Fetcher
       return unless config
 
       # Check if IO size exceeds memory limit
-      if io.responds_to?(:size) && io.size > config.max_streaming_memory
+      if io.responds_to?(:size) && io.size > config.streaming.max_memory
         raise MemoryLimitExceeded.new(
-          "Feed size (#{io.size} bytes) exceeds memory limit (#{config.max_streaming_memory} bytes)"
+          "Feed size (#{io.size} bytes) exceeds memory limit (#{config.streaming.max_memory} bytes)"
         )
       end
     end

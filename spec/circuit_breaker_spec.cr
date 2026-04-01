@@ -132,8 +132,10 @@ describe Fetcher::CircuitBreaker::Registry do
 
     it "uses config settings for new circuit breaker" do
       config = Fetcher::RequestConfig.new(
-        circuit_breaker_failure_threshold: 10,
-        circuit_breaker_recovery_timeout: 120.seconds
+        circuit_breaker: Fetcher::CircuitBreakerConfig.new(
+          failure_threshold: 10,
+          recovery_timeout: 120.seconds
+        )
       )
       cb = Fetcher::CircuitBreaker::Registry.get("example.com", config)
 
@@ -156,7 +158,9 @@ describe Fetcher::CircuitBreaker::Registry do
 
   describe ".all_states" do
     it "returns states for all domains" do
-      config = Fetcher::RequestConfig.new(circuit_breaker_failure_threshold: 1)
+      config = Fetcher::RequestConfig.new(
+        circuit_breaker: Fetcher::CircuitBreakerConfig.new(failure_threshold: 1)
+      )
 
       cb = Fetcher::CircuitBreaker::Registry.get("failing.com", config)
       cb.record_failure

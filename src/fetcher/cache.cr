@@ -182,47 +182,11 @@ module Fetcher
       end
     end
 
-    # Module-level singleton for backward compatibility
+    # Shared instance for backward compatibility
     @@default : Cache? = nil
 
     def self.default : Cache
       @@default ||= new
-    end
-
-    def self.get(key : String) : Result?
-      default.get(key)
-    end
-
-    def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
-      default.set(key, value, ttl)
-    end
-
-    def self.clear : Nil
-      default.clear
-    end
-
-    def self.clear_by_prefix(prefix : String) : Nil
-      default.clear_by_prefix(prefix)
-    end
-
-    def self.stats : CacheStats
-      default.stats
-    end
-
-    def self.enabled? : Bool
-      default.enabled?
-    end
-
-    def self.enabled=(value : Bool)
-      default.enabled = value
-    end
-
-    def self.max_size : Int32
-      default.max_size
-    end
-
-    def self.max_size=(value : Int32)
-      default.max_size = value
     end
   end
 end

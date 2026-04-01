@@ -11,7 +11,7 @@ describe "Integration Tests - Full Fetch Flow" do
     end
 
     it "handles RSS feed with streaming parser" do
-      config = Fetcher::RequestConfig.new(use_streaming_parser: true)
+      config = Fetcher::RequestConfig.new(streaming: Fetcher::StreamingConfig.new(enabled: true))
       result = Fetcher.pull("https://httpbin.org/xml", limit: 5, config: config)
 
       result.success?.should be_true
@@ -75,7 +75,7 @@ describe "Integration Tests - Full Fetch Flow" do
   describe "Cache integration" do
     it "caches results when enabled" do
       url = "https://httpbin.org/xml"
-      config = Fetcher::RequestConfig.new(cache_enabled: true, cache_max_size: 100)
+      config = Fetcher::RequestConfig.new(cache_config: Fetcher::CacheConfig.new(enabled: true, max_size: 100))
 
       result1 = Fetcher.pull(url, config: config)
       result2 = Fetcher.pull(url, config: config)
@@ -86,7 +86,7 @@ describe "Integration Tests - Full Fetch Flow" do
 
     it "skips cache when disabled" do
       url = "https://httpbin.org/xml"
-      config = Fetcher::RequestConfig.new(cache_enabled: false)
+      config = Fetcher::RequestConfig.new(cache_config: Fetcher::CacheConfig.new(enabled: false))
 
       result = Fetcher.pull(url, config: config)
       result.success?.should be_true
@@ -95,7 +95,7 @@ describe "Integration Tests - Full Fetch Flow" do
 
   describe "Retry mechanism" do
     it "respects max_retries configuration" do
-      config = Fetcher::RequestConfig.new(max_retries: 0)
+      config = Fetcher::RequestConfig.new(retry: Fetcher::RetryConfig.new(max_retries: 0))
 
       result = Fetcher.pull("https://invalid-domain-that-does-not-exist-12345.com/feed.xml", config: config)
 

@@ -33,7 +33,7 @@ module Fetcher
       return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>#{Fetcher::SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)") if body.bytesize > Fetcher::SafeFeedProcessor::MAX_FEED_SIZE
 
       # Use streaming parser if configured
-      if config.use_streaming_parser
+      if config.streaming.enabled
         begin
           io = IO::Memory.new(body)
           parser = Fetcher::XMLStreamingParser.new(limit)

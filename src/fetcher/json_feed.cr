@@ -29,7 +29,7 @@ module Fetcher
 
     private def self.parse_feed(body : String, limit : Int32, config : RequestConfig) : Result
       # Try streaming parser first if configured
-      if config.use_streaming_parser
+      if config.streaming.enabled
         begin
           io = IO::Memory.new(body)
           parser = Fetcher::JSONStreamingParser.new(limit)

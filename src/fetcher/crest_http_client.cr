@@ -80,8 +80,8 @@ module Fetcher
           headers: crest_headers,
           max_redirects: 0,
           handle_errors: false,
-          connect_timeout: @config.connect_timeout,
-          read_timeout: @config.read_timeout
+          connect_timeout: @config.timeout.connect,
+          read_timeout: @config.timeout.read
         )
 
         final_response = handle_redirects(response, url, crest_headers, domain, method)
@@ -127,8 +127,8 @@ module Fetcher
         headers: headers,
         max_redirects: 0,
         handle_errors: false,
-        connect_timeout: @config.connect_timeout,
-        read_timeout: @config.read_timeout
+        connect_timeout: @config.timeout.connect,
+        read_timeout: @config.timeout.read
       )
 
       handle_redirects(crest_response, resolved_url, headers, redirect_domain, method, remaining - 1)
@@ -192,7 +192,7 @@ module Fetcher
     end
 
     private def check_circuit_breaker(domain : String) : Nil
-      return unless @config.circuit_breaker_enabled
+      return unless @config.circuit_breaker.enabled
 
       circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
       unless circuit_breaker.allow_request?
@@ -201,14 +201,14 @@ module Fetcher
     end
 
     private def record_success(domain : String) : Nil
-      return unless @config.circuit_breaker_enabled
+      return unless @config.circuit_breaker.enabled
 
       circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
       circuit_breaker.record_success
     end
 
     private def record_failure(domain : String) : Nil
-      return unless @config.circuit_breaker_enabled
+      return unless @config.circuit_breaker.enabled
 
       circuit_breaker = CircuitBreaker::Registry.get(domain, @config)
       circuit_breaker.record_failure

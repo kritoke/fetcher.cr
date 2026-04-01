@@ -45,8 +45,8 @@ module Fetcher
         end
 
         limiter = TokenBucketRateLimiter.new(
-          config.rate_limit_capacity,
-          config.rate_limit_refill_rate
+          config.rate_limit.capacity,
+          config.rate_limit.refill_rate
         )
         @entries[domain] = Entry.new(
           limiter: limiter,
@@ -75,10 +75,7 @@ module Fetcher
 
     def start_cleanup_if_needed : Nil
       return if @cleanup_running
-      @lock.synchronize do
-        return if @cleanup_running
-        @cleanup_running = true
-      end
+      @cleanup_running = true
       spawn do
         loop do
           sleep 60.seconds
