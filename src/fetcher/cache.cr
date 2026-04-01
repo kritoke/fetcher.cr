@@ -125,10 +125,9 @@ module Fetcher
         keys_to_remove = @data.keys.select(&.starts_with?(prefix))
         keys_to_remove.each do |key|
           @data.delete(key)
-          if pos = @positions.delete(key)
-            @access_order.delete_at(pos)
-          end
+          @positions.delete(key)
         end
+        @access_order.reject! { |k| k.starts_with?(prefix) }
         reindex_positions if keys_to_remove.any?
       end
     end
@@ -187,6 +186,56 @@ module Fetcher
 
     def self.default : Cache
       @@default ||= new
+    end
+
+    # Backward-compatible class methods (delegates to default instance)
+    def self.get(key : String) : Result?
+      default.get(key)
+    end
+
+    def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
+      default.set(key, value, ttl)
+    end
+
+    def self.clear : Nil
+      default.clear
+    end
+
+    def self.clear_by_prefix(prefix : String) : Nil
+      default.clear_by_prefix(prefix)
+    end
+
+    def self.stats : CacheStats
+      default.stats
+    end
+
+    def self.enabled? : Bool
+      default.enabled?
+    end
+
+    def self.enabled=(value : Bool)
+      default.enabled = value
+    end
+
+    def self.max_size : Int32
+      default.max_size
+    end
+
+    def self.max_size=(value : Int32)
+      default.max_size = value
+    end
+
+    # Backward-compatible Reddit helpers (deprecated: use Reddit module instead)
+    def self.generate_key(subreddit : String, sort : String, limit : Int32) : String
+      Reddit.generate_cache_key(subreddit, sort, limit)
+    end
+
+    def self.ttl_for_sort(sort : String) : Time::Span
+      Reddit.ttl_for_sort(sort)
+    end
+
+    def self.clear_subreddit(subreddit : String) : Nil
+      Reddit.clear_cache(subreddit)
     end
   end
 end

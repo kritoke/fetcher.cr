@@ -175,8 +175,8 @@ module Fetcher
       end
     end
 
-    def self.clear_cache(subreddit : String, config : RequestConfig = RequestConfig.new) : Nil
-      config.cache.clear_by_prefix("reddit:#{subreddit}:")
+    def self.clear_cache(subreddit : String) : Nil
+      Cache.default.clear_by_prefix("reddit:#{subreddit}:")
     end
 
     private def self.transient_error_kind?(kind : ErrorKind?) : Bool

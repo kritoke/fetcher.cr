@@ -11,6 +11,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redirect control configuration
 - SSL verification options
 
+## [0.9.0] - 2026-04-01
+
+### What's New
+
+#### Structured Configuration (Required)
+`RequestConfig` now uses composable sub-config objects instead of flat parameters. This makes configuration more organized and explicit about what you're configuring.
+
+```crystal
+config = Fetcher::RequestConfig.new(
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds),
+  retry: Fetcher::RetryConfig.new(max_retries: 5),
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(failure_threshold: 5),
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: 10),
+  streaming: Fetcher::StreamingConfig.new(enabled: true),
+  cache_config: Fetcher::CacheConfig.new(max_size: 500)
+)
+```
+
+#### Cache Goes Class-Based
+`Cache` is now a proper class instead of a module. This means you can create isolated cache instances — great for testing or running multiple independent feeds in the same app.
+
+```crystal
+# Shared singleton (works exactly like before)
+Fetcher::Cache.get("my-key")
+Fetcher::Cache.set("my-key", result, 5.minutes)
+
+# Or create your own isolated cache
+cache = Fetcher::Cache.new(max_size: 100)
+cache.get("my-key")
+```
+
+#### Reddit Cache Helpers Moved
+Reddit-specific cache helpers (`generate_key`, `ttl_for_sort`, `clear_subreddit`) now live on the `Reddit` module where they belong. The old `Cache.*` methods still work as thin wrappers, so nothing breaks.
+
+```crystal
+# Preferred (new)
+Fetcher::Reddit.generate_cache_key("crystal", "hot", 25)
+Fetcher::Reddit.ttl_for_sort("hot")
+Fetcher::Reddit.clear_cache("crystal")
+
+# Still works (delegates to Reddit)
+Fetcher::Cache.generate_key("crystal", "hot", 25)
+Fetcher::Cache.ttl_for_sort("hot")
+Fetcher::Cache.clear_subreddit("crystal")
+```
+
+#### Reddit Fallback Actually Works Now
+The Reddit JSON API fallback to RSS was broken — the error handling path was unreachable. Now the fallback is properly wired: if the JSON API fails with a transient error (timeout, DNS, server error), it retries first, then falls back to the RSS feed. Non-transient errors (like 404 for a missing subreddit) are returned immediately without falling back.
+
+#### Readability Pass
+A thorough code review cleaned up the codebase:
+- `FeedMetadata` updates use `copy_with` instead of 50-line rebuilds
+- `head` and `get` share a single `perform_request` method
+- Redirect handling extracts domain transition logic into a helper
+- `Cache.get` uses guard clauses instead of nested if/else
+- `URLValidator` uses a `blocked_ip?` predicate instead of 6 negated terms
+- Manual `mutex.lock`/`unlock` replaced with `synchronize` everywhere
+- Dead code removed (unused `@waiters` field, unused `parse_reddit_post` method, duplicate extract helpers)
+- Variable shadowing fixed in Reddit module
+- `CircuitBreaker#check_recovery` separated into pure query + caller-side transition
+
+### Breaking Changes
+
+| Old API | New API |
+|---------|---------|
+| `config.connect_timeout` | `config.timeout.connect` |
+| `config.read_timeout` | `config.timeout.read` |
+| `config.max_retries` | `config.retry.max_retries` |
+| `config.rate_limit_capacity` | `config.rate_limit.capacity` |
+| `config.circuit_breaker_enabled` | `config.circuit_breaker.enabled` |
+| `config.use_streaming_parser` | `config.streaming.enabled` |
+| `config.cache_enabled` | `config.cache_config.enabled` |
+
+`Cache` changed from `module` to `class`. Backward-compatible class methods (`Cache.get`, `Cache.set`, `Cache.clear`, `Cache.stats`) still work via `Cache.default` delegation. For isolated caches, create instances with `Cache.new(max_size: 100)`.
+
+Cache key format changed from `fetcher:reddit:*` to `reddit:*`. Any cached data from before this version won't be found by the new code (but will work for new fetches going forward).
+
+`FetchError.from_error` was removed (was dead code, never called in the codebase).
+
 ## [0.8.3] - 2026-03-28
 
 ### Fixed
@@ -435,7 +514,13 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.7.0..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.9.0..HEAD
+[0.9.0]: https://github.com/kritoke/fetcher.cr/compare/v0.8.3..v0.9.0
+[0.8.3]: https://github.com/kritoke/fetcher.cr/compare/v0.8.2..v0.8.3
+[0.8.2]: https://github.com/kritoke/fetcher.cr/compare/v0.8.1.1..v0.8.2
+[0.8.1.1]: https://github.com/kritoke/fetcher.cr/compare/v0.8.1..v0.8.1.1
+[0.8.1]: https://github.com/kritoke/fetcher.cr/compare/v0.8.0..v0.8.1
+[0.8.0]: https://github.com/kritoke/fetcher.cr/compare/v0.7.0..v0.8.0
 [0.7.0]: https://github.com/kritoke/fetcher.cr/compare/v0.6.4..v0.7.0
 [0.6.4]: https://github.com/kritoke/fetcher.cr/compare/v0.6.3..v0.6.4
 [0.6.3]: https://github.com/kritoke/fetcher.cr/compare/v0.6.2..v0.6.3

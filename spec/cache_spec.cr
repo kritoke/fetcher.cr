@@ -226,4 +226,72 @@ describe "Fetcher::Cache" do
       cached.should_not be_nil
     end
   end
+
+  describe "backward-compatible class methods" do
+    before_each do
+      Fetcher::Cache.default.clear
+      Fetcher::Cache.default.enabled = true
+      Fetcher::Cache.default.max_size = 100
+    end
+
+    it "Cache.get delegates to default instance" do
+      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      Fetcher::Cache.set("test_key", result, 5.minutes)
+
+      cached = Fetcher::Cache.get("test_key")
+      cached.should_not be_nil
+      cached.try(&.site_link).should eq("https://example.com")
+    end
+
+    it "Cache.clear delegates to default instance" do
+      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      Fetcher::Cache.set("key1", result, 5.minutes)
+
+      Fetcher::Cache.clear
+
+      Fetcher::Cache.get("key1").should be_nil
+    end
+
+    it "Cache.stats delegates to default instance" do
+      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      Fetcher::Cache.set("test_key", result, 5.minutes)
+      Fetcher::Cache.get("test_key")
+      Fetcher::Cache.get("nonexistent")
+
+      stats = Fetcher::Cache.stats
+      stats.hits.should eq(1)
+      stats.misses.should eq(1)
+    end
+
+    it "Cache.enabled delegates to default instance" do
+      Fetcher::Cache.enabled = false
+      Fetcher::Cache.enabled?.should be_false
+      Fetcher::Cache.enabled = true
+    end
+
+    it "Cache.max_size delegates to default instance" do
+      Fetcher::Cache.max_size = 50
+      Fetcher::Cache.max_size.should eq(50)
+    end
+
+    it "Cache.generate_key delegates to Reddit" do
+      key = Fetcher::Cache.generate_key("crystal", "hot", 25)
+      key.should eq("reddit:crystal:hot:25")
+    end
+
+    it "Cache.ttl_for_sort delegates to Reddit" do
+      Fetcher::Cache.ttl_for_sort("hot").should eq(2.minutes)
+    end
+
+    it "Cache.clear_subreddit delegates to Reddit.clear_cache" do
+      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      Fetcher::Cache.set("reddit:crystal:hot:25", result, 5.minutes)
+      Fetcher::Cache.set("reddit:news:hot:25", result, 5.minutes)
+
+      Fetcher::Cache.clear_subreddit("crystal")
+
+      Fetcher::Cache.get("reddit:crystal:hot:25").should be_nil
+      Fetcher::Cache.get("reddit:news:hot:25").should_not be_nil
+    end
+  end
 end

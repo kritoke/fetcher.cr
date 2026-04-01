@@ -4,6 +4,8 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 
 > ⚠️ **Unstable API**: This library is undergoing active development. The API may change until v1.0.0.
 
+v0.9.0 introduces structured `RequestConfig` (replacing flat parameters) and moves `Cache` to a class-based API with a singleton. See Breaking Changes below.
+
 ## Features
 
 - **RSS/Atom Feeds** - Standard RSS and Atom feed parsing with content extraction
@@ -45,7 +47,7 @@ Add to your `shard.yml`:
 dependencies:
   fetcher:
     github: kritoke/fetcher.cr
-    version: "~> 0.8"
+    version: "~> 0.9"
 ```
 
 ## Usage
@@ -98,8 +100,7 @@ end
 ```crystal
 # Configure custom timeouts for slow feeds
 config = Fetcher::RequestConfig.new(
-  connect_timeout: 30.seconds,
-  read_timeout: 60.seconds
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds)
 )
 
 result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
@@ -110,14 +111,7 @@ result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
 ```crystal
 # Configure per-domain rate limiting to prevent API abuse
 config = Fetcher::RequestConfig.new(
-  max_requests_per_second: 10  # Max 10 requests per second per domain
-)
-
-# Or with timeouts
-config = Fetcher::RequestConfig.new(
-  connect_timeout: 30.seconds,
-  read_timeout: 60.seconds,
-  max_requests_per_second: 5
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: 10)
 )
 
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
@@ -130,19 +124,14 @@ For high-volume applications fetching thousands of feeds, the circuit breaker pr
 ```crystal
 # Configure circuit breaker (enabled by default)
 config = Fetcher::RequestConfig.new(
-  # Circuit breaker settings
-  circuit_breaker_enabled: true,           # Enable/disable (default: true)
-  circuit_breaker_failure_threshold: 5,    # Open circuit after 5 failures
-  circuit_breaker_recovery_timeout: 60.seconds  # Wait 60s before testing recovery
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(
+    enabled: true,               # Enable/disable (default: true)
+    failure_threshold: 5,        # Open circuit after 5 failures
+    recovery_timeout: 60.seconds # Wait 60s before testing recovery
+  )
 )
 
 result = Fetcher.pull("https://failing-domain.com/feed.xml", config: config)
-
-# Monitor circuit breaker state
-states = Fetcher::CircuitBreaker::Registry.all_states
-states.each do |domain, (state, failure_count)|
-  puts "#{domain}: #{state} (#{failure_count} failures)"
-end
 ```
 
 When a circuit breaker is open, requests to that domain are immediately rejected with a `CircuitOpenError` without making HTTP requests, reducing load on failing services.
@@ -202,6 +191,39 @@ headers = HTTP::Headers{
 
 result = Fetcher.pull("https://example.com/feed.xml", headers: headers)
 ```
+
+### Breaking Changes in v0.9.0
+
+`RequestConfig` now uses structured sub-configs instead of flat parameters. The flat parameter constructors are removed.
+
+**Structured configuration is required:**
+
+```crystal
+# New (v0.9.0+)
+config = Fetcher::RequestConfig.new(
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds),
+  retry: Fetcher::RetryConfig.new(max_retries: 5),
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(enabled: true, failure_threshold: 5),
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: 10),
+  streaming: Fetcher::StreamingConfig.new(enabled: true),
+  cache_config: Fetcher::CacheConfig.new(max_size: 500)
+)
+```
+
+**Accessors changed:**
+- `config.connect_timeout` → `config.timeout.connect`
+- `config.read_timeout` → `config.timeout.read`
+- `config.max_retries` → `config.retry.max_retries`
+- `config.rate_limit_capacity` → `config.rate_limit.capacity`
+- `config.circuit_breaker_enabled` → `config.circuit_breaker.enabled`
+- `config.use_streaming_parser` → `config.streaming.enabled`
+- `config.cache_enabled` → `config.cache_config.enabled`
+
+**Cache is now a class** with a singleton (`Cache.default`). Backward-compatible class methods (`Cache.get`, `Cache.set`, `Cache.clear`, `Cache.stats`) still work. For isolated caches, create instances with `Cache.new(max_size: 100)`.
+
+**Cache key format changed** from `fetcher:reddit:*` to `reddit:*`.
+
+**Reddit-specific cache helpers** moved to `Reddit` module. Backward-compatible aliases (`Cache.generate_key`, `Cache.ttl_for_sort`, `Cache.clear_subreddit`) still work but delegate to `Reddit`.
 
 ### Breaking Changes in v0.7.0
 
@@ -401,13 +423,20 @@ record Attachment,
   duration_in_seconds : Int32?
 ```
 
-### RequestConfig (v0.4.0+)
+### RequestConfig (v0.9.0+)
 
 ```crystal
-record RequestConfig,
-  connect_timeout : Time::Span = 10.seconds,
-  read_timeout : Time::Span = 30.seconds,
-  max_requests_per_second : Int32? = nil  # Optional rate limiting
+Fetcher::RequestConfig.new(
+  timeout: Fetcher::TimeoutConfig.new(connect: 10.seconds, read: 30.seconds),
+  retry: Fetcher::RetryConfig.new(max_retries: 3, base_delay: 1.second),
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(enabled: true, failure_threshold: 5),
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: nil),
+  streaming: Fetcher::StreamingConfig.new(enabled: false, max_memory: 10_485_760),
+  cache_config: Fetcher::CacheConfig.new(enabled: true, max_size: 1000),
+  max_redirects: 5,
+  driver_detection_mode: Fetcher::DriverDetectionMode::Auto,
+  error_detail_level: Fetcher::ErrorDetailLevel::Debug
+)
 ```
 
 ## Supported Feed Formats
