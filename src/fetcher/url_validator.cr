@@ -33,9 +33,7 @@ module Fetcher
       return true if host.nil? || host.empty?
 
       ip_address = Socket::IPAddress.new(host, 80)
-      !ip_address.private? && !ip_address.loopback? && !link_local?(ip_address) &&
-        !ipv6_unique_local?(ip_address) && !ipv6_site_local?(ip_address) &&
-        !ipv6_mapped_ipv4_private?(ip_address)
+      !blocked_ip?(ip_address)
     rescue Socket::Error
       true
     rescue URI::Error
@@ -81,32 +79,16 @@ module Fetcher
     end
 
     private def self.validate_ip_address(host : String) : Bool
-      begin
-        ip_address = Socket::IPAddress.new(host, 80)
-
-        # Block private IPs
-        return false if ip_address.private?
-
-        # Block loopback IPs
-        return false if ip_address.loopback?
-
-        # Block link-local IPs
-        return false if link_local?(ip_address)
-
-        # Block IPv6 unique local addresses (fc00::/7) - RFC 4193
-        return false if ipv6_unique_local?(ip_address)
-
-        # Block IPv6 site-local addresses (fec0::/10) - deprecated but still used
-        return false if ipv6_site_local?(ip_address)
-
-        # Block IPv6 mapped IPv4 private addresses
-        return false if ipv6_mapped_ipv4_private?(ip_address)
-      rescue Socket::Error
-        # Not a valid IP address - treat as hostname (allowed)
-        # Hostnames will be resolved by DNS later, which is handled by the HTTP client
-      end
-
+      ip_address = Socket::IPAddress.new(host, 80)
+      !blocked_ip?(ip_address)
+    rescue Socket::Error
       true
+    end
+
+    private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool
+      ip_address.private? || ip_address.loopback? || link_local?(ip_address) ||
+        ipv6_unique_local?(ip_address) || ipv6_site_local?(ip_address) ||
+        ipv6_mapped_ipv4_private?(ip_address)
     end
 
     # Enhanced IPv6 link-local detection with proper IP address parsing

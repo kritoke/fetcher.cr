@@ -34,34 +34,19 @@ module Fetcher
         entries = parser.parse_entries(body, limit)
         entries.map do |entry|
           version = entry.version || extract_version_from_title(entry.title)
-          if version != entry.version
-            Entry.create(
-              title: entry.title,
-              url: entry.url,
-              source_type: source_type,
-              content: entry.content,
-              content_html: entry.content_html,
-              author: entry.author,
-              author_url: entry.author_url,
-              published_at: entry.published_at,
-              categories: entry.categories,
-              attachments: entry.attachments,
-              version: version,
-            )
-          else
-            Entry.create(
-              title: entry.title,
-              url: entry.url,
-              source_type: source_type,
-              content: entry.content,
-              content_html: entry.content_html,
-              author: entry.author,
-              author_url: entry.author_url,
-              published_at: entry.published_at,
-              categories: entry.categories,
-              attachments: entry.attachments,
-            )
-          end
+          Entry.create(
+            title: entry.title,
+            url: entry.url,
+            source_type: source_type,
+            content: entry.content,
+            content_html: entry.content_html,
+            author: entry.author,
+            author_url: entry.author_url,
+            published_at: entry.published_at,
+            categories: entry.categories,
+            attachments: entry.attachments,
+            version: version,
+          )
         end
       rescue XML::Error
         [] of Entry

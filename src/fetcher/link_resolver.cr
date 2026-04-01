@@ -48,19 +48,13 @@ module Fetcher
       )
     end
 
+    DISCUSSION_PATHS = {"/comments/", "/item?id=", "/s/", "/discuss", "/r/"}
+
     private def self.detect_discussion_url(url : String) : Bool
       return false if url.empty? || url == "#"
 
-      lowercase_url = url.downcase
-
-      return true if lowercase_url.includes?("/comments/")
-      return true if lowercase_url.includes?("/item?id=")
-      return true if lowercase_url.includes?("/s/")
-      return true if lowercase_url.includes?("/discuss")
-      return true if lowercase_url.includes?("/r/")
-      return true if lowercase_url.ends_with?("/rss") || lowercase_url.includes?(".rss")
-
-      false
+      lower = url.downcase
+      DISCUSSION_PATHS.any? { |path| lower.includes?(path) }
     end
   end
 end

@@ -136,7 +136,7 @@ module Fetcher
       attachments = node.xpath_nodes("./*[local-name()='enclosure']").compact_map do |enc|
         url = enc["url"]?
         type = enc["type"]?
-        length = enc["length"]?.try(&.to_i64)
+        length = enc["length"]?.try(&.to_i64?)
         next unless url && type
         Attachment.new(url: url, mime_type: type, size_in_bytes: length)
       end

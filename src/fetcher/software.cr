@@ -16,7 +16,9 @@ require "./software/atom_parser"
 
 module Fetcher
   module Software
-    GITLAB_RELEASES_PATTERN = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
+    GITHUB_RELEASES_PATTERN  = %r{https?://(?:www\.)?github\.com/([^/]+/[^/]+)(?:/[^/]*)*/releases}
+    CODEBERG_RELEASES_PATTERN = %r{https?://(?:www\.)?codeberg\.org/([^/]+/[^/]+)(?:/[^/]*)*/releases}
+    GITLAB_RELEASES_PATTERN  = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
 
     struct SoftwareProvider
       getter name : String
@@ -49,28 +51,16 @@ module Fetcher
     end
 
     private def self.detect_provider(url : String) : SoftwareProvider?
-      if url.includes?("github.com") && url.includes?("/releases")
+      if match = url.match(GITHUB_RELEASES_PATTERN)
         return unless valid_domain?(url, "github.com")
-
         repo = extract_repo_path(url, "github.com")
-        if repo
-          return SoftwareProvider.new(
-            name: "github",
-            base_url: "https://github.com",
-            repo: repo,
-            source_type: SourceType::GitHub,
-            api_url: "https://api.github.com/repos/#{repo}/releases",
-            atom_url: "https://github.com/#{repo}/releases.atom",
-          )
-        end
+        return build_github_provider(repo) if repo
       end
 
-      gitlab_match = url.match(GITLAB_RELEASES_PATTERN)
-      if gitlab_match
-        gitlab_domain = gitlab_match[1]
+      if match = url.match(GITLAB_RELEASES_PATTERN)
+        gitlab_domain = match[1]
         return unless valid_domain?(url, gitlab_domain)
-
-        repo = gitlab_match[2]
+        repo = match[2]
         base_url = "https://#{gitlab_domain}"
         return SoftwareProvider.new(
           name: "gitlab",
@@ -83,23 +73,35 @@ module Fetcher
         )
       end
 
-      if url.includes?("codeberg.org") && url.includes?("/releases")
+      if match = url.match(CODEBERG_RELEASES_PATTERN)
         return unless valid_domain?(url, "codeberg.org")
-
         repo = extract_repo_path(url, "codeberg.org")
-        if repo
-          return SoftwareProvider.new(
-            name: "codeberg",
-            base_url: "https://codeberg.org",
-            repo: repo,
-            source_type: SourceType::Codeberg,
-            api_url: "https://codeberg.org/api/v1/repos/#{repo}/releases",
-            atom_url: "https://codeberg.org/#{repo}/releases.atom",
-          )
-        end
+        return build_codeberg_provider(repo) if repo
       end
 
       nil
+    end
+
+    private def self.build_github_provider(repo : String) : SoftwareProvider
+      SoftwareProvider.new(
+        name: "github",
+        base_url: "https://github.com",
+        repo: repo,
+        source_type: SourceType::GitHub,
+        api_url: "https://api.github.com/repos/#{repo}/releases",
+        atom_url: "https://github.com/#{repo}/releases.atom",
+      )
+    end
+
+    private def self.build_codeberg_provider(repo : String) : SoftwareProvider
+      SoftwareProvider.new(
+        name: "codeberg",
+        base_url: "https://codeberg.org",
+        repo: repo,
+        source_type: SourceType::Codeberg,
+        api_url: "https://codeberg.org/api/v1/repos/#{repo}/releases",
+        atom_url: "https://codeberg.org/#{repo}/releases.atom",
+      )
     end
 
     private def self.valid_domain?(url : String, expected_domain : String) : Bool

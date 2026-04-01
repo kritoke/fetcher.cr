@@ -32,7 +32,7 @@ module Fetcher
         domain_config = get_domain_config(domain, config)
 
         # Process all URLs in this domain group
-        domain_results = ConcurrentFetcher.pull_multiple(domain_urls, headers, limit, domain_config)
+        domain_results = ConcurrentFetcher.pull_multiple(domain_urls, headers, limit, config.max_concurrent_requests || ConcurrentFetcher::DEFAULT_MAX_CONCURRENT, config)
         results.concat(domain_results)
       end
 

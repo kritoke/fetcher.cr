@@ -45,7 +45,16 @@ module Fetcher
     Result.error(Error.new(kind: kind, message: message, status_code: status_code))
   end
 
+  def self.error_result(kind : ErrorKind, message : String, original : Exception) : Result
+    Result.error(Error.new(kind: kind, message: message, status_code: nil, original_error: original))
+  end
+
   def self.transient_error?(ex : Exception) : Bool
+    # Unwrap RedditFetchError to check the original cause
+    if ex.is_a?(Reddit::RedditFetchError) && (cause = ex.original_cause)
+      return transient_error?(cause)
+    end
+
     # Check for typed exceptions first
     case ex
     when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError

@@ -74,7 +74,10 @@ module Fetcher
         ::Log.for("fetcher.streaming").debug { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
       end
 
-      # Reset pull parser to beginning
+      # Reset pull parser to beginning using IO#rewind if supported
+      if @io.responds_to?(:rewind)
+        @io.as(IO::Seekable).rewind
+      end
       @pull = JSON::PullParser.new(@io)
     end
 
@@ -157,52 +160,6 @@ module Fetcher
         end
       end
 
-      nil
-    end
-
-    private def parse_reddit_post : Entry?
-      # Parse Reddit post from current pull parser position
-      # Expected format: {"data": {...post data...}}
-
-      post_data = nil
-
-      @pull.read_object do |key|
-        if key == "data"
-          post_data = parse_reddit_post_data
-          break # Only need the first post
-        else
-          @pull.skip
-        end
-      end
-
-      return unless post_data
-
-      # Extract post fields
-      title = post_data[:title] || "Untitled"
-      post_url = post_data[:url] || ""
-      permalink = post_data[:permalink] || ""
-      created_utc = post_data[:created_utc] || 0.0
-      is_self = post_data[:is_self] || false
-
-      # Resolve link
-      link = resolve_reddit_link(post_url, permalink, is_self)
-
-      # Create published date
-      pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
-
-      link_data = LinkResolver.resolve_from_url(link)
-
-      Entry.create(
-        title: title,
-        url: link,
-        source_type: SourceType::Reddit,
-        published_at: pub_date,
-        comment_url: link_data.comment_url,
-        commentary_url: link_data.commentary_url,
-        is_discussion_url: link_data.is_discussion_url
-      )
-    rescue ex
-      ::Log.for("fetcher.streaming").debug { "Failed to parse Reddit post: #{ex.class} - #{ex.message}" }
       nil
     end
 

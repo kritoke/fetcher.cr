@@ -14,7 +14,18 @@ module Fetcher
     REDDIT_API_BASE = "https://www.reddit.com"
 
     class RedditFetchError < Exception
+      getter original_cause : Exception?
+
+      def initialize(message : String, @original_cause : Exception? = nil)
+        super(message)
+      end
     end
+
+    REDDIT_CACHE_TTL_NEW           = 30.seconds
+    REDDIT_CACHE_TTL_RISING        = 30.seconds
+    REDDIT_CACHE_TTL_HOT           = 2.minutes
+    REDDIT_CACHE_TTL_TOP           = 10.minutes
+    REDDIT_CACHE_TTL_CONTROVERSIAL = 10.minutes
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       subreddit = extract_subreddit(url)
@@ -23,7 +34,7 @@ module Fetcher
       sort = extract_sort(url)
       actual_limit = Math.min(limit, 25)
 
-      cache_key = Cache.generate_key(subreddit, sort, actual_limit)
+      cache_key = generate_cache_key(subreddit, sort, actual_limit)
 
       if config.cache_enabled
         if cached = Cache.get(cache_key)
@@ -34,7 +45,7 @@ module Fetcher
       result = fetch_with_reddit_fallback(subreddit, sort, actual_limit, headers, config)
 
       if config.cache_enabled && result.success?
-        ttl = Cache.ttl_for_sort(sort)
+        ttl = ttl_for_sort(sort)
         Cache.set(cache_key, result, ttl)
       end
 
@@ -49,15 +60,23 @@ module Fetcher
     end
 
     private def self.fetch_with_reddit_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      Fetcher.with_retry(config) do
+      result = Fetcher.with_retry(config) do
         fetch_reddit(subreddit, sort, limit, headers, config)
       end
-    rescue FetchError
-      fetch_reddit_rss(subreddit, sort, limit, headers, config)
+
+      return result if result.success?
+
+      # Fall back to RSS for transient errors (excluding rate limiting)
+      error = result.error
+      if error && transient_error_kind?(error.kind) && !error.rate_limited?
+        fetch_reddit_rss(subreddit, sort, limit, headers, config)
+      else
+        result
+      end
     end
 
     private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
+      api_url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
       reddit_headers = ::HTTP::Headers{
         "User-Agent" => USER_AGENT,
         "Accept"     => "application/json",
@@ -66,78 +85,67 @@ module Fetcher
       final_headers.merge!(headers)
 
       http_client = Fetcher::CrestHttpClient.new(config)
-      response = http_client.get(url, final_headers)
+      response = http_client.get(api_url, final_headers)
 
       case response.status_code
       when 200..299
-        # Use streaming parser if configured
-        if config.use_streaming_parser
-          begin
-            io = IO::Memory.new(response.body)
-            parser = Fetcher::JSONStreamingParser.new(limit)
-            items = parser.parse_entries(io, limit)
+        result = try_streaming_parse(response.body, subreddit, limit, config)
+        return result if result
 
-            site_link = "https://www.reddit.com/r/#{subreddit}"
-            favicon = "https://www.reddit.com/favicon.ico"
-
-            return Result.success(
-              entries: items,
-              site_link: site_link,
-              favicon: favicon
-            )
-          rescue ex : Fetcher::MemoryLimitExceeded
-            # Don't fallback for memory issues
-            puts "Reddit streaming parser memory limit exceeded, cannot fallback" if config.debug_streaming
-            error = Error.invalid_format(ex.message || "Feed too large", url)
-            return Result.error(error)
-          rescue ex
-            puts "Reddit streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" if config.debug_streaming
-          end
-        end
-
-        # Fallback to DOM parser
-        items = parse_reddit_response(response.body, limit)
-        site_link = "https://www.reddit.com/r/#{subreddit}"
-        favicon = "https://www.reddit.com/favicon.ico"
-
-        Result.success(
-          entries: items,
-          site_link: site_link,
-          favicon: favicon
-        )
+        build_reddit_result(parse_reddit_response(response.body, limit), subreddit)
       when 404
-        error = Error.invalid_url("Subreddit '#{subreddit}' not found", url)
+        error = Error.invalid_url("Subreddit '#{subreddit}' not found", api_url)
         raise InvalidURLError.new(error.message, error)
       when 429
-        error = Error.rate_limited("Rate limited by Reddit API", url)
+        error = Error.rate_limited("Rate limited by Reddit API", api_url)
         raise RateLimitError.new(error.message, error)
       when 500..599
-        error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", url)
+        error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
         raise HTTPServerError.new(error.message, response.status_code, error)
       else
-        error = Error.http(response.status_code, "HTTP error #{response.status_code}", url)
+        error = Error.http(response.status_code, "HTTP error #{response.status_code}", api_url)
         raise HTTPError.new(error.message, response.status_code, error)
       end
     rescue ex : IO::TimeoutError
-      error = Error.timeout("Timeout: #{ex.message}", url)
-      raise TimeoutError.new(error.message, error)
+      error = Error.timeout("Timeout: #{ex.message}", api_url)
+      raise RedditFetchError.new(error.message, TimeoutError.new(error.message, error))
     rescue ex : CrestHttpClient::DNSError
-      error = Error.dns("DNS error: #{ex.message}", url)
-      raise DNSError.new(error.message, error)
+      error = Error.dns("DNS error: #{ex.message}", api_url)
+      raise RedditFetchError.new(error.message, DNSError.new(error.message, error))
     rescue ex : JSON::ParseException
-      error = Error.invalid_format("JSON parsing error: #{ex.message}", url)
-      raise InvalidFormatError.new(error.message, error)
+      error = Error.invalid_format("JSON parsing error: #{ex.message}", api_url)
+      raise RedditFetchError.new(error.message, InvalidFormatError.new(error.message, error))
+    rescue ex : RedditFetchError
+      raise
     rescue ex : FetchError
-      # Re-raise typed exceptions
-      raise ex
+      raise RedditFetchError.new(ex.message || "Reddit API failed", ex)
     rescue ex
-      if Fetcher.transient_error?(ex)
-        error = Error.unknown(ex.message || "Unknown error", url)
-        raise UnknownError.new(error.message, error)
-      end
-      error = Error.unknown("#{ex.class}: #{ex.message}", url)
-      ::Log.for("fetcher.reddit").debug { "Reddit fetch error for #{url}: #{ex.class} - #{ex.message}" }
-      Fetcher.error_result(error)
+      raise RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
+    end
+
+    private def self.try_streaming_parse(body : String, subreddit : String, limit : Int32, config : RequestConfig) : Result?
+      return unless config.use_streaming_parser
+
+      io = IO::Memory.new(body)
+      parser = Fetcher::JSONStreamingParser.new(limit)
+      items = parser.parse_entries(io, limit)
+
+      build_reddit_result(items, subreddit)
+    rescue ex : Fetcher::MemoryLimitExceeded
+      ::Log.for("fetcher.reddit").debug { "Streaming parser memory limit exceeded, cannot fallback" } if config.debug_streaming
+      error = Error.invalid_format(ex.message || "Feed too large", "#{REDDIT_API_BASE}/r/#{subreddit}")
+      Result.error(error)
+    rescue ex
+      ::Log.for("fetcher.reddit").debug { "Streaming parser failed: #{ex.class} - #{ex.message}, falling back to DOM parser" } if config.debug_streaming
+      nil
+    end
+
+    private def self.build_reddit_result(entries : Array(Entry), subreddit : String) : Result
+      Result.success(
+        entries: entries,
+        site_link: "https://www.reddit.com/r/#{subreddit}",
+        favicon: "https://www.reddit.com/favicon.ico"
+      )
     end
 
     private def self.extract_subreddit(url : String) : String?
@@ -150,6 +158,35 @@ module Fetcher
       return "new" if url.includes?("/new.")
       return "rising" if url.includes?("/rising.")
       "hot"
+    end
+
+    def self.generate_cache_key(subreddit : String, sort : String, limit : Int32) : String
+      "reddit:#{subreddit}:#{sort}:#{limit}"
+    end
+
+    def self.ttl_for_sort(sort : String) : Time::Span
+      case sort
+      when "new"          then REDDIT_CACHE_TTL_NEW
+      when "rising"       then REDDIT_CACHE_TTL_RISING
+      when "hot"          then REDDIT_CACHE_TTL_HOT
+      when "top"          then REDDIT_CACHE_TTL_TOP
+      when "controversial" then REDDIT_CACHE_TTL_CONTROVERSIAL
+      else                      Cache::DEFAULT_TTL
+      end
+    end
+
+    def self.clear_cache(subreddit : String) : Nil
+      Cache.clear_by_prefix("reddit:#{subreddit}:")
+    end
+
+    private def self.transient_error_kind?(kind : ErrorKind?) : Bool
+      return false unless kind
+      case kind
+      when .timeout?, .dns_error?, .server_error?, .rate_limited?
+        true
+      else
+        false
+      end
     end
 
     def self.parse_reddit_response(body : String, limit : Int32) : Array(Entry)
@@ -166,6 +203,9 @@ module Fetcher
       data = parsed.as_a? ? parsed[0]["data"]? : parsed["data"]?
       children = data.try(&.["children"]?)
       children.as_a? if children
+    rescue ex
+      ::Log.for("fetcher.reddit").warn { "Unexpected JSON structure in Reddit response: #{ex.message}" }
+      nil
     end
 
     private def self.parse_reddit_post(child : JSON::Any) : Entry?

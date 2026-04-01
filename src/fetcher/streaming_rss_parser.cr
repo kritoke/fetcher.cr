@@ -234,7 +234,7 @@ module Fetcher
 
       return unless url && type
 
-      length = length_str.try(&.to_i64)
+      length = length_str.try(&.to_i64?)
 
       Attachment.new(
         url: url,

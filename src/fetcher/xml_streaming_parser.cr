@@ -4,35 +4,22 @@ require "./result"
 require "./streaming_rss_parser"
 
 module Fetcher
-  # Feed metadata extracted during streaming
-  struct FeedMetadata
-    getter site_link : String?
-    getter favicon : String?
-    getter feed_title : String?
-    getter feed_description : String?
-    getter feed_language : String?
-    getter feed_authors : Array(Author)
-
-    def initialize(
-      @site_link : String? = nil,
-      @favicon : String? = nil,
-      @feed_title : String? = nil,
-      @feed_description : String? = nil,
-      @feed_language : String? = nil,
-      @feed_authors : Array(Author) = [] of Author,
-    )
-    end
-
-    # Create success result with this metadata
+  record FeedMetadata,
+    site_link : String? = nil,
+    favicon : String? = nil,
+    feed_title : String? = nil,
+    feed_description : String? = nil,
+    feed_language : String? = nil,
+    feed_authors : Array(Author) = [] of Author do
     def to_result(entries : Array(Entry)) : Result
       ResultBuilder.success(
         entries: entries,
-        site_link: @site_link,
-        favicon: @favicon,
-        feed_title: @feed_title,
-        feed_description: @feed_description,
-        feed_language: @feed_language,
-        feed_authors: @feed_authors
+        site_link: site_link,
+        favicon: favicon,
+        feed_title: feed_title,
+        feed_description: feed_description,
+        feed_language: feed_language,
+        feed_authors: feed_authors
       )
     end
   end
@@ -143,64 +130,18 @@ module Fetcher
     end
 
     private def extract_metadata(name : String) : Nil
-      value = case name
-              when "title"                   then read_text_content
-              when "description", "subtitle" then read_text_content
-              when "language"                then read_text_content
-              when "icon", "logo"            then read_text_content
-              when "link"
-                @reader["href"]?
-              end
-
-      return unless value
-
       case name
       when "title"
-        @metadata = FeedMetadata.new(
-          site_link: @metadata.site_link,
-          favicon: @metadata.favicon,
-          feed_title: value.to_s,
-          feed_description: @metadata.feed_description,
-          feed_language: @metadata.feed_language,
-          feed_authors: @metadata.feed_authors
-        )
+        @metadata = @metadata.copy_with(feed_title: read_text_content)
       when "description", "subtitle"
-        @metadata = FeedMetadata.new(
-          site_link: @metadata.site_link,
-          favicon: @metadata.favicon,
-          feed_title: @metadata.feed_title,
-          feed_description: value.to_s,
-          feed_language: @metadata.feed_language,
-          feed_authors: @metadata.feed_authors
-        )
+        @metadata = @metadata.copy_with(feed_description: read_text_content)
       when "language"
-        @metadata = FeedMetadata.new(
-          site_link: @metadata.site_link,
-          favicon: @metadata.favicon,
-          feed_title: @metadata.feed_title,
-          feed_description: @metadata.feed_description,
-          feed_language: value.to_s,
-          feed_authors: @metadata.feed_authors
-        )
+        @metadata = @metadata.copy_with(feed_language: read_text_content)
       when "icon", "logo"
-        @metadata = FeedMetadata.new(
-          site_link: @metadata.site_link,
-          favicon: value.to_s,
-          feed_title: @metadata.feed_title,
-          feed_description: @metadata.feed_description,
-          feed_language: @metadata.feed_language,
-          feed_authors: @metadata.feed_authors
-        )
+        @metadata = @metadata.copy_with(favicon: read_text_content)
       when "link"
-        if href = value.to_s.presence
-          @metadata = FeedMetadata.new(
-            site_link: @metadata.site_link || href,
-            favicon: @metadata.favicon,
-            feed_title: @metadata.feed_title,
-            feed_description: @metadata.feed_description,
-            feed_language: @metadata.feed_language,
-            feed_authors: @metadata.feed_authors
-          )
+        if href = @reader["href"]?.try(&.strip).presence
+          @metadata = @metadata.copy_with(site_link: @metadata.site_link || href)
         end
       end
     end

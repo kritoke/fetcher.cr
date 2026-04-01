@@ -160,46 +160,46 @@ describe "Fetcher::Cache" do
       result1 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
       result2 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
 
-      Fetcher::Cache.set("fetcher:reddit:crystal:hot:25", result1, 5.minutes)
-      Fetcher::Cache.set("fetcher:reddit:news:hot:25", result2, 5.minutes)
+      Fetcher::Cache.set("reddit:crystal:hot:25", result1, 5.minutes)
+      Fetcher::Cache.set("reddit:news:hot:25", result2, 5.minutes)
 
-      Fetcher::Cache.clear_subreddit("crystal")
+      Fetcher::Reddit.clear_cache("crystal")
 
-      Fetcher::Cache.get("fetcher:reddit:crystal:hot:25").should be_nil
-      Fetcher::Cache.get("fetcher:reddit:news:hot:25").should_not be_nil
+      Fetcher::Cache.get("reddit:crystal:hot:25").should be_nil
+      Fetcher::Cache.get("reddit:news:hot:25").should_not be_nil
     end
   end
 
-  describe "generate_key" do
+  describe "generate_cache_key" do
     it "generates correct cache key format" do
-      key = Fetcher::Cache.generate_key("crystal", "hot", 25)
-      key.should eq("fetcher:reddit:crystal:hot:25")
+      key = Fetcher::Reddit.generate_cache_key("crystal", "hot", 25)
+      key.should eq("reddit:crystal:hot:25")
     end
   end
 
   describe "ttl_for_sort" do
     it "returns 30 seconds for new posts" do
-      Fetcher::Cache.ttl_for_sort("new").should eq(30.seconds)
+      Fetcher::Reddit.ttl_for_sort("new").should eq(30.seconds)
     end
 
     it "returns 30 seconds for rising posts" do
-      Fetcher::Cache.ttl_for_sort("rising").should eq(30.seconds)
+      Fetcher::Reddit.ttl_for_sort("rising").should eq(30.seconds)
     end
 
     it "returns 2 minutes for hot posts" do
-      Fetcher::Cache.ttl_for_sort("hot").should eq(2.minutes)
+      Fetcher::Reddit.ttl_for_sort("hot").should eq(2.minutes)
     end
 
     it "returns 10 minutes for top posts" do
-      Fetcher::Cache.ttl_for_sort("top").should eq(10.minutes)
+      Fetcher::Reddit.ttl_for_sort("top").should eq(10.minutes)
     end
 
     it "returns 10 minutes for controversial posts" do
-      Fetcher::Cache.ttl_for_sort("controversial").should eq(10.minutes)
+      Fetcher::Reddit.ttl_for_sort("controversial").should eq(10.minutes)
     end
 
     it "returns default TTL for unknown sort" do
-      Fetcher::Cache.ttl_for_sort("unknown").should eq(Fetcher::Cache::DEFAULT_TTL)
+      Fetcher::Reddit.ttl_for_sort("unknown").should eq(Fetcher::Cache::DEFAULT_TTL)
     end
   end
 

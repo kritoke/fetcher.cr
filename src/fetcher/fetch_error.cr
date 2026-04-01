@@ -7,6 +7,7 @@ module Fetcher
     HTTPError
     RateLimited
     ServerError
+    TooLarge
     Unknown
   end
 

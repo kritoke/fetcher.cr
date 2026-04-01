@@ -36,7 +36,12 @@ module Fetcher
         in State::Closed
           true
         in State::Open
-          check_recovery
+          if recovery_timeout_elapsed?
+            @state = State::HalfOpen
+            true
+          else
+            false
+          end
         in State::HalfOpen
           true
         end
@@ -63,15 +68,12 @@ module Fetcher
       end
     end
 
-    private def check_recovery : Bool
+    private def recovery_timeout_elapsed? : Bool
       if last_failure = @last_failure_time
-        elapsed = Time.utc - last_failure
-        if elapsed >= @recovery_timeout
-          @state = State::HalfOpen
-          return true
-        end
+        Time.utc - last_failure >= @recovery_timeout
+      else
+        false
       end
-      false
     end
 
     module Registry
@@ -133,7 +135,10 @@ module Fetcher
 
       private def start_cleanup_if_needed : Nil
         return if @@cleanup_running
-        @@cleanup_running = true
+        @@lock.synchronize do
+          return if @@cleanup_running
+          @@cleanup_running = true
+        end
         spawn do
           loop do
             sleep 60.seconds
