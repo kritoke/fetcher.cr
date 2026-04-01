@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.8.3.
+Technical API documentation for Fetcher v0.9.0.
 
 ## Table of Contents
 
@@ -26,6 +26,7 @@ enum ErrorKind
   HTTPError       # HTTP error response
   RateLimited     # Rate limited by API
   ServerError     # Server error (5xx)
+  TooLarge        # Response exceeded size limit
   Unknown         # Unknown error
 end
 ```
@@ -146,13 +147,23 @@ record Attachment,
   duration_in_seconds : Int32?
 ```
 
-### RequestConfig (v0.4.0+)
+### RequestConfig (v0.9.0+)
 
 ```crystal
-record RequestConfig,
-  connect_timeout : Time::Span = 10.seconds,
-  read_timeout : Time::Span = 30.seconds,
-  max_requests_per_second : Int32? = nil  # Rate limiting (nil = disabled)
+Fetcher::RequestConfig.new(
+  timeout : TimeoutConfig = TimeoutConfig.new,
+  retry : RetryConfig = RetryConfig.new,
+  circuit_breaker : CircuitBreakerConfig = CircuitBreakerConfig.new,
+  rate_limit : RateLimitConfig = RateLimitConfig.new,
+  streaming : StreamingConfig = StreamingConfig.new,
+  cache_config : CacheConfig = CacheConfig.new,
+  max_redirects : Int32 = 5,
+  follow_redirects : Bool = true,
+  ssl_verify : Bool = true,
+  driver_detection_mode : DriverDetectionMode = Auto,
+  error_detail_level : ErrorDetailLevel = Debug,
+  max_concurrent_requests : Int32? = nil
+)
 ```
 
 ---
@@ -213,38 +224,76 @@ Fetcher.pull_json_feed(
 ) : Result
 ```
 
-### HTTP Client Methods
-
-```crystal
-# Low-level fetch with compression support
-HTTPClient.fetch(
-  url : String,
-  headers : HTTP::Headers? = nil,
-  config : RequestConfig? = nil
-) : HTTP::Client::Response
-```
-
 ---
 
 ## Configuration
+
+### Sub-Configs
+
+#### TimeoutConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `connect` | `Time::Span` | `10.seconds` | Connection timeout |
+| `read` | `Time::Span` | `30.seconds` | Read timeout |
+
+#### RetryConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `max_retries` | `Int32` | `3` | Maximum retry attempts |
+| `base_delay` | `Time::Span` | `1.second` | Base delay for exponential backoff |
+| `max_delay` | `Time::Span` | `30.seconds` | Maximum delay cap |
+| `exponential_base` | `Float64` | `2.0` | Exponential backoff multiplier |
+
+#### CircuitBreakerConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `enabled` | `Bool` | `true` | Enable circuit breaker |
+| `failure_threshold` | `Int32` | `5` | Failures before opening circuit |
+| `recovery_timeout` | `Time::Span` | `60.seconds` | Wait before testing recovery |
+
+#### RateLimitConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `requests_per_second` | `Int32?` | `nil` | Rate limit per domain (nil = disabled) |
+| `capacity` | `Float64` | `10.0` | Token bucket burst capacity |
+| `refill_rate` | `Float64` | `1.0` | Token refill rate per second |
+
+#### StreamingConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `enabled` | `Bool` | `false` | Enable streaming parser |
+| `max_memory` | `Int32` | `10_485_760` | Max bytes before aborting (10MB) |
+| `debug` | `Bool` | `false` | Debug logging for streaming |
+
+#### CacheConfig
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `enabled` | `Bool` | `true` | Enable caching |
+| `max_size` | `Int32` | `1000` | Max cached entries |
+| `default_ttl` | `Time::Span` | `5.minutes` | Default TTL |
 
 ### RequestConfig Parameters
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `connect_timeout` | `Time::Span` | `10.seconds` | Connection timeout |
-| `read_timeout` | `Time::Span` | `30.seconds` | Read timeout |
-| `max_requests_per_second` | `Int32?` | `nil` | Rate limit per domain (nil = disabled) |
-| `max_concurrent_requests` | `Int32?` | `nil` | Max concurrent requests (reserved) |
+| `timeout` | `TimeoutConfig` | defaults | Connection and read timeouts |
+| `retry` | `RetryConfig` | defaults | Retry behavior |
+| `circuit_breaker` | `CircuitBreakerConfig` | defaults | Circuit breaker settings |
+| `rate_limit` | `RateLimitConfig` | defaults | Rate limiting |
+| `streaming` | `StreamingConfig` | defaults | Streaming parser options |
+| `cache_config` | `CacheConfig` | defaults | Caching options |
 | `max_redirects` | `Int32` | `5` | Maximum redirect follows |
 | `follow_redirects` | `Bool` | `true` | Follow HTTP redirects |
 | `ssl_verify` | `Bool` | `true` | Verify SSL certificates |
-| `rate_limit_capacity` | `Float64` | `10.0` | Token bucket burst capacity (v0.5.0+) |
-| `rate_limit_refill_rate` | `Float64` | `1.0` | Token refill rate per second (v0.5.0+) |
-| `max_retries` | `Int32` | `3` | Maximum retry attempts |
-| `base_delay` | `Time::Span` | `1.second` | Base delay for exponential backoff |
-| `max_delay` | `Time::Span` | `30.seconds` | Maximum delay cap |
-| `exponential_base` | `Float64` | `2.0` | Exponential backoff multiplier |
+| `driver_detection_mode` | `DriverDetectionMode` | `Auto` | How to detect feed type |
+| `error_detail_level` | `ErrorDetailLevel` | `Debug` | Verbosity of error logging |
+| `max_concurrent_requests` | `Int32?` | `nil` | Request semaphore limit |
 
 ### Usage Examples
 
@@ -254,32 +303,28 @@ result = Fetcher.pull("https://example.com/feed.xml")
 
 # Custom timeouts
 config = Fetcher::RequestConfig.new(
-  connect_timeout: 30.seconds,
-  read_timeout: 60.seconds
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds)
 )
 result = Fetcher.pull("https://slow.example.com/feed.xml", config: config)
 
-# Rate limiting with token bucket (v0.5.0+)
+# Rate limiting
 config = Fetcher::RequestConfig.new(
-  rate_limit_capacity: 10.0,      # Allow burst of 10 requests
-  rate_limit_refill_rate: 2.0     # Refill 2 tokens per second
+  rate_limit: Fetcher::RateLimitConfig.new(requests_per_second: 10)
 )
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
 
-# Simple rate limiting (v0.4.0+)
+# Token bucket rate limiting
 config = Fetcher::RequestConfig.new(
-  max_requests_per_second: 10
+  rate_limit: Fetcher::RateLimitConfig.new(capacity: 10.0, refill_rate: 2.0)
 )
 result = Fetcher.pull("https://api.example.com/feed.xml", config: config)
 
-# Combined configuration with retry
+# Combined configuration
 config = Fetcher::RequestConfig.new(
-  connect_timeout: 30.seconds,
-  read_timeout: 60.seconds,
-  max_retries: 5,
-  base_delay: 2.seconds,
-  rate_limit_capacity: 20.0,
-  rate_limit_refill_rate: 5.0
+  timeout: Fetcher::TimeoutConfig.new(connect: 30.seconds, read: 60.seconds),
+  retry: Fetcher::RetryConfig.new(max_retries: 5, base_delay: 2.seconds),
+  rate_limit: Fetcher::RateLimitConfig.new(capacity: 20.0, refill_rate: 5.0),
+  circuit_breaker: Fetcher::CircuitBreakerConfig.new(failure_threshold: 10)
 )
 
 # With caching headers
@@ -438,6 +483,7 @@ end
 
 ## Version History
 
+- **v0.9.0** - Structured configuration required (sub-configs replace flat params), Cache is now a class with singleton, Reddit cache helpers moved to Reddit module, readability improvements
 - **v0.8.3** - Fixed RSS 2.0 `<comments>` element extraction, fixed streaming parser bugs
 - **v0.8.0** - Added comment_url, commentary_url, is_discussion_url fields, LinkResolver module
 - **v0.4.0** - Structured error handling, SourceType enum, rate limiting, enhanced security
