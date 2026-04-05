@@ -9,7 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - Redirect control configuration
-- SSL verification options
+
+## [0.9.1] - 2026-04-05
+
+### Security
+- **SSRF Protection**: Fixed fail-open on DNS resolution failures (return false instead of allowing request)
+- **XXE Prevention**: Removed `NOENT` XML parser flag that could enable entity expansion attacks
+- **Redirect Resolution**: Fixed path traversal risk by replacing `File.join` with proper `URI.resolve`
+- **SSL Verification**: Fixed `ssl_verify` config not being wired through to HTTP client
+- **URL Length Limit**: Added 2048 character max URL length validation
+
+### Bug Fixes
+- **DNS Rebinding**: Added IP validation tracking to mitigate TOCTOU attacks
+- **Race Conditions**: Fixed concurrent cleanup spawn in CircuitBreaker and RateLimiterRegistry
+- **Error Handling**: Fixed silent error swallowing in XML streaming parser
+- **Rate Limiting**: Fixed double rate limiting on cross-domain redirects
+- **Streaming Parser**: Fixed non-seekable IO handling in JSON streaming parser
+
+### Performance
+- **XML/JSON Parsing**: Eliminated double parsing by parsing once and reusing document
+- **XPath Queries**: Fixed N+1 XPath queries by extracting child nodes in single pass
+- **Cache Eviction**: Simplified from O(n) LRU to O(1) FIFO
+
+### Maintenance
+- **Error Classification**: Added `MissingLocationHeaderError` for proper redirect error categorization
+- **Code Cleanup**: Removed redundant `ResultBuilder` module, fixed broken error_result overload
+- **Code Style**: Fixed Ameba linter issues (block parameter naming, useless assignments)
 
 ## [0.9.0] - 2026-04-01
 
