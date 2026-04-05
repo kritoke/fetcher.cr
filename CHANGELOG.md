@@ -10,7 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Redirect control configuration
 
-## [0.9.1.2] - 2026-04-05
+## [0.9.1.3] - 2026-04-05
+
+### Bug Fixes
+- **URL Validation**: Fixed validate_ip_address to return true for hostnames. Socket::IPAddress.new only parses IPs, not hostnames, so it was raising Socket::Error and returning false - blocking all URLs with hostnames.
 
 ### Bug Fixes
 - **DNS Resolution**: Fixed URLValidator.resolve_and_validate to use proper DNS lookup (Socket::Addrinfo.resolve) instead of Socket::IPAddress.new. This enables SSRF protection for URLs with hostnames, not just explicit IPs.

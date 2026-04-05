@@ -128,7 +128,7 @@ module Fetcher
       ip_address = Socket::IPAddress.new(host, 80)
       !blocked_ip?(ip_address)
     rescue Socket::Error
-      false
+      true
     end
 
     private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool
