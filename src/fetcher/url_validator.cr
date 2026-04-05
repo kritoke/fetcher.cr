@@ -67,9 +67,15 @@ module Fetcher
       return true if host.nil? || host.empty?
 
       begin
-        ip_address = Socket::IPAddress.new(host, 80)
-        return false if blocked_ip?(ip_address)
-        register_validated_ip(host, ip_address)
+        addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+        addr_info.each do |addr|
+          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
+            ip_address = addr.ip_address
+            return false if blocked_ip?(ip_address)
+            register_validated_ip(host, ip_address)
+            return true
+          end
+        end
         true
       rescue Socket::Error
         true
