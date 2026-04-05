@@ -49,8 +49,7 @@ module Fetcher
     DEFAULT_TTL = 5.minutes
 
     @data : Hash(String, CacheEntry) = {} of String => CacheEntry
-    @access_order : Deque(String) = Deque(String).new
-    @positions : Hash(String, Int32) = {} of String => Int32
+    @eviction_order : Deque(String) = Deque(String).new
     @mutex : Mutex = Mutex.new
     @stats : CacheStats = CacheStats.new
     @max_size : Int32 = 1000
@@ -88,7 +87,6 @@ module Fetcher
           @stats.record_miss
           nil
         else
-          update_access_order(key)
           @stats.record_hit
           entry.value
         end
@@ -100,13 +98,11 @@ module Fetcher
 
       @mutex.synchronize do
         if @data[key]?
-          update_access_order(key)
           @data[key] = CacheEntry.new(value, Time.utc, ttl)
         else
           evict_if_needed
           @data[key] = CacheEntry.new(value, Time.utc, ttl)
-          @access_order << key
-          @positions[key] = @access_order.size - 1
+          @eviction_order << key
         end
       end
     end
@@ -114,8 +110,7 @@ module Fetcher
     def clear : Nil
       @mutex.synchronize do
         @data.clear
-        @access_order.clear
-        @positions.clear
+        @eviction_order.clear
         @stats = CacheStats.new
       end
     end
@@ -125,10 +120,8 @@ module Fetcher
         keys_to_remove = @data.keys.select(&.starts_with?(prefix))
         keys_to_remove.each do |key|
           @data.delete(key)
-          @positions.delete(key)
         end
-        @access_order.reject! { |k| k.starts_with?(prefix) }
-        reindex_positions if keys_to_remove.any?
+        @eviction_order.reject! { |k| k.starts_with?(prefix) }
       end
     end
 
@@ -142,41 +135,17 @@ module Fetcher
       end
     end
 
-    private def update_access_order(key : String)
-      if pos = @positions[key]?
-        @access_order.delete_at(pos)
-        @access_order << key
-        @positions[key] = @access_order.size - 1
-      else
-        @access_order << key
-        @positions[key] = @access_order.size - 1
-      end
-    end
-
     private def remove_entry(key : String)
       @data.delete(key)
-      pos = @positions.delete(key)
-      if pos
-        @access_order.delete_at(pos)
-        reindex_positions
-      end
-    end
-
-    private def reindex_positions
-      @positions.clear
-      @access_order.each_with_index do |key, idx|
-        @positions[key] = idx
-      end
+      @eviction_order.reject! { |k| k == key }
     end
 
     private def evict_if_needed
-      while @data.size >= @max_size && !@access_order.empty?
-        oldest_key = @access_order.shift?
+      while @data.size >= @max_size && !@eviction_order.empty?
+        oldest_key = @eviction_order.shift?
         if oldest_key
-          @positions.delete(oldest_key)
           @data.delete(oldest_key)
           @stats.record_eviction
-          reindex_positions
         end
       end
     end

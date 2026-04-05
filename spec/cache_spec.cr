@@ -33,8 +33,8 @@ describe "Fetcher::Cache" do
     end
   end
 
-  describe "LRU eviction" do
-    it "evicts least recently used entry when max size is reached" do
+  describe "FIFO eviction" do
+    it "evicts oldest entry when max size is reached" do
       cache = Fetcher::Cache.new(max_size: 3, enabled: true)
 
       3.times do |i|
@@ -47,8 +47,8 @@ describe "Fetcher::Cache" do
       new_result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://new.com")
       cache.set("key3", new_result, 5.minutes)
 
-      cache.get("key0").should_not be_nil
-      cache.get("key1").should be_nil
+      cache.get("key0").should be_nil
+      cache.get("key1").should_not be_nil
     end
 
     it "respects max_size configuration" do

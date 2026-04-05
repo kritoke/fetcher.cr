@@ -12,7 +12,7 @@ module Fetcher
     feed_language : String? = nil,
     feed_authors : Array(Author) = [] of Author do
     def to_result(entries : Array(Entry)) : Result
-      ResultBuilder.success(
+      Result.success(
         entries: entries,
         site_link: site_link,
         favicon: favicon,
@@ -29,7 +29,6 @@ module Fetcher
     @feed_metadata : FeedMetadata?
 
     def initialize(@limit : Int32 = 100)
-      @entries_parsed = 0
       @feed_metadata = nil
     end
 
@@ -55,12 +54,10 @@ module Fetcher
       error = Error.invalid_format("XML parsing error: #{ex.message}", "streaming")
       Fetcher.error_result(ErrorKind::InvalidFormat, error.message)
     rescue ex : MemoryLimitExceeded
-      # Don't fallback for memory issues - raise immediately
       raise ex
     rescue ex : Exception
-      # Generic error handling
-      error = Error.unknown("Streaming parser error: #{ex.message}", "streaming")
-      Fetcher.error_result(ErrorKind::Unknown, error.message)
+      ::Log.for("fetcher").warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
+      raise ex
     end
 
     # Parse XML feed and return array of entries
@@ -69,8 +66,12 @@ module Fetcher
       reader = XML::Reader.new(io)
       parser = StreamingRSSParser.new
       parser.parse_entries(reader, actual_limit)
-    rescue
+    rescue ex : XML::Error
+      ::Log.for("fetcher").warn { "XML streaming parser error: #{ex.message}" }
       [] of Entry
+    rescue ex : Exception
+      ::Log.for("fetcher").warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
+      raise ex
     end
 
     private def check_memory_limit(io : IO, config : RequestConfig?)

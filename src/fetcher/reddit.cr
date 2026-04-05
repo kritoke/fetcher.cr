@@ -7,10 +7,11 @@ require "./rss"
 require "./exceptions"
 require "./json_streaming_parser"
 require "./link_resolver"
+require "./header_builder"
 
 module Fetcher
   module Reddit
-    USER_AGENT      = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    USER_AGENT      = HeaderBuilder::DEFAULT_USER_AGENT
     REDDIT_API_BASE = "https://www.reddit.com"
 
     class RedditFetchError < Exception
@@ -154,9 +155,15 @@ module Fetcher
     end
 
     private def self.extract_sort(url : String) : String
-      return "top" if url.includes?("/top.")
-      return "new" if url.includes?("/new.")
-      return "rising" if url.includes?("/rising.")
+      begin
+        uri = URI.parse(url)
+        path = uri.path || ""
+        segments = path.split('/').reject(&.empty?)
+        return "top" if segments.last? == "top"
+        return "new" if segments.last? == "new"
+        return "rising" if segments.last? == "rising"
+      rescue
+      end
       "hot"
     end
 

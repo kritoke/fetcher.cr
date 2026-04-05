@@ -83,6 +83,7 @@ module Fetcher
       @@lock = Mutex.new
       @@cleanup_channel = Channel(Nil).new(1)
       @@cleanup_running = false
+      @@cleanup_lock = Mutex.new
       DEFAULT_TTL = 5.minutes
 
       def get(domain : String, config) : CircuitBreaker
@@ -134,8 +135,10 @@ module Fetcher
       end
 
       private def start_cleanup_if_needed : Nil
-        return if @@cleanup_running
-        @@cleanup_running = true
+        @@cleanup_lock.synchronize do
+          return if @@cleanup_running
+          @@cleanup_running = true
+        end
         spawn do
           loop do
             sleep 60.seconds

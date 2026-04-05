@@ -12,7 +12,10 @@ module Fetcher
   class JSONFeedParser < EntryParser
     def parse_entries(data : String, limit : Int32) : Array(Entry)
       parsed = parse_json(data)
+      parse_entries(parsed, limit)
+    end
 
+    def parse_entries(parsed : JSON::Any, limit : Int32) : Array(Entry)
       version = parsed["version"]?.try(&.as_s)
       raise InvalidFormatError.new("Invalid JSON Feed: missing version") unless version
       raise InvalidFormatError.new("Unsupported JSON Feed version") unless version.includes?("https://jsonfeed.org/version/")
@@ -29,7 +32,16 @@ module Fetcher
       feed_language: String?,
       feed_authors: Array(Author))
       parsed = parse_json(data)
+      parse_feed_metadata(parsed)
+    end
 
+    def parse_feed_metadata(parsed : JSON::Any) : NamedTuple(
+      site_link: String?,
+      favicon: String?,
+      feed_title: String?,
+      feed_description: String?,
+      feed_language: String?,
+      feed_authors: Array(Author))
       home_url = parsed["home_page_url"]?.try(&.as_s)
       favicon = parsed["favicon"]?.try(&.as_s)
       icon = parsed["icon"]?.try(&.as_s)
@@ -74,7 +86,8 @@ module Fetcher
       id = item["id"]?.try(&.to_s)
       return if id.nil? || id.empty?
 
-      url = item["url"]?.try(&.as_s) || id
+      url_candidate = item["url"]?.try(&.as_s)
+      url = url_candidate || (URLValidator.valid?(id) ? id : "#")
       title = item["title"]?.try(&.as_s)
       title = Entry.sanitize_title(title)
 

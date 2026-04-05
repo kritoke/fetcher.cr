@@ -4,13 +4,47 @@ require "socket"
 module Fetcher
   module URLValidator
     ALLOWED_SCHEMES = {"http", "https"}
+    MAX_URL_LENGTH = 2048
 
     # Standard private and reserved IP ranges that should be blocked for SSRF protection
     LINK_LOCAL_IPV4 = "169.254.0.0/16"
     LINK_LOCAL_IPV6 = "fe80::/10"
 
+    # DNS rebinding mitigation: track recently validated hostnames and their IPs
+    @@validated_ips = {} of String => Time::Span
+    @@validation_lock = Mutex.new
+
+    def self.clear_validated_ips : Nil
+      @@validation_lock.synchronize do
+        @@validated_ips.clear
+      end
+    end
+
+    def self.register_validated_ip(host : String, ip : Socket::IPAddress) : Nil
+      @@validation_lock.synchronize do
+        @@validated_ips[host] = Time.monotonic
+      end
+    end
+
+    def self.cleanup_expired_validations(expiry : Time::Span = 30.seconds) : Nil
+      now = Time.monotonic
+      @@validation_lock.synchronize do
+        @@validated_ips.reject! { |_, time| (now - time) > expiry }
+      end
+    end
+
+    def self.check_dns_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
+      @@validation_lock.synchronize do
+        return true unless @@validated_ips.has_key?(host)
+        @@validated_ips.delete(host)
+      end
+
+      return !blocked_ip?(current_ip)
+    end
+
     def self.valid?(url : String?) : Bool
       return false if url.nil? || url.empty?
+      return false if url.size > MAX_URL_LENGTH
 
       begin
         uri = URI.parse(url)
@@ -33,11 +67,19 @@ module Fetcher
       return true if host.nil? || host.empty?
 
       ip_address = Socket::IPAddress.new(host, 80)
-      !blocked_ip?(ip_address)
+      result = !blocked_ip?(ip_address)
+      if result
+        register_validated_ip(host, ip_address)
+      end
+      result
     rescue Socket::Error
-      true
+      false
     rescue URI::Error
-      true
+      false
+    end
+
+    def self.validate_connected_ip(host : String, connected_ip : Socket::IPAddress) : Bool
+      check_dns_rebinding(host, connected_ip)
     end
 
     def self.valid_redirect?(redirect_url : String) : Bool
@@ -82,7 +124,7 @@ module Fetcher
       ip_address = Socket::IPAddress.new(host, 80)
       !blocked_ip?(ip_address)
     rescue Socket::Error
-      true
+      false
     end
 
     private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool

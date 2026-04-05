@@ -3,7 +3,7 @@ module Fetcher
     def self.handle_response(response : ::HTTP::Client::Response, url : String, & : -> Result) : Result
       case response.status_code
       when 304
-        ResultBuilder.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)
+        Result.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)
       when 200..299
         yield
       when 500..599
@@ -25,6 +25,9 @@ module Fetcher
         Result.error(error)
       when DNSError
         error = Error.dns("DNS error: #{ex.message}", url)
+        Result.error(error)
+      when MissingLocationHeaderError
+        error = Error.missing_location_header("Missing Location header: #{ex.message}", url)
         Result.error(error)
       when JSON::ParseException
         error = Error.invalid_format("JSON parsing error: #{ex.message}", url)

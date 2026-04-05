@@ -9,6 +9,7 @@ module Fetcher
     ServerError
     TooLarge
     Unknown
+    MissingLocationHeader
   end
 
   record Error,
@@ -65,6 +66,10 @@ module Fetcher
         message: "Response too large: #{size} bytes (max: #{max_size})",
         url: url
       )
+    end
+
+    def self.missing_location_header(message : String, url : String? = nil) : Error
+      new(kind: ErrorKind::MissingLocationHeader, message: message, url: url)
     end
 
     def to_s : String

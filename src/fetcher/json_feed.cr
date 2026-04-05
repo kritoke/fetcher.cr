@@ -4,7 +4,6 @@ require "./retry"
 require "./crest_http_client"
 require "./exceptions"
 require "./json_feed_parser"
-require "./result_builder"
 require "./json_streaming_parser"
 require "./error_handler"
 
@@ -37,7 +36,7 @@ module Fetcher
 
           # For JSON Feed, we need to extract metadata separately
           # For now, return minimal metadata
-          return ResultBuilder.success(
+          return Result.success(
             entries: entries,
             site_link: nil,
             favicon: nil,
@@ -63,10 +62,10 @@ module Fetcher
 
       begin
         parser = JSONFeedParser.new
-        entries = parser.parse_entries(body, limit)
-        metadata = parser.parse_feed_metadata(body)
+        entries = parser.parse_entries(parsed, limit)
+        metadata = parser.parse_feed_metadata(parsed)
 
-        ResultBuilder.success(
+        Result.success(
           entries: entries,
           site_link: metadata[:site_link],
           favicon: metadata[:favicon],

@@ -87,6 +87,13 @@ module Fetcher
     end
   end
 
+  # HTTP protocol errors
+  class MissingLocationHeaderError < FetchError
+    def initialize(message : String, original_error : Error? = nil)
+      super(message, original_error)
+    end
+  end
+
   # Streaming errors
   class MemoryLimitExceeded < FetchError
     def initialize(message : String = "Memory limit exceeded during streaming parsing")

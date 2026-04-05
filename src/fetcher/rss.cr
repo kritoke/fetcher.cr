@@ -4,7 +4,6 @@ require "./retry"
 require "./crest_http_client"
 require "./exceptions"
 require "./rss_parser"
-require "./result_builder"
 require "./xml_streaming_parser"
 require "./error_handler"
 
@@ -53,10 +52,11 @@ module Fetcher
       # Use DOM parser (default and fallback implementation)
       begin
         parser = RSSParser.new
-        entries = parser.parse_entries(body, limit)
-        metadata = parser.parse_feed_metadata(body)
+        xml = parser.parse_xml_document(body)
+        entries = parser.parse_entries(xml, limit)
+        metadata = parser.parse_feed_metadata(xml)
 
-        ResultBuilder.success(
+        Result.success(
           entries: entries,
           site_link: metadata[:site_link],
           favicon: metadata[:favicon],

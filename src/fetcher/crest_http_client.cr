@@ -12,6 +12,7 @@ module Fetcher
   class CrestHttpClient
     alias DNSError = Fetcher::DNSError
     alias CircuitOpenError = Fetcher::CircuitOpenError
+    alias MissingLocationHeaderError = Fetcher::MissingLocationHeaderError
 
     REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
 
@@ -81,7 +82,8 @@ module Fetcher
           max_redirects: 0,
           handle_errors: false,
           connect_timeout: @config.timeout.connect,
-          read_timeout: @config.timeout.read
+          read_timeout: @config.timeout.read,
+          tls: build_tls_context
         )
 
         final_response = handle_redirects(response, url, crest_headers, domain, method)
@@ -104,9 +106,9 @@ module Fetcher
       remaining = remaining_redirects || @config.max_redirects
       return convert_response(response) unless REDIRECT_STATUS_CODES.includes?(response.status_code)
 
-      redirect_url = response.headers["Location"]?
+      redirect_url = response.headers["location"]? || response.headers["Location"]?
       if redirect_url.nil? || redirect_url.empty?
-        raise DNSError.new("Redirect response without Location header for #{original_url}")
+        raise MissingLocationHeaderError.new("Redirect response without Location header for #{original_url}")
       end
 
       redirect_url_str = redirect_url.is_a?(Array) ? redirect_url.join(", ") : redirect_url.to_s
@@ -128,7 +130,8 @@ module Fetcher
         max_redirects: 0,
         handle_errors: false,
         connect_timeout: @config.timeout.connect,
-        read_timeout: @config.timeout.read
+        read_timeout: @config.timeout.read,
+        tls: build_tls_context
       )
 
       handle_redirects(crest_response, resolved_url, headers, redirect_domain, method, remaining - 1)
@@ -136,7 +139,6 @@ module Fetcher
 
     private def transition_domain(from_domain : String, to_domain : String) : Nil
       check_circuit_breaker(to_domain)
-      RateLimiterRegistry.get(to_domain, @config).acquire
       record_success(to_domain)
     end
 
@@ -144,11 +146,12 @@ module Fetcher
       if redirect_url.starts_with?("http://") || redirect_url.starts_with?("https://")
         redirect_url
       else
-        uri = URI.parse(original_url)
-        base = "#{uri.scheme}://#{uri.host}"
-        base += ":#{uri.port}" if uri.port && uri.port != 80 && uri.port != 443
-        File.join(base, redirect_url)
+        base = URI.parse(original_url)
+        relative = URI.parse(redirect_url)
+        base.resolve(relative).to_s
       end
+    rescue URI::Error
+      redirect_url
     end
 
     private def extract_domain(url : String) : String
@@ -169,6 +172,8 @@ module Fetcher
 
     private def handle_error(ex : Exception, url : String)
       case ex
+      when MissingLocationHeaderError
+        raise ex
       when URI::Error
         raise DNSError.new("Invalid URL: #{ex.message}")
       when Socket::Error
@@ -220,6 +225,15 @@ module Fetcher
         body: crest_response.body,
         headers: ::HTTP::Headers.new.merge!(crest_response.headers)
       )
+    end
+
+    private def build_tls_context : OpenSSL::SSL::Context::Client?
+      return nil if @config.ssl_verify?
+
+      ::Log.for("fetcher").warn { "SSL certificate verification is disabled - connections are vulnerable to MITM attacks" }
+      ctx = OpenSSL::SSL::Context::Client.new
+      ctx.verify_mode = OpenSSL::SSL::VerifyMode::NONE
+      ctx
     end
   end
 end

@@ -76,7 +76,7 @@ module Fetcher
       @follow_redirects : Bool = true,
       @ssl_verify : Bool = true,
       @driver_detection_mode : DriverDetectionMode = DriverDetectionMode::Auto,
-      @error_detail_level : ErrorDetailLevel = ErrorDetailLevel::Debug,
+      @error_detail_level : ErrorDetailLevel = ErrorDetailLevel::Normal,
       @max_concurrent_requests : Int32? = nil,
     )
     end

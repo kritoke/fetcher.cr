@@ -13,6 +13,10 @@ module Fetcher
   class RSSParser < EntryParser
     def parse_entries(data : String, limit : Int32) : Array(Entry)
       xml = parse_xml(data)
+      parse_entries(xml, limit)
+    end
+
+    def parse_entries(xml : XML::Document, limit : Int32) : Array(Entry)
       return [] of Entry unless xml.root
 
       rss_entries = parse_rss(xml, limit)
@@ -32,6 +36,16 @@ module Fetcher
       feed_language: String?,
       feed_authors: Array(Author))
       xml = parse_xml(data)
+      parse_feed_metadata(xml)
+    end
+
+    def parse_feed_metadata(xml : XML::Document) : NamedTuple(
+      site_link: String?,
+      favicon: String?,
+      feed_title: String?,
+      feed_description: String?,
+      feed_language: String?,
+      feed_authors: Array(Author))
       return {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author} unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
@@ -43,10 +57,14 @@ module Fetcher
       {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author}
     end
 
+    def parse_xml_document(data : String) : XML::Document
+      parse_xml(data)
+    end
+
     private def parse_xml(data : String) : XML::Document
       XML.parse(data, options: XML::ParserOptions::RECOVER |
-                               XML::ParserOptions::NOENT |
-                               XML::ParserOptions::NONET)
+                               XML::ParserOptions::NONET |
+                               XML::ParserOptions::NOBLANKS)
     rescue ex : XML::Error
       raise InvalidFormatError.new("XML parsing error: #{ex.message}")
     end
@@ -112,36 +130,16 @@ module Fetcher
     end
 
     private def parse_rss_item(node : XML::Node) : Entry
-      title_node = node.xpath_node("./*[local-name()='title']").try(&.text)
-      title = Entry.sanitize_title(title_node)
+      children = node.children.select { |n| n.element? }
 
-      link = HTMLUtils.sanitize_link(node.xpath_node("./*[local-name()='link']").try(&.text))
-
-      pub_date_str = node.xpath_node("./*[local-name()='pubDate']").try(&.text) ||
-                     node.xpath_node("./*[local-name()='dc:date']").try(&.text) ||
-                     node.xpath_node("./*[local-name()='date']").try(&.text)
-      pub_date = TimeParser.parse(pub_date_str)
-
-      content_encoded = node.xpath_node("./*[local-name()='encoded']").try(&.text)
-      description = node.xpath_node("./*[local-name()='description']").try(&.text)
-      content = content_encoded || description || ""
-
-      dc_creator = node.xpath_node("./*[local-name()='creator']").try(&.text)
-      author = dc_creator.try(&.strip).presence
-
-      categories = node.xpath_nodes("./*[local-name()='category']").compact_map do |cat|
-        cat.text.try(&.strip).presence
-      end
-
-      attachments = node.xpath_nodes("./*[local-name()='enclosure']").compact_map do |enc|
-        url = enc["url"]?
-        type = enc["type"]?
-        length = enc["length"]?.try(&.to_i64?)
-        next unless url && type
-        Attachment.new(url: url, mime_type: type, size_in_bytes: length)
-      end
-
-      comments_link = node.xpath_node("./*[local-name()='comments']").try(&.text).try(&.strip).presence
+      title = extract_rss_title(children)
+      link = extract_rss_link(children)
+      pub_date = extract_rss_pub_date(children)
+      content = extract_rss_content(children)
+      author = extract_rss_author(children)
+      categories = extract_rss_categories(children)
+      attachments = extract_rss_attachments(children)
+      comments_link = extract_rss_comments_link(children)
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -157,6 +155,51 @@ module Fetcher
         commentary_url: link_data.commentary_url,
         is_discussion_url: link_data.is_discussion_url
       )
+    end
+
+    private def extract_rss_title(children : Array(XML::Node)) : String?
+      children.find { |n| n.name == "title" }.try(&.text).try(&.strip)
+    end
+
+    private def extract_rss_link(children : Array(XML::Node)) : String?
+      HTMLUtils.sanitize_link(children.find { |n| n.name == "link" }.try(&.text))
+    end
+
+    private def extract_rss_pub_date(children : Array(XML::Node)) : Time?
+      pub_date_str = children.find { |n| n.name == "pubDate" }.try(&.text) ||
+                      children.find { |n| n.name == "dc:date" }.try(&.text) ||
+                      children.find { |n| n.name == "date" }.try(&.text)
+      TimeParser.parse(pub_date_str)
+    end
+
+    private def extract_rss_content(children : Array(XML::Node)) : String
+      content_encoded = children.find { |n| n.name == "encoded" }.try(&.text)
+      description = children.find { |n| n.name == "description" }.try(&.text)
+      content_encoded || description || ""
+    end
+
+    private def extract_rss_author(children : Array(XML::Node)) : String?
+      children.find { |n| n.name == "creator" }.try(&.text).try(&.strip).presence
+    end
+
+    private def extract_rss_categories(children : Array(XML::Node)) : Array(String)
+      children.select { |n| n.name == "category" }.compact_map do |cat|
+        cat.text.try(&.strip).presence
+      end
+    end
+
+    private def extract_rss_attachments(children : Array(XML::Node)) : Array(Attachment)
+      children.select { |n| n.name == "enclosure" }.compact_map do |enc|
+        url = enc["url"]?
+        type = enc["type"]?
+        length = enc["length"]?.try(&.to_i64?)
+        next unless url && type
+        Attachment.new(url: url, mime_type: type, size_in_bytes: length)
+      end
+    end
+
+    private def extract_rss_comments_link(children : Array(XML::Node)) : String?
+      children.find { |n| n.name == "comments" }.try(&.text).try(&.strip).presence
     end
 
     private def parse_atom(xml : XML::Node, limit : Int32) : Array(Entry)
@@ -214,25 +257,15 @@ module Fetcher
     end
 
     private def parse_atom_entry(node : XML::Node) : Entry
-      title_node = node.xpath_node("./*[local-name()='title']").try(&.text)
-      title = Entry.sanitize_title(title_node)
+      children = node.children.select { |n| n.element? }
 
-      link = extract_atom_link(node)
-
-      published_str = node.xpath_node("./*[local-name()='published']").try(&.text) ||
-                      node.xpath_node("./*[local-name()='updated']").try(&.text)
-      pub_date = TimeParser.parse(published_str)
-
-      content = extract_atom_content(node)
-
-      author_node = node.xpath_node("./*[local-name()='author']")
-      author = author_node.try(&.xpath_node("./*[local-name()='name']").try(&.text)).try(&.strip).presence
-      author_url = author_node.try(&.xpath_node("./*[local-name()='uri']").try(&.text)).try(&.strip).presence
-
-      categories = node.xpath_nodes("./*[local-name()='category']").compact_map do |cat|
-        cat["term"]?.try(&.strip).presence
-      end
-
+      title = Entry.sanitize_title(children.find { |n| n.name == "title" }.try(&.text))
+      link = extract_atom_link(children)
+      pub_date = extract_atom_pub_date(children)
+      content = extract_atom_content(children)
+      author = extract_atom_author(children)
+      author_url = extract_atom_author_url(children)
+      categories = extract_atom_categories(children)
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -250,24 +283,47 @@ module Fetcher
       )
     end
 
-    private def extract_atom_link(node : XML::Node) : String
-      link_node = node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
-                  node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
-                  node.xpath_node("./*[local-name()='link'][@href]") ||
-                  node.xpath_node("./*[local-name()='link']")
-      link_node.try(&.[]?("href")).try(&.strip).presence ||
+    private def extract_atom_link(children : Array(XML::Node)) : String
+      alt_link = children.find { |n| n.name == "link" && n["rel"]? == "alternate" && (n["type"]?.nil? || n["type"].starts_with?("text/html")) }
+      link_node = alt_link ||
+                  children.find { |n| n.name == "link" && n["rel"]? == "alternate" } ||
+                  children.find { |n| n.name == "link" && n["href"]? } ||
+                  children.find { |n| n.name == "link" }
+      link_node.try(&.["href"]?).try(&.strip).presence ||
         link_node.try(&.text).try(&.strip).presence || "#"
     end
 
-    private def extract_atom_content(node : XML::Node) : String
-      content_node = node.xpath_node("./*[local-name()='content']")
-      summary_node = node.xpath_node("./*[local-name()='summary']")
-      content_type = content_node.try(&.[]?("type")) || "text"
+    private def extract_atom_pub_date(children : Array(XML::Node)) : Time?
+      published_str = children.find { |n| n.name == "published" }.try(&.text) ||
+                     children.find { |n| n.name == "updated" }.try(&.text)
+      TimeParser.parse(published_str)
+    end
+
+    private def extract_atom_content(children : Array(XML::Node)) : String
+      content_node = children.find { |n| n.name == "content" }
+      summary_node = children.find { |n| n.name == "summary" }
+      content_type = content_node.try(&.["type"]) || "text"
 
       case content_type
       when "html", "xhtml" then content_node.try(&.text) || ""
       when "text"          then content_node.try(&.text) || ""
       else                      summary_node.try(&.text) || ""
+      end
+    end
+
+    private def extract_atom_author(children : Array(XML::Node)) : String?
+      author_node = children.find { |n| n.name == "author" }
+      author_node.try(&.children.find { |n| n.name == "name" }).try(&.text).try(&.strip).presence
+    end
+
+    private def extract_atom_author_url(children : Array(XML::Node)) : String?
+      author_node = children.find { |n| n.name == "author" }
+      author_node.try(&.children.find { |n| n.name == "uri" }).try(&.text).try(&.strip).presence
+    end
+
+    private def extract_atom_categories(children : Array(XML::Node)) : Array(String)
+      children.select { |n| n.name == "category" }.compact_map do |cat|
+        cat["term"]?.try(&.strip).presence
       end
     end
   end
