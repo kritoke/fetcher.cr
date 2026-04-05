@@ -66,16 +66,14 @@ module Fetcher
       host = uri.host
       return true if host.nil? || host.empty?
 
-      ip_address = Socket::IPAddress.new(host, 80)
-      result = !blocked_ip?(ip_address)
-      if result
+      begin
+        ip_address = Socket::IPAddress.new(host, 80)
+        return false if blocked_ip?(ip_address)
         register_validated_ip(host, ip_address)
+        true
+      rescue Socket::Error
+        true
       end
-      result
-    rescue Socket::Error
-      true
-    rescue URI::Error
-      true
     end
 
     def self.validate_connected_ip(host : String, connected_ip : Socket::IPAddress) : Bool
