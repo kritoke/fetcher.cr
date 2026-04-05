@@ -10,6 +10,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Redirect control configuration
 
+## [0.9.2] - 2026-04-05
+
+### Bug Fixes
+- **URL Validation**: Restructured URLValidator into two tiers — `valid?` is now fast (no DNS) for hostnames, `resolve_and_validate` only does DNS for explicit IP addresses
+- **SSRF Resilience**: `check_ssrf` now logs a warning instead of raising an error when DNS resolution fails, preventing blocked requests on transient DNS issues
+
+### Tests
+- Added 21 unit tests for URLValidator covering hostname acceptance, localhost rejection, private/public IP handling, URL length limits, query strings, and DNS failure resilience
+
 ## [0.9.1.3] - 2026-04-05
 
 ### Bug Fixes

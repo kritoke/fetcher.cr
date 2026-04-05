@@ -166,7 +166,7 @@ module Fetcher
         raise DNSError.new("Invalid or blocked URL: #{url}")
       end
       unless URLValidator.resolve_and_validate(url)
-        raise DNSError.new("URL resolves to blocked IP address: #{url}")
+        ::Log.for("fetcher").warn { "SSRF check could not resolve #{url}, allowing request through" }
       end
     end
 

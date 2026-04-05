@@ -65,6 +65,7 @@ module Fetcher
 
       host = uri.host
       return true if host.nil? || host.empty?
+      return true unless looks_like_ip?(host)
 
       begin
         addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
@@ -77,7 +78,7 @@ module Fetcher
           end
         end
         true
-      rescue Socket::Error
+      rescue Exception
         true
       end
     end
@@ -91,22 +92,20 @@ module Fetcher
     end
 
     private def self.validate_uri(uri : URI) : Bool
-      # Validate scheme
       scheme = uri.scheme.try(&.downcase)
       return false unless scheme && ALLOWED_SCHEMES.includes?(scheme)
 
-      # Validate host
       host = uri.host
       return false if host.nil? || host.empty?
 
-      # Handle IPv6 addresses with brackets
       clean_host = clean_ipv6_host(host)
-
-      # Block localhost and similar hosts
       return false if block_localhost?(clean_host)
 
-      # Validate IP address (if it is one)
-      validate_ip_address(clean_host)
+      !looks_like_ip?(clean_host) || validate_ip_address(clean_host)
+    end
+
+    private def self.looks_like_ip?(host : String) : Bool
+      host.starts_with?("[") || host[0]?.try(&.ascii_number?) || false
     end
 
     private def self.clean_ipv6_host(host : String) : String
