@@ -73,9 +73,9 @@ module Fetcher
       end
       result
     rescue Socket::Error
-      false
+      true
     rescue URI::Error
-      false
+      true
     end
 
     def self.validate_connected_ip(host : String, connected_ip : Socket::IPAddress) : Bool
