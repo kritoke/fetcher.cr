@@ -34,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Maintenance
 - **Error Classification**: Added `MissingLocationHeaderError` for proper redirect error categorization
 - **Code Cleanup**: Removed redundant `ResultBuilder` module, fixed broken error_result overload
-- **Code Style**: Fixed Ameba linter issues (block parameter naming, useless assignments)
 
 ## [0.9.0] - 2026-04-01
 
