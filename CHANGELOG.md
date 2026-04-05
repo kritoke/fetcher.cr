@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Redirect control configuration
 
+## [0.9.1.1] - 2026-04-05
+
+### Bug Fixes
+- Fixed nilable title passing to Entry.create in RSS parser (regression from N+1 XPath refactoring)
+
 ## [0.9.1] - 2026-04-05
 
 ### Security

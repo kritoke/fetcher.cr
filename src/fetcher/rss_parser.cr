@@ -132,7 +132,7 @@ module Fetcher
     private def parse_rss_item(node : XML::Node) : Entry
       children = node.children.select(&.element?)
 
-      title = extract_rss_title(children)
+      title = Entry.sanitize_title(extract_rss_title(children))
       link = extract_rss_link(children)
       pub_date = extract_rss_pub_date(children)
       content = extract_rss_content(children)
