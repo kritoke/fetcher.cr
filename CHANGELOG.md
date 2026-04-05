@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.1.2] - 2026-04-05
 
 ### Bug Fixes
-- **DNS Resolution**: Revert fail-closed behavior - allow requests when DNS fails temporarily. For a feed aggregator, blocking all feeds when DNS has issues is too aggressive.
+- **DNS Resolution**: Fixed URLValidator.resolve_and_validate to use proper DNS lookup (Socket::Addrinfo.resolve) instead of Socket::IPAddress.new. This enables SSRF protection for URLs with hostnames, not just explicit IPs.
 
 ## [0.9.1.1] - 2026-04-05
 
