@@ -29,7 +29,7 @@ module Fetcher
       # Process each domain group sequentially to maximize connection reuse
       domain_groups.each do |domain, domain_urls|
         # Use domain-specific configuration if available
-        domain_config = get_domain_config(domain, config)
+        _ = get_domain_config(domain, config)
 
         # Process all URLs in this domain group
         domain_results = ConcurrentFetcher.pull_multiple(domain_urls, headers, limit, config.max_concurrent_requests || ConcurrentFetcher::DEFAULT_MAX_CONCURRENT, config)

@@ -173,10 +173,10 @@ module Fetcher
 
     def self.ttl_for_sort(sort : String) : Time::Span
       case sort
-      when "new"          then REDDIT_CACHE_TTL_NEW
-      when "rising"       then REDDIT_CACHE_TTL_RISING
-      when "hot"          then REDDIT_CACHE_TTL_HOT
-      when "top"          then REDDIT_CACHE_TTL_TOP
+      when "new"           then REDDIT_CACHE_TTL_NEW
+      when "rising"        then REDDIT_CACHE_TTL_RISING
+      when "hot"           then REDDIT_CACHE_TTL_HOT
+      when "top"           then REDDIT_CACHE_TTL_TOP
       when "controversial" then REDDIT_CACHE_TTL_CONTROVERSIAL
       else                      Cache::DEFAULT_TTL
       end

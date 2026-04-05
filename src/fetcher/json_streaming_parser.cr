@@ -23,7 +23,7 @@ module Fetcher
   end
 
   class JSONStreamingIterator < EntryIterator
-    @parser : RedditJSONParser | JSONFeedStreamingParser | Nil
+    @parser : RedditJSONParser | JSONFeedStreamingParser?
 
     def initialize(@io : IO, @limit : Int32)
       super()
@@ -37,7 +37,7 @@ module Fetcher
 
       unless @parser
         determine_feed_type
-        return nil unless @parser
+        return unless @parser
       end
 
       entry = @parser.as(RedditJSONParser | JSONFeedStreamingParser).next_entry(@pull)

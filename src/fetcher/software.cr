@@ -16,9 +16,9 @@ require "./software/atom_parser"
 
 module Fetcher
   module Software
-    GITHUB_RELEASES_PATTERN  = %r{https?://(?:www\.)?github\.com/([^/]+/[^/]+)(?:/[^/]*)*/releases}
+    GITHUB_RELEASES_PATTERN   = %r{https?://(?:www\.)?github\.com/([^/]+/[^/]+)(?:/[^/]*)*/releases}
     CODEBERG_RELEASES_PATTERN = %r{https?://(?:www\.)?codeberg\.org/([^/]+/[^/]+)(?:/[^/]*)*/releases}
-    GITLAB_RELEASES_PATTERN  = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
+    GITLAB_RELEASES_PATTERN   = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
 
     struct SoftwareProvider
       getter name : String
@@ -51,7 +51,7 @@ module Fetcher
     end
 
     private def self.detect_provider(url : String) : SoftwareProvider?
-      if match = url.match(GITHUB_RELEASES_PATTERN)
+      if _ = url.match(GITHUB_RELEASES_PATTERN)
         return unless valid_domain?(url, "github.com")
         repo = extract_repo_path(url, "github.com")
         return build_github_provider(repo) if repo
@@ -73,7 +73,7 @@ module Fetcher
         )
       end
 
-      if match = url.match(CODEBERG_RELEASES_PATTERN)
+      if _ = url.match(CODEBERG_RELEASES_PATTERN)
         return unless valid_domain?(url, "codeberg.org")
         repo = extract_repo_path(url, "codeberg.org")
         return build_codeberg_provider(repo) if repo

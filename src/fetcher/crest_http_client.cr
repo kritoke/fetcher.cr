@@ -228,7 +228,7 @@ module Fetcher
     end
 
     private def build_tls_context : OpenSSL::SSL::Context::Client?
-      return nil if @config.ssl_verify?
+      return if @config.ssl_verify?
 
       ::Log.for("fetcher").warn { "SSL certificate verification is disabled - connections are vulnerable to MITM attacks" }
       ctx = OpenSSL::SSL::Context::Client.new

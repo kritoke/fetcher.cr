@@ -121,7 +121,7 @@ module Fetcher
         keys_to_remove.each do |key|
           @data.delete(key)
         end
-        @eviction_order.reject! { |k| k.starts_with?(prefix) }
+        @eviction_order.reject!(&.starts_with?(prefix))
       end
     end
 

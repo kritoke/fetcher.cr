@@ -100,7 +100,7 @@ describe "Security Tests - Input Encoding" do
       # Path traversal is prevented at the URL validation layer:
       # URLs with suspicious patterns are blocked before reaching the Reddit module
       url = "https://reddit.com/r/../admin"
-      Fetcher::URLValidator.valid?(url).should be_true  # URL itself is valid
+      Fetcher::URLValidator.valid?(url).should be_true # URL itself is valid
       # The actual fetch would fail at HTTP level or return a 404 from Reddit
     end
   end

@@ -51,19 +51,19 @@ module Fetcher
         when XML::Reader::Type::ELEMENT
           depth += 1
           case reader.name
-          when "title"         then title = read_text_content(reader)
-          when "link"          then link = read_text_content(reader)
+          when "title"                      then title = read_text_content(reader)
+          when "link"                       then link = read_text_content(reader)
           when "pubDate", "dc:date", "date" then pub_date_str = read_text_content(reader)
-          when "content:encoded" then content = read_text_content(reader)
-          when "description"   then description = read_text_content(reader)
-          when "dc:creator"    then author = read_text_content(reader)
+          when "content:encoded"            then content = read_text_content(reader)
+          when "description"                then description = read_text_content(reader)
+          when "dc:creator"                 then author = read_text_content(reader)
           when "category"
             cat = read_text_content(reader)
             categories << cat unless cat.empty?
           when "enclosure"
             attachment = parse_enclosure_attributes(reader)
             attachments << attachment if attachment
-          when "comments"      then comments_link = read_text_content(reader)
+          when "comments" then comments_link = read_text_content(reader)
           end
         when XML::Reader::Type::END_ELEMENT
           depth -= 1

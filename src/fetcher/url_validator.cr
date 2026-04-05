@@ -4,7 +4,7 @@ require "socket"
 module Fetcher
   module URLValidator
     ALLOWED_SCHEMES = {"http", "https"}
-    MAX_URL_LENGTH = 2048
+    MAX_URL_LENGTH  = 2048
 
     # Standard private and reserved IP ranges that should be blocked for SSRF protection
     LINK_LOCAL_IPV4 = "169.254.0.0/16"
@@ -39,7 +39,7 @@ module Fetcher
         @@validated_ips.delete(host)
       end
 
-      return !blocked_ip?(current_ip)
+      !blocked_ip?(current_ip)
     end
 
     def self.valid?(url : String?) : Bool

@@ -45,7 +45,7 @@ module Fetcher
         when "permalink"   then permalink = pull.read_string
         when "created_utc" then created_utc = pull.read_float
         when "is_self"     then is_self = pull.read_bool
-        else pull.skip
+        else                    pull.skip
         end
       end
 
@@ -57,10 +57,10 @@ module Fetcher
 
     private def build_entry(post : RedditPostData) : Entry
       link = if post.is_self || post.url.empty?
-        "https://www.reddit.com#{post.permalink}"
-      else
-        post.url
-      end
+               "https://www.reddit.com#{post.permalink}"
+             else
+               post.url
+             end
       pub_date = post.created_utc > 0 ? Time.unix(post.created_utc.to_i64) : nil
       link_data = LinkResolver.resolve_from_url(link)
 

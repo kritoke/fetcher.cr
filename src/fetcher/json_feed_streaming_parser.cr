@@ -38,7 +38,7 @@ module Fetcher
             pull.skip
           end
         end
-        return nil
+        return
       end
 
       pull.read_array do
@@ -74,7 +74,7 @@ module Fetcher
         when "date_published" then date_published = pull.read_string
         when "tags"           then tags = parse_string_array(pull)
         when "authors"        then authors = parse_authors_array(pull)
-        else pull.skip
+        else                       pull.skip
         end
       end
 
@@ -96,7 +96,7 @@ module Fetcher
 
       author = nil
       author_url = nil
-      if (first = item.authors.first?)
+      if first = item.authors.first?
         author = first.name
         author_url = first.url
       end
@@ -138,7 +138,7 @@ module Fetcher
           case key
           when "name"       then name = pull.read_string
           when "url", "uri" then url = pull.read_string
-          else pull.skip
+          else                   pull.skip
           end
         end
         authors << StreamingAuthorInfo.new(name, url) if name || url
