@@ -23,7 +23,7 @@ module Fetcher
       when "gitlab"                then GitLab
       when "codeberg"              then Codeberg
       when "youtube"               then YouTube
-      else                              RSS
+      else                              raise ArgumentError.new("Unknown source type: #{value}")
       end
     end
   end

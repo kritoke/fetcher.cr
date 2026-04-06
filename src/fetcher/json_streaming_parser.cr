@@ -67,14 +67,15 @@ module Fetcher
           end
         end
       rescue ex
-        ::Log.for("fetcher.streaming").debug { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
+        ::Log.for("fetcher.streaming").warn { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
       end
 
       if @io.responds_to?(:rewind)
         @io.rewind
         @pull = JSON::PullParser.new(@io)
       else
-        ::Log.for("fetcher.streaming").warn { "JSON streaming parser received non-seekable IO; type detection consumed data and cannot be rewound" }
+        ::Log.for("fetcher.streaming").warn { "JSON streaming parser received non-seekable IO; type detection consumed data and cannot be rewound - falling back to DOM parser" }
+        raise MemoryLimitExceeded.new("Non-seekable IO cannot be used with streaming JSON parser after type detection")
       end
     end
   end

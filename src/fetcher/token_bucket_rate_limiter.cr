@@ -9,6 +9,8 @@ module Fetcher
     @last_refill : Time
     @mutex : Mutex
 
+    MAX_WAIT_TIME = 0.1
+
     def initialize(capacity : Float64, refill_rate : Float64)
       @capacity = capacity
       @refill_rate = refill_rate
@@ -20,24 +22,10 @@ module Fetcher
     def acquire(tokens : Float64 = 1.0)
       loop do
         wait_time = calculate_wait_time(tokens)
-        if wt = wait_time
-          sleep(wt.seconds)
-        else
-          return
-        end
-      end
-    end
+        return if wait_time.nil?
 
-    private def calculate_wait_time(tokens : Float64) : Float64?
-      @mutex.synchronize do
-        refill_tokens
-        if @tokens >= tokens
-          @tokens -= tokens
-          return
-        end
-        tokens_needed = tokens - @tokens
-        wait = tokens_needed / @refill_rate
-        wait < 0.001 ? 0.001 : wait
+        sleep_time = {wait_time, MAX_WAIT_TIME}.min
+        ::sleep(sleep_time.seconds)
       end
     end
 
@@ -56,6 +44,19 @@ module Fetcher
       @mutex.synchronize do
         refill_tokens
         @tokens
+      end
+    end
+
+    private def calculate_wait_time(tokens : Float64) : Float64?
+      @mutex.synchronize do
+        refill_tokens
+        if @tokens >= tokens
+          @tokens -= tokens
+          return nil
+        end
+        tokens_needed = tokens - @tokens
+        wait = tokens_needed / @refill_rate
+        wait < 0.001 ? 0.001 : wait
       end
     end
 

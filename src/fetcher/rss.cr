@@ -29,8 +29,6 @@ module Fetcher
     end
 
     private def self.parse_feed(body : String, url : String, limit : Int32, config : RequestConfig) : Result
-      return Fetcher.error_result(ErrorKind::InvalidFormat, "Feed too large (>#{Fetcher::SafeFeedProcessor::MAX_FEED_SIZE / (1024 * 1024)}MB)") if body.bytesize > Fetcher::SafeFeedProcessor::MAX_FEED_SIZE
-
       # Use streaming parser if configured
       if config.streaming.enabled
         begin

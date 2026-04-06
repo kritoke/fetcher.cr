@@ -11,8 +11,13 @@ module Fetcher
     LINK_LOCAL_IPV6 = "fe80::/10"
 
     # DNS rebinding mitigation: track recently validated hostnames and their IPs
-    @@validated_ips = {} of String => Time::Span
+    record ValidatedEntry,
+      ip : Socket::IPAddress,
+      timestamp : Time
+
+    @@validated_ips = {} of String => ValidatedEntry
     @@validation_lock = Mutex.new
+    @@validation_ttl = 30.seconds
 
     def self.clear_validated_ips : Nil
       @@validation_lock.synchronize do
@@ -22,23 +27,28 @@ module Fetcher
 
     def self.register_validated_ip(host : String, ip : Socket::IPAddress) : Nil
       @@validation_lock.synchronize do
-        @@validated_ips[host] = Time.monotonic
+        @@validated_ips[host] = ValidatedEntry.new(ip, Time.utc)
       end
     end
 
-    def self.cleanup_expired_validations(expiry : Time::Span = 30.seconds) : Nil
-      now = Time.monotonic
+    def self.cleanup_expired_validations(expiry : Time::Span? = nil) : Nil
+      ttl = expiry || @@validation_ttl
+      now = Time.utc
       @@validation_lock.synchronize do
-        @@validated_ips.reject! { |_, time| (now - time) > expiry }
+        @@validated_ips.reject! { |_, entry| (now - entry.timestamp) > ttl }
       end
     end
 
     def self.check_dns_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
       @@validation_lock.synchronize do
-        return true unless @@validated_ips.has_key?(host)
-        @@validated_ips.delete(host)
+        if entry = @@validated_ips[host]?
+          if (Time.utc - entry.timestamp) <= @@validation_ttl
+            return entry.ip == current_ip
+          else
+            @@validated_ips.delete(host)
+          end
+        end
       end
-
       !blocked_ip?(current_ip)
     end
 
@@ -73,6 +83,11 @@ module Fetcher
           if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
             ip_address = addr.ip_address
             return false if blocked_ip?(ip_address)
+          end
+        end
+        addr_info.each do |addr|
+          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
+            ip_address = addr.ip_address
             register_validated_ip(host, ip_address)
             return true
           end
@@ -105,7 +120,21 @@ module Fetcher
     end
 
     private def self.looks_like_ip?(host : String) : Bool
-      host.starts_with?("[") || host[0]?.try(&.ascii_number?) || false
+      return false if host.empty?
+
+      if host.starts_with?("[")
+        return true
+      end
+
+      first_char = host[0]
+      return false unless first_char.ascii_number?
+
+      host.each_char do |c|
+        unless c.ascii_number? || c == '.' || c == ':'
+          return false
+        end
+      end
+      true
     end
 
     private def self.clean_ipv6_host(host : String) : String

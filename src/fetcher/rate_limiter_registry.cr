@@ -80,9 +80,14 @@ module Fetcher
         @cleanup_running = true
       end
       spawn do
-        loop do
-          sleep 60.seconds
-          cleanup
+        begin
+          loop do
+            sleep 60.seconds
+            cleanup
+          end
+        rescue ex
+          ::Log.for("fetcher").warn { "Rate limiter cleanup fiber error: #{ex.class} - #{ex.message}" }
+          @cleanup_lock.synchronize { @cleanup_running = false }
         end
       end
     end

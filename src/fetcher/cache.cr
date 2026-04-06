@@ -28,16 +28,16 @@ module Fetcher
       total > 0 ? @hits.to_f / total : 0.0
     end
 
-    def record_hit
-      @hits += 1
+    def record_hit : CacheStats
+      CacheStats.new(@hits + 1, @misses, @evictions)
     end
 
-    def record_miss
-      @misses += 1
+    def record_miss : CacheStats
+      CacheStats.new(@hits, @misses + 1, @evictions)
     end
 
-    def record_eviction
-      @evictions += 1
+    def record_eviction : CacheStats
+      CacheStats.new(@hits, @misses, @evictions + 1)
     end
 
     def to_s : String
@@ -50,6 +50,7 @@ module Fetcher
 
     @data : Hash(String, CacheEntry) = {} of String => CacheEntry
     @eviction_order : Deque(String) = Deque(String).new
+    @eviction_set : Set(String) = Set(String).new
     @mutex : Mutex = Mutex.new
     @stats : CacheStats = CacheStats.new
     @max_size : Int32 = 1000
@@ -80,14 +81,14 @@ module Fetcher
       @mutex.synchronize do
         entry = @data[key]?
         if entry.nil?
-          @stats.record_miss
+          @stats = @stats.record_miss
           nil
         elsif entry.expired?
           remove_entry(key)
-          @stats.record_miss
+          @stats = @stats.record_miss
           nil
         else
-          @stats.record_hit
+          @stats = @stats.record_hit
           entry.value
         end
       end
@@ -99,10 +100,15 @@ module Fetcher
       @mutex.synchronize do
         if @data[key]?
           @data[key] = CacheEntry.new(value, Time.utc, ttl)
+          @eviction_order.reject! { |k| k == key }
+          @eviction_set.delete(key)
+          @eviction_order << key
+          @eviction_set.add(key)
         else
           evict_if_needed
           @data[key] = CacheEntry.new(value, Time.utc, ttl)
           @eviction_order << key
+          @eviction_set.add(key)
         end
       end
     end
@@ -111,15 +117,20 @@ module Fetcher
       @mutex.synchronize do
         @data.clear
         @eviction_order.clear
+        @eviction_set.clear
         @stats = CacheStats.new
       end
     end
 
     def clear_by_prefix(prefix : String) : Nil
       @mutex.synchronize do
-        keys_to_remove = @data.keys.select(&.starts_with?(prefix))
+        keys_to_remove = [] of String
+        @data.each_key do |key|
+          keys_to_remove << key if key.starts_with?(prefix)
+        end
         keys_to_remove.each do |key|
           @data.delete(key)
+          @eviction_set.delete(key)
         end
         @eviction_order.reject!(&.starts_with?(prefix))
       end
@@ -137,6 +148,7 @@ module Fetcher
 
     private def remove_entry(key : String)
       @data.delete(key)
+      @eviction_set.delete(key)
       @eviction_order.reject! { |k| k == key }
     end
 
@@ -145,7 +157,8 @@ module Fetcher
         oldest_key = @eviction_order.shift?
         if oldest_key
           @data.delete(oldest_key)
-          @stats.record_eviction
+          @eviction_set.delete(oldest_key)
+          @stats = @stats.record_eviction
         end
       end
     end

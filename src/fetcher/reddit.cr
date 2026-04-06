@@ -11,7 +11,7 @@ require "./header_builder"
 
 module Fetcher
   module Reddit
-    USER_AGENT      = HeaderBuilder::DEFAULT_USER_AGENT
+    USER_AGENT      = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE = "https://www.reddit.com"
 
     class RedditFetchError < Exception
@@ -145,7 +145,8 @@ module Fetcher
       Result.success(
         entries: entries,
         site_link: "https://www.reddit.com/r/#{subreddit}",
-        favicon: "https://www.reddit.com/favicon.ico"
+        favicon: "https://www.reddit.com/favicon.ico",
+        last_modified: nil
       )
     end
 
@@ -189,7 +190,7 @@ module Fetcher
     private def self.transient_error_kind?(kind : ErrorKind?) : Bool
       return false unless kind
       case kind
-      when .timeout?, .dns_error?, .server_error?, .rate_limited?
+      when .timeout?, .dns_error?, .server_error?
         true
       else
         false
@@ -210,7 +211,7 @@ module Fetcher
       data = parsed.as_a? ? parsed[0]["data"]? : parsed["data"]?
       children = data.try(&.["children"]?)
       children.as_a? if children
-    rescue ex
+    rescue ex : KeyError | TypeCastError | IndexError
       ::Log.for("fetcher.reddit").warn { "Unexpected JSON structure in Reddit response: #{ex.message}" }
       nil
     end

@@ -27,6 +27,7 @@ module Fetcher
     protected abstract def next_entry : Entry?
 
     # Convert iterator to array with optional limit
+    # Note: This consumes the iterator. Call only once.
     def to_a(limit : Int32? = nil) : Array(Entry)
       entries = [] of Entry
       count = 0

@@ -19,8 +19,8 @@ module Fetcher
       result_array = [] of Result
 
       urls.each_with_index do |url, index|
+        semaphore.send(nil)
         spawn do
-          semaphore.send(nil)
           begin
             results.send({index, Fetcher.pull(url, headers, limit, config)})
           rescue ex

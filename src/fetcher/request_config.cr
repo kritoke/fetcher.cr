@@ -55,6 +55,7 @@ module Fetcher
     getter driver_detection_mode : DriverDetectionMode
     getter error_detail_level : ErrorDetailLevel
     getter max_concurrent_requests : Int32?
+    getter ssl_verify_bypass_acknowledged : Bool
 
     @cache_instance : Cache? = nil
 
@@ -78,11 +79,13 @@ module Fetcher
       @driver_detection_mode : DriverDetectionMode = DriverDetectionMode::Auto,
       @error_detail_level : ErrorDetailLevel = ErrorDetailLevel::Normal,
       @max_concurrent_requests : Int32? = nil,
+      @ssl_verify_bypass_acknowledged : Bool = false,
     )
     end
 
     def delay_for_attempt(attempt : Int32) : Time::Span
-      delay = retry.base_delay * (retry.exponential_base ** attempt)
+      capped_attempt = Math.min(attempt, 30)
+      delay = retry.base_delay * (retry.exponential_base ** capped_attempt)
       delay > retry.max_delay ? retry.max_delay : delay
     end
   end

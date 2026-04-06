@@ -33,6 +33,7 @@ module Fetcher
         Result.success(
           entries: entries,
           etag: response.headers["ETag"]?,
+          last_modified: response.headers["Last-Modified"]?,
           site_link: "#{provider.base_url}/#{provider.repo}",
           favicon: "#{provider.base_url}/favicon.ico"
         )

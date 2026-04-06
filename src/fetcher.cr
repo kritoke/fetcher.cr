@@ -55,9 +55,9 @@ module Fetcher
       error = Error.invalid_format("Explicit driver required - auto-detection disabled", url)
       raise InvalidFormatError.new(error.message, error)
     when .url_only?
-      detect_by_url_pattern(url) || detect_by_url_extension(url)
+      detect_by_url_pattern(url) || detect_by_url_extension(url) || DriverType::RSS
     when .content_type?
-      detect_by_content_type(url, headers, config) || detect_by_url_extension(url)
+      detect_by_content_type(url, headers, config) || detect_by_url_extension(url) || DriverType::RSS
     else # :auto
       # First, try to detect based on URL patterns for known sources
       driver = detect_by_url_pattern(url)
@@ -68,7 +68,7 @@ module Fetcher
       return driver if driver
 
       # Final fallback based on URL extension/patterns
-      detect_by_url_extension(url)
+      detect_by_url_extension(url) || DriverType::RSS
     end
   end
 
@@ -121,11 +121,11 @@ module Fetcher
       content_type.includes?("application/xml")
   end
 
-  private def self.detect_by_url_extension(url : String) : DriverType
+  private def self.detect_by_url_extension(url : String) : DriverType?
     if url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")
       DriverType::JSONFeed
     else
-      DriverType::RSS
+      nil
     end
   end
 

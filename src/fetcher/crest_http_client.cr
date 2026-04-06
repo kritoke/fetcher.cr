@@ -148,10 +148,16 @@ module Fetcher
       else
         base = URI.parse(original_url)
         relative = URI.parse(redirect_url)
-        base.resolve(relative).to_s
+        resolved = base.resolve(relative)
+        raise URI::Error.new("Failed to resolve redirect URL: #{redirect_url} from #{original_url}") unless resolved.host
+        resolved.to_s
       end
-    rescue URI::Error
-      redirect_url
+    rescue ex
+      if ex.is_a?(URI::Error)
+        raise ex
+      else
+        raise URI::Error.new("Invalid redirect URL: #{redirect_url}")
+      end
     end
 
     private def extract_domain(url : String) : String
@@ -166,7 +172,7 @@ module Fetcher
         raise DNSError.new("Invalid or blocked URL: #{url}")
       end
       unless URLValidator.resolve_and_validate(url)
-        ::Log.for("fetcher").warn { "SSRF check could not resolve #{url}, allowing request through" }
+        raise DNSError.new("SSRF check failed: URL resolved to blocked IP range: #{url}")
       end
     end
 
@@ -175,24 +181,32 @@ module Fetcher
       when MissingLocationHeaderError
         raise ex
       when URI::Error
-        raise DNSError.new("Invalid URL: #{ex.message}")
+        error = Error.invalid_url("Invalid URL: #{ex.message}", url)
+        raise DNSError.new(error.message, error, ex)
       when Socket::Error
-        raise DNSError.new("DNS/Connection error: #{ex.message}")
+        error = Error.dns("DNS/Connection error: #{ex.message}", url)
+        raise DNSError.new(error.message, error, ex)
       when IO::TimeoutError
-        raise TimeoutError.new("Timeout: #{ex.message}")
+        error = Error.timeout("Timeout: #{ex.message}", url)
+        raise TimeoutError.new(error.message, error, ex)
       when OpenSSL::SSL::Error
-        raise DNSError.new("SSL error: #{ex.message}")
+        error = Error.dns("SSL error: #{ex.message}", url)
+        raise DNSError.new(error.message, error, ex)
       when Crest::RequestFailed
         status = ex.response.status_code
         if (400..499).includes?(status)
-          raise HTTPClientError.new("HTTP #{status}: #{ex.message}", status, nil)
+          error = Error.http(status, "HTTP #{status}: #{ex.message}", url)
+          raise HTTPClientError.new(error.message, status, error, ex)
         elsif (500..599).includes?(status)
-          raise HTTPServerError.new("HTTP #{status}: #{ex.message}", status, nil)
+          error = Error.server_error(status, "HTTP #{status}: #{ex.message}", url)
+          raise HTTPServerError.new(error.message, status, error, ex)
         else
-          raise HTTPError.new("HTTP #{status}: #{ex.message}", status, nil)
+          error = Error.http(status, "HTTP #{status}: #{ex.message}", url)
+          raise HTTPError.new(error.message, status, error, ex)
         end
       else
-        raise DNSError.new("Request error: #{ex.message}")
+        error = Error.unknown("#{ex.class}: #{ex.message}", url)
+        raise FetchError.new("Request error: #{ex.class}: #{ex.message}", error, ex)
       end
     end
 
@@ -229,6 +243,10 @@ module Fetcher
 
     private def build_tls_context : OpenSSL::SSL::Context::Client?
       return if @config.ssl_verify?
+
+      unless @config.responds_to?(:ssl_verify_bypass_acknowledged) && @config.ssl_verify_bypass_acknowledged
+        raise InvalidURLError.new("SSL verification bypass requires explicit acknowledgment via ssl_verify_bypass_acknowledged: true in RequestConfig")
+      end
 
       ::Log.for("fetcher").warn { "SSL certificate verification is disabled - connections are vulnerable to MITM attacks" }
       ctx = OpenSSL::SSL::Context::Client.new
