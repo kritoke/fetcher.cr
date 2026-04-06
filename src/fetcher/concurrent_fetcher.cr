@@ -15,18 +15,19 @@ module Fetcher
       config : RequestConfig = RequestConfig.new,
     ) : Array(Result)
       semaphore = Channel(Nil).new(max_concurrent)
+      max_concurrent.times { semaphore.send(nil) }
       results = Channel(Tuple(Int32, Result)).new
       result_array = [] of Result
 
       urls.each_with_index do |url, index|
-        semaphore.send(nil)
         spawn do
+          semaphore.receive
           begin
             results.send({index, Fetcher.pull(url, headers, limit, config)})
           rescue ex
             results.send({index, Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{url}: #{ex.class}: #{ex.message}")})
           ensure
-            semaphore.receive
+            semaphore.send(nil)
           end
         end
       end
