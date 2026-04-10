@@ -32,12 +32,12 @@ describe Fetcher::ThreadSafeCache do
       10.times do |i|
         spawn do
           key = "key#{i}"
-          start = Time.monotonic
-          cache.get_or_compute(key) do
-            sleep(50.milliseconds)
-            i * 10
+          elapsed = Time.measure do
+            cache.get_or_compute(key) do
+              sleep(50.milliseconds)
+              i * 10
+            end
           end
-          elapsed = Time.monotonic - start
           mutex.synchronize { compute_times[key] = elapsed }
         end
       end

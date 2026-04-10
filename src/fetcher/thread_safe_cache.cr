@@ -77,10 +77,15 @@ module Fetcher
 
         if wait_fiber
           Fiber.suspend
-          return @mutex.synchronize { @data[key] }
+          @mutex.synchronize do
+            if val = @data[key]?
+              return val
+            end
+          end
+          compute_and_store(key, &block)
+        else
+          compute_and_store(key, &block)
         end
-
-        compute_and_store(key, &block)
       end
 
       private def compute_and_store(key : K, & : -> V) : V
@@ -95,12 +100,22 @@ module Fetcher
 
         result
       rescue ex
+        computation_failed(key)
+        raise ex
+      end
+
+      private def computation_failed(key : K) : Nil
+        @mutex.synchronize do
+          @computing.delete(key)
+        end
+      end
+
+      private def wake_waiting_fibers(key : K, ex : Exception?) : Nil
         @mutex.synchronize do
           if waiters = @computing.delete(key)
             waiters.each(&.enqueue)
           end
         end
-        raise ex
       end
     end
   end

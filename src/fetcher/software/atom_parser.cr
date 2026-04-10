@@ -33,7 +33,7 @@ module Fetcher
         parser = RSSParser.new
         entries = parser.parse_entries(body, limit)
         entries.map do |entry|
-          version = entry.version || extract_version_from_title(entry.title)
+          version = entry.version || extract_version(entry.title)
           Entry.create(
             title: entry.title,
             url: entry.url,
@@ -56,7 +56,7 @@ module Fetcher
         Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
       end
 
-      private def self.extract_version_from_title(title : String) : String?
+      private def self.extract_version(title : String) : String?
         match = title.match(/v?\d+\.\d+(?:\.\d+)?(?:[-._]?\w+)?/)
         match ? match[0] : nil
       end

@@ -17,13 +17,13 @@ module Fetcher
         end
 
         ErrorHandler.handle_response(response, provider.api_url) do
-          releases = parse_json_releases(response.body, provider.api_url)
+          releases = parse_json(response.body, provider.api_url)
           stable_releases = releases.reject do |release|
             release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
           end
 
           entries = stable_releases.first(limit).map do |release|
-            parse_release_entry(release, provider)
+            parse_entry(release, provider)
           end
 
           Result.success(
@@ -38,14 +38,14 @@ module Fetcher
         ErrorHandler.handle_network_error(ex, provider.api_url)
       end
 
-      private def self.parse_json_releases(body : String, url : String) : Array(JSON::Any)
+      private def self.parse_json(body : String, url : String) : Array(JSON::Any)
         Array(JSON::Any).from_json(body)
       rescue ex : JSON::ParseException
         error = Error.invalid_format("Invalid JSON from #{url}: #{ex.message}", url)
         raise InvalidFormatError.new(error.message, error)
       end
 
-      private def self.parse_release_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
+      private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
         tag = release["tag_name"]?.try(&.as_s) || ""
         name = release["name"]?.try(&.as_s).presence || tag
         published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?

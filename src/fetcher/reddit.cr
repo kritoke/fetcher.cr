@@ -29,7 +29,7 @@ module Fetcher
     REDDIT_CACHE_TTL_CONTROVERSIAL = 10.minutes
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-      subreddit = extract_subreddit(url)
+      subreddit = extract_sub(url)
       return Fetcher.error_result(ErrorKind::InvalidURL, "Not a Reddit subreddit URL") unless subreddit
 
       sort = extract_sort(url)
@@ -43,7 +43,7 @@ module Fetcher
         end
       end
 
-      result = fetch_with_reddit_fallback(subreddit, sort, actual_limit, headers, config)
+      result = fetch_fallback(subreddit, sort, actual_limit, headers, config)
 
       if config.cache_config.enabled && result.success?
         ttl = ttl_for_sort(sort)
@@ -53,24 +53,23 @@ module Fetcher
       result
     end
 
-    private def self.fetch_reddit_rss(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+    private def self.fetch_rss(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
       rss_url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.rss"
       rss_headers = headers.dup
       rss_headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
       RSS.pull(rss_url, rss_headers, limit, config)
     end
 
-    private def self.fetch_with_reddit_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+    private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
       result = Fetcher.with_retry(config) do
         fetch_reddit(subreddit, sort, limit, headers, config)
       end
 
       return result if result.success?
 
-      # Fall back to RSS for transient errors (excluding rate limiting)
       error = result.error
-      if error && transient_error_kind?(error.kind) && error.kind != ErrorKind::RateLimited
-        fetch_reddit_rss(subreddit, sort, limit, headers, config)
+      if error && transient_error?(error.kind) && error.kind != ErrorKind::RateLimited
+        fetch_rss(subreddit, sort, limit, headers, config)
       else
         result
       end
@@ -90,10 +89,10 @@ module Fetcher
 
       case response.status_code
       when 200..299
-        result = try_streaming_parse(response.body, subreddit, limit, config)
+        result = try_stream(response.body, subreddit, limit, config)
         return result if result
 
-        build_reddit_result(parse_reddit_response(response.body, limit), subreddit)
+        build_result(parse_reddit_response(response.body, limit), subreddit)
       when 404
         error = Error.invalid_url("Subreddit '#{subreddit}' not found", api_url)
         raise InvalidURLError.new(error.message, error)
@@ -124,14 +123,14 @@ module Fetcher
       raise RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
     end
 
-    private def self.try_streaming_parse(body : String, subreddit : String, limit : Int32, config : RequestConfig) : Result?
+    private def self.try_stream(body : String, subreddit : String, limit : Int32, config : RequestConfig) : Result?
       return unless config.streaming.enabled
 
       io = IO::Memory.new(body)
       parser = Fetcher::JSONStreamingParser.new(limit)
       items = parser.parse_entries(io, limit)
 
-      build_reddit_result(items, subreddit)
+      build_result(items, subreddit)
     rescue ex : Fetcher::MemoryLimitExceeded
       ::Log.for("fetcher.reddit").debug { "Streaming parser memory limit exceeded, cannot fallback" } if config.streaming.debug
       error = Error.invalid_format(ex.message || "Feed too large", "#{REDDIT_API_BASE}/r/#{subreddit}")
@@ -141,7 +140,7 @@ module Fetcher
       nil
     end
 
-    private def self.build_reddit_result(entries : Array(Entry), subreddit : String) : Result
+    private def self.build_result(entries : Array(Entry), subreddit : String) : Result
       Result.success(
         entries: entries,
         site_link: "https://www.reddit.com/r/#{subreddit}",
@@ -150,22 +149,14 @@ module Fetcher
       )
     end
 
-    private def self.extract_subreddit(url : String) : String?
+    private def self.extract_sub(url : String) : String?
       match = url.match(%r{reddit\.com/r/([^/]+)}i)
       match ? match[1] : nil
     end
 
     private def self.extract_sort(url : String) : String
-      begin
-        uri = URI.parse(url)
-        path = uri.path || ""
-        segments = path.split('/').reject(&.empty?)
-        return "top" if segments.last? == "top"
-        return "new" if segments.last? == "new"
-        return "rising" if segments.last? == "rising"
-      rescue
-      end
-      "hot"
+      match = url.match(%r{reddit\.com/r/[^/]+/([^/]+)}i)
+      match ? match[1] : "hot"
     end
 
     def self.generate_cache_key(subreddit : String, sort : String, limit : Int32) : String
@@ -187,7 +178,7 @@ module Fetcher
       Cache.default.clear_by_prefix("reddit:#{subreddit}:")
     end
 
-    private def self.transient_error_kind?(kind : ErrorKind?) : Bool
+    private def self.transient_error?(kind : ErrorKind?) : Bool
       return false unless kind
       case kind
       when .timeout?, .dns_error?, .server_error?

@@ -52,7 +52,7 @@ module Fetcher
         refill_tokens
         if @tokens >= tokens
           @tokens -= tokens
-          return nil
+          return
         end
         tokens_needed = tokens - @tokens
         wait = tokens_needed / @refill_rate

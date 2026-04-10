@@ -11,7 +11,7 @@ module Fetcher
         result = try_api(provider, limit, http_client, request_headers)
         return result if result && result.success?
 
-        result = try_atom_feeds(provider, limit, http_client, request_headers)
+        result = try_atom(provider, limit, http_client, request_headers)
         return result if result && result.success?
 
         Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: No releases found", 404)
@@ -27,7 +27,7 @@ module Fetcher
         return if releases.empty?
 
         entries = releases.first(limit).map do |release|
-          parse_release_entry(release, provider)
+          parse_entry(release, provider)
         end
 
         Result.success(
@@ -49,7 +49,7 @@ module Fetcher
         nil
       end
 
-      private def self.try_atom_feeds(provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
+      private def self.try_atom(provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
         atom_urls = [provider.atom_url] + provider.atom_fallback_urls
         atom_urls.each do |atom_url|
           begin
@@ -62,7 +62,7 @@ module Fetcher
         nil
       end
 
-      private def self.parse_release_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
+      private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
         tag = release["tag_name"]?.try(&.as_s) || ""
         name = release["name"]?.try(&.as_s).presence || tag
         published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?

@@ -25,7 +25,7 @@ module Fetcher
         title: title,
         url: safe_url,
         source_type: source_type,
-        content: sanitize_content(content),
+        content: sanitize(content),
         content_html: content_html,
         author: author,
         author_url: author_url,
@@ -39,13 +39,14 @@ module Fetcher
       )
     end
 
-    private def self.sanitize_content(content : String) : String
+    private def self.sanitize(content : String) : String
       return "" if content.empty?
       begin
         sanitizer = Sanitize::Policy::HTMLSanitizer.common
         sanitizer.process(content).to_s
-      rescue
-        content
+      rescue ex
+        ::Log.for("fetcher").warn { "HTML sanitization failed: #{ex.message}" }
+        ""
       end
     end
   end

@@ -17,21 +17,21 @@ module Fetcher
 
     @@validated_ips = {} of String => ValidatedEntry
     @@validation_lock = Mutex.new
-    @@validation_ttl = 30.seconds
+    @@validation_ttl = 5.seconds
 
-    def self.clear_validated_ips : Nil
+    def self.clear_validated : Nil
       @@validation_lock.synchronize do
         @@validated_ips.clear
       end
     end
 
-    def self.register_validated_ip(host : String, ip : Socket::IPAddress) : Nil
+    def self.register_ip(host : String, ip : Socket::IPAddress) : Nil
       @@validation_lock.synchronize do
         @@validated_ips[host] = ValidatedEntry.new(ip, Time.utc)
       end
     end
 
-    def self.cleanup_expired_validations(expiry : Time::Span? = nil) : Nil
+    def self.purge_expired(expiry : Time::Span? = nil) : Nil
       ttl = expiry || @@validation_ttl
       now = Time.utc
       @@validation_lock.synchronize do
@@ -39,7 +39,7 @@ module Fetcher
       end
     end
 
-    def self.check_dns_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
+    def self.check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
       @@validation_lock.synchronize do
         if entry = @@validated_ips[host]?
           if (Time.utc - entry.timestamp) <= @@validation_ttl
@@ -79,18 +79,18 @@ module Fetcher
 
       begin
         addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+        valid_ips = [] of Socket::IPAddress
+
         addr_info.each do |addr|
           if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
             ip_address = addr.ip_address
             return false if blocked_ip?(ip_address)
+            valid_ips << ip_address
           end
         end
-        addr_info.each do |addr|
-          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
-            ip_address = addr.ip_address
-            register_validated_ip(host, ip_address)
-            return true
-          end
+
+        valid_ips.each do |ip|
+          register_ip(host, ip)
         end
         true
       rescue Exception
@@ -99,7 +99,7 @@ module Fetcher
     end
 
     def self.validate_connected_ip(host : String, connected_ip : Socket::IPAddress) : Bool
-      check_dns_rebinding(host, connected_ip)
+      check_rebinding(host, connected_ip)
     end
 
     def self.valid_redirect?(redirect_url : String) : Bool
@@ -113,10 +113,10 @@ module Fetcher
       host = uri.host
       return false if host.nil? || host.empty?
 
-      clean_host = clean_ipv6_host(host)
+      clean_host = clean_ipv6(host)
       return false if block_localhost?(clean_host)
 
-      !looks_like_ip?(clean_host) || validate_ip_address(clean_host)
+      !looks_like_ip?(clean_host) || validate_ip(clean_host)
     end
 
     private def self.looks_like_ip?(host : String) : Bool
@@ -126,19 +126,23 @@ module Fetcher
         return true
       end
 
+      if host.includes?(":")
+        return true
+      end
+
       first_char = host[0]
       return false unless first_char.ascii_number?
 
       valid_ip_chars = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ':', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'}
-      host.each_char do |c|
-        unless valid_ip_chars.includes?(c)
+      host.each_char do |char|
+        unless valid_ip_chars.includes?(char)
           return false
         end
       end
       true
     end
 
-    private def self.clean_ipv6_host(host : String) : String
+    private def self.clean_ipv6(host : String) : String
       if host.starts_with?("[") && host.ends_with?("]")
         host[1..-2]
       else
@@ -153,7 +157,7 @@ module Fetcher
         host == "::" # IPv6 unspecified address
     end
 
-    private def self.validate_ip_address(host : String) : Bool
+    private def self.validate_ip(host : String) : Bool
       ip_address = Socket::IPAddress.new(host, 80)
       !blocked_ip?(ip_address)
     rescue Socket::Error
@@ -162,26 +166,26 @@ module Fetcher
 
     private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool
       ip_address.private? || ip_address.loopback? || link_local?(ip_address) ||
-        ipv6_unique_local?(ip_address) || ipv6_site_local?(ip_address) ||
-        ipv6_mapped_ipv4_private?(ip_address)
+        ipv6_unique?(ip_address) || ipv6_site?(ip_address) ||
+        ipv6_mapped_ipv4?(ip_address)
     end
 
-    # Enhanced IPv6 link-local detection with proper IP address parsing
+    private VALID_HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
+
     private def self.link_local?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
       if address.includes?(":")
-        # IPv6 address - check link-local (fe80::/10)
-        # Simplified check: starts with "fe" followed by 8-f
         downcase = address.downcase
         if downcase.starts_with?("fe")
           second_char = downcase[2]?
-          if second_char
-            return "89abcdef".includes?(second_char)
-          end
+          return false unless second_char
+          return false unless VALID_HEX_CHARS.includes?(second_char)
+          second_nibble = second_char.to_i(16)
+          second_nibble >= 8 && second_nibble <= 15
+        else
+          false
         end
-        false
       else
-        # IPv4 address - check IPv4 link-local (169.254.0.0/16)
         parts = address.split(".").map(&.to_i)
         parts.size == 4 && parts[0] == 169 && parts[1] == 254
       end
@@ -190,7 +194,7 @@ module Fetcher
     end
 
     # IPv6 unique local addresses (fc00::/7) - RFC 4193
-    private def self.ipv6_unique_local?(ip_address : Socket::IPAddress) : Bool
+    private def self.ipv6_unique?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
       if address.includes?(":")
         # IPv6 unique local addresses (fc00::/7)
@@ -204,7 +208,7 @@ module Fetcher
     end
 
     # IPv6 site-local addresses (deprecated) - RFC 3874
-    private def self.ipv6_site_local?(ip_address : Socket::IPAddress) : Bool
+    private def self.ipv6_site?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
       if address.includes?(":")
         # IPv6 site-local addresses (fec0::/10) - deprecated but still in use
@@ -220,7 +224,7 @@ module Fetcher
     end
 
     # IPv6 mapped IPv4 addresses (::ffff:x.x.x.x) - check if mapped IPv4 is private
-    private def self.ipv6_mapped_ipv4_private?(ip_address : Socket::IPAddress) : Bool
+    private def self.ipv6_mapped_ipv4?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
       if address.includes?(":") && address.downcase.starts_with?("::ffff:")
         # IPv6 mapped IPv4 (e.g., ::ffff:192.168.1.1)

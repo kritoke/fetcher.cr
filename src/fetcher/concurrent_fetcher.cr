@@ -21,8 +21,8 @@ module Fetcher
 
       urls.each_with_index do |url, index|
         spawn do
-          semaphore.receive
           begin
+            semaphore.receive
             results.send({index, Fetcher.pull(url, headers, limit, config)})
           rescue ex
             results.send({index, Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{url}: #{ex.class}: #{ex.message}")})

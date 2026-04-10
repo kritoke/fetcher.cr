@@ -13,11 +13,11 @@ module Fetcher
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       Fetcher.with_retry(config) do
-        perform_fetch(url, headers, limit, config)
+        fetch(url, headers, limit, config)
       end
     end
 
-    private def self.perform_fetch(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
+    private def self.fetch(url : String, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(url, headers)
 

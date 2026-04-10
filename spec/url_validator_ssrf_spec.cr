@@ -91,9 +91,16 @@ describe Fetcher::URLValidator do
   end
 
   describe "IPv6 bracket notation" do
-    it "accepts valid IPv6 in brackets" do
-      Fetcher::URLValidator.valid?("http://[::1]/feed").should be_true
-      Fetcher::URLValidator.valid?("http://[fe80::1]/feed").should be_true
+    it "accepts public IPv6 in brackets" do
+      Fetcher::URLValidator.valid?("http://[2001:db8::1]/feed").should be_true
+    end
+
+    it "rejects loopback IPv6 in brackets" do
+      Fetcher::URLValidator.valid?("http://[::1]/feed").should be_false
+    end
+
+    it "rejects link-local IPv6 in brackets" do
+      Fetcher::URLValidator.valid?("http://[fe80::1]/feed").should be_false
     end
   end
 end

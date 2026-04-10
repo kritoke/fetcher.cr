@@ -23,7 +23,7 @@ module Fetcher
         end
       end
 
-      is_discussion = detect_discussion_url(main_url)
+      is_discussion = discussion_url?(main_url)
 
       if is_discussion && comment_url.nil?
         comment_url = main_url
@@ -37,7 +37,7 @@ module Fetcher
     end
 
     def self.resolve_from_url(url : String) : LinkData
-      is_discussion = detect_discussion_url(url)
+      is_discussion = discussion_url?(url)
 
       comment_url = is_discussion ? url : nil
 
@@ -50,7 +50,7 @@ module Fetcher
 
     DISCUSSION_PATHS = {"/comments/", "/item?id=", "/s/", "/discuss", "/r/"}
 
-    private def self.detect_discussion_url(url : String) : Bool
+    private def self.discussion_url?(url : String) : Bool
       return false if url.empty? || url == "#"
 
       lower = url.downcase

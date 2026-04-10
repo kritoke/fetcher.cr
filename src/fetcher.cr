@@ -55,24 +55,21 @@ module Fetcher
       error = Error.invalid_format("Explicit driver required - auto-detection disabled", url)
       raise InvalidFormatError.new(error.message, error)
     when .url_only?
-      detect_by_url_pattern(url) || detect_by_url_extension(url) || DriverType::RSS
+      detect_pattern(url) || detect_ext(url) || DriverType::RSS
     when .content_type?
-      detect_by_content_type(url, headers, config) || detect_by_url_extension(url) || DriverType::RSS
+      detect_content(url, headers, config) || detect_ext(url) || DriverType::RSS
     else # :auto
-      # First, try to detect based on URL patterns for known sources
-      driver = detect_by_url_pattern(url)
+      driver = detect_pattern(url)
       return driver if driver
 
-      # For other URLs, use content-type detection
-      driver = detect_by_content_type(url, headers, config)
+      driver = detect_content(url, headers, config)
       return driver if driver
 
-      # Final fallback based on URL extension/patterns
-      detect_by_url_extension(url) || DriverType::RSS
+      detect_ext(url) || DriverType::RSS
     end
   end
 
-  private def self.detect_by_url_pattern(url : String) : DriverType?
+  private def self.detect_pattern(url : String) : DriverType?
     if url.matches?(REDDIT_URL_PATTERN)
       DriverType::Reddit
     elsif url.matches?(GITHUB_RELEASES_PATTERN)
@@ -86,7 +83,7 @@ module Fetcher
     end
   end
 
-  private def self.detect_by_content_type(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
+  private def self.detect_content(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
     begin
       head_headers = Fetcher::CrestHttpClient.build_headers(headers)
       http_client = Fetcher::CrestHttpClient.new(config)
@@ -95,9 +92,9 @@ module Fetcher
       content_type = response.headers["content-type"]?.try(&.downcase)
 
       if content_type
-        if json_feed_content_type?(content_type, url)
+        if jsonfeed_type?(content_type, url)
           return DriverType::JSONFeed
-        elsif rss_content_type?(content_type)
+        elsif rss_type?(content_type)
           return DriverType::RSS
         end
       end
@@ -108,24 +105,22 @@ module Fetcher
     nil
   end
 
-  private def self.json_feed_content_type?(content_type : String, url : String) : Bool
+  private def self.jsonfeed_type?(content_type : String, url : String) : Bool
     content_type.includes?("application/feed+json") ||
       (content_type.includes?("application/json") &&
         (url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")))
   end
 
-  private def self.rss_content_type?(content_type : String) : Bool
+  private def self.rss_type?(content_type : String) : Bool
     content_type.includes?("application/rss+xml") ||
       content_type.includes?("application/atom+xml") ||
       content_type.includes?("text/xml") ||
       content_type.includes?("application/xml")
   end
 
-  private def self.detect_by_url_extension(url : String) : DriverType?
+  private def self.detect_ext(url : String) : DriverType?
     if url.ends_with?(".json") || url.includes?("/feed.json") || url.includes?("/feeds/json")
       DriverType::JSONFeed
-    else
-      nil
     end
   end
 
@@ -145,23 +140,23 @@ module Fetcher
 
     ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" }
 
-    begin
-      case driver
-      in .rss?
-        RSS.pull(url, headers, actual_limit, config)
-      in .reddit?
-        Reddit.pull(url, headers, actual_limit, config)
-      in .software?
-        Software.pull(url, headers, actual_limit, config)
-      in .json_feed?
-        JSONFeed.pull(url, headers, actual_limit, config)
-      in .you_tube?
-        YouTube.pull(url, headers, actual_limit, config)
-      end
-    rescue ex
-      ErrorHandler.log_error(url, ex, config)
-      raise ex
+    case driver
+    when .rss?
+      RSS.pull(url, headers, actual_limit, config)
+    when .reddit?
+      Reddit.pull(url, headers, actual_limit, config)
+    when .software?
+      Software.pull(url, headers, actual_limit, config)
+    when .json_feed?
+      JSONFeed.pull(url, headers, actual_limit, config)
+    when .you_tube?
+      YouTube.pull(url, headers, actual_limit, config)
+    else
+      RSS.pull(url, headers, actual_limit, config)
     end
+  rescue ex
+    ErrorHandler.log_error(url, ex, config)
+    raise ex
   end
 
   def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result

@@ -88,8 +88,8 @@ module Fetcher
 
         final_response = handle_redirects(response, url, crest_headers, domain, method)
 
-        if method == :get && final_response.body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
-          raise InvalidFormatError.new("Response too large (#{final_response.body.bytesize} bytes, max: #{SafeFeedProcessor::MAX_FEED_SIZE} bytes)")
+        if method == :get && (body = final_response.body) && body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
+          raise InvalidFormatError.new("Response too large (#{body.bytesize} bytes, max: #{SafeFeedProcessor::MAX_FEED_SIZE} bytes)")
         end
 
         record_success(domain)

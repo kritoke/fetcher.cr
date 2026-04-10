@@ -27,7 +27,7 @@ module Fetcher
         return if releases.empty?
 
         entries = releases.first(limit).map do |release|
-          parse_release_entry(release, provider)
+          parse_entry(release, provider)
         end
 
         Result.success(
@@ -55,7 +55,7 @@ module Fetcher
         Fetcher.error_result(ErrorKind::DNSError, "Codeberg SSL error: #{ex.message}")
       end
 
-      private def self.parse_release_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
+      private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
         tag = release["tag_name"]?.try(&.as_s) || ""
         name = release["name"]?.try(&.as_s).presence || tag
         published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?

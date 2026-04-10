@@ -3,11 +3,18 @@ require "../../src/fetcher"
 
 describe "Integration Tests - Full Fetch Flow" do
   describe "RSS feed fetching" do
-    it "fetches a real RSS feed from httpbin" do
-      result = Fetcher.pull("https://httpbin.org/xml", limit: 5)
+    it "fetches a real RSS feed" do
+      result = Fetcher.pull("http://feeds.bbci.co.uk/news/world/rss.xml", limit: 5)
 
       result.success?.should be_true
       result.entries.size.should be > 0
+    end
+
+    it "handles RSS feed with streaming parser" do
+      config = Fetcher::RequestConfig.new(streaming: Fetcher::StreamingConfig.new(enabled: true))
+      result = Fetcher.pull("http://feeds.bbci.co.uk/news/world/rss.xml", limit: 5, config: config)
+
+      result.success?.should be_true
     end
 
     it "handles RSS feed with streaming parser" do

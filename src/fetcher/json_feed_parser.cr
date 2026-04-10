@@ -18,7 +18,7 @@ module Fetcher
     def parse_entries(parsed : JSON::Any, limit : Int32) : Array(Entry)
       version = parsed["version"]?.try(&.as_s)
       raise InvalidFormatError.new("Invalid JSON Feed: missing version") unless version
-      raise InvalidFormatError.new("Unsupported JSON Feed version") unless version.includes?("https://jsonfeed.org/version/")
+      raise InvalidFormatError.new("Unsupported JSON Feed version") unless version.starts_with?("https://jsonfeed.org/version/")
 
       items = parsed["items"]?.try(&.as_a) || [] of JSON::Any
       items.first(limit).compact_map { |item| parse_item(item) }

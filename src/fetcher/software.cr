@@ -42,7 +42,7 @@ module Fetcher
     end
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-      provider = detect_provider(url)
+      provider = detect(url)
       return Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider") unless provider
 
       Fetcher.with_retry(config) do
@@ -50,10 +50,10 @@ module Fetcher
       end
     end
 
-    private def self.detect_provider(url : String) : SoftwareProvider?
+    private def self.detect(url : String) : SoftwareProvider?
       if _ = url.match(GITHUB_RELEASES_PATTERN)
         return unless valid_domain?(url, "github.com")
-        repo = extract_repo_path(url, "github.com")
+        repo = extract_repo(url, "github.com")
         return build_github_provider(repo) if repo
       end
 
@@ -67,7 +67,7 @@ module Fetcher
           base_url: base_url,
           repo: repo,
           source_type: SourceType::GitLab,
-          api_url: "#{base_url}/api/v4/projects/#{URI.encode_path(repo)}/releases",
+          api_url: "#{base_url}/api/v4/projects/#{repo.split('/').map { |segment| URI.encode_path(segment) }.join('/')}/releases",
           atom_url: "#{base_url}/#{repo}/-/releases.atom",
           atom_fallback_urls: ["#{base_url}/#{repo}/-/tags?format=atom"],
         )
@@ -75,7 +75,7 @@ module Fetcher
 
       if _ = url.match(CODEBERG_RELEASES_PATTERN)
         return unless valid_domain?(url, "codeberg.org")
-        repo = extract_repo_path(url, "codeberg.org")
+        repo = extract_repo(url, "codeberg.org")
         return build_codeberg_provider(repo) if repo
       end
 
@@ -112,7 +112,7 @@ module Fetcher
       false
     end
 
-    private def self.extract_repo_path(url : String, domain : String) : String?
+    private def self.extract_repo(url : String, domain : String) : String?
       pattern = "#{domain}/([^/]+/[^/]+)/?"
       match = url.match(Regex.new(pattern))
       match ? match[1] : nil

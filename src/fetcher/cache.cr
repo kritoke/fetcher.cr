@@ -16,32 +16,48 @@ module Fetcher
   end
 
   struct CacheStats
-    getter hits : UInt64
-    getter misses : UInt64
-    getter evictions : UInt64
+    @hits : Atomic(UInt64)
+    @misses : Atomic(UInt64)
+    @evictions : Atomic(UInt64)
 
-    def initialize(@hits = 0_u64, @misses = 0_u64, @evictions = 0_u64)
+    def initialize(
+      @hits : Atomic(UInt64) = Atomic.new(0_u64),
+      @misses : Atomic(UInt64) = Atomic.new(0_u64),
+      @evictions : Atomic(UInt64) = Atomic.new(0_u64),
+    )
     end
 
     def hit_ratio : Float64
-      total = @hits + @misses
-      total > 0 ? @hits.to_f / total : 0.0
+      total = @hits.get + @misses.get
+      total > 0 ? @hits.get.to_f / total : 0.0
     end
 
-    def record_hit : CacheStats
-      CacheStats.new(@hits + 1, @misses, @evictions)
+    def record_hit : Nil
+      @hits.add(1)
     end
 
-    def record_miss : CacheStats
-      CacheStats.new(@hits, @misses + 1, @evictions)
+    def record_miss : Nil
+      @misses.add(1)
     end
 
-    def record_eviction : CacheStats
-      CacheStats.new(@hits, @misses, @evictions + 1)
+    def record_eviction : Nil
+      @evictions.add(1)
+    end
+
+    def hits : UInt64
+      @hits.get
+    end
+
+    def misses : UInt64
+      @misses.get
+    end
+
+    def evictions : UInt64
+      @evictions.get
     end
 
     def to_s : String
-      "CacheStats(hits: #{@hits}, misses: #{@misses}, evictions: #{@evictions}, hit_ratio: #{(hit_ratio * 100).round(2)}%)"
+      "CacheStats(hits: #{@hits.get}, misses: #{@misses.get}, evictions: #{@evictions.get}, hit_ratio: #{(hit_ratio * 100).round(2)}%)"
     end
   end
 
@@ -81,14 +97,14 @@ module Fetcher
       @mutex.synchronize do
         entry = @data[key]?
         if entry.nil?
-          @stats = @stats.record_miss
+          @stats.record_miss
           nil
         elsif entry.expired?
           remove_entry(key)
-          @stats = @stats.record_miss
+          @stats.record_miss
           nil
         else
-          @stats = @stats.record_hit
+          @stats.record_hit
           entry.value
         end
       end
@@ -139,9 +155,9 @@ module Fetcher
     def stats : CacheStats
       @mutex.synchronize do
         CacheStats.new(
-          hits: @stats.hits,
-          misses: @stats.misses,
-          evictions: @stats.evictions
+          hits: Atomic.new(@stats.hits),
+          misses: Atomic.new(@stats.misses),
+          evictions: Atomic.new(@stats.evictions)
         )
       end
     end
@@ -158,7 +174,7 @@ module Fetcher
         if oldest_key
           @data.delete(oldest_key)
           @eviction_set.delete(oldest_key)
-          @stats = @stats.record_eviction
+          @stats.record_eviction
         end
       end
     end

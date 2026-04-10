@@ -45,3 +45,7 @@ Lint/NotNil:
   Excluded:
   - spec/cache_spec.cr
   - spec/link_resolver_spec.cr
+
+Naming/QueryBoolMethods:
+  Excluded:
+  - src/fetcher/request_config.cr

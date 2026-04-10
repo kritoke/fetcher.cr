@@ -29,7 +29,7 @@ module Fetcher
       # Process each domain group sequentially to maximize connection reuse
       domain_groups.each do |domain, domain_urls|
         # Use domain-specific configuration if available
-        _ = get_domain_config(domain, config)
+        _ = get_config(domain, config)
 
         # Process all URLs in this domain group
         domain_results = ConcurrentFetcher.pull_multiple(domain_urls, headers, limit, config.max_concurrent_requests || ConcurrentFetcher::DEFAULT_MAX_CONCURRENT, config)
@@ -39,7 +39,7 @@ module Fetcher
       results
     end
 
-    private def self.get_domain_config(domain : String, base_config : RequestConfig) : RequestConfig
+    private def self.get_config(domain : String, base_config : RequestConfig) : RequestConfig
       # In a real implementation, this would look up domain-specific configuration
       # from feeds.yml or other configuration sources
       base_config

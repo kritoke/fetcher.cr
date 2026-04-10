@@ -11,7 +11,7 @@ module Fetcher
     YOUTUBE_RSS_BASE = "https://www.youtube.com/feeds/videos.xml?channel_id="
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-      channel_id = extract_channel_id(url)
+      channel_id = extract_channel(url)
       return Fetcher.error_result(ErrorKind::InvalidURL, "Not a valid YouTube channel URL. Only /channel/UC... URLs are supported.") unless channel_id
 
       rss_url = "#{YOUTUBE_RSS_BASE}#{channel_id}"
@@ -63,7 +63,7 @@ module Fetcher
       ErrorHandler.handle_network_error(ex, rss_url)
     end
 
-    private def self.extract_channel_id(url : String) : String?
+    private def self.extract_channel(url : String) : String?
       match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
       match ? match[1] : nil
     end
