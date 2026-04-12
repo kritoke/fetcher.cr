@@ -1,5 +1,7 @@
 require "time"
 require "mutex"
+require "./registry_helpers"
+require "./periodic_cleanup"
 
 module Fetcher
   class RateLimiterRegistry
@@ -44,7 +46,7 @@ module Fetcher
           config.rate_limit.refill_rate
         )
         @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.utc, ttl: DEFAULT_TTL)
-        RegistryHelpers.start_periodic_cleanup(60.seconds) { cleanup }
+        PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
         limiter
       end
     end
@@ -57,8 +59,7 @@ module Fetcher
 
     def cleanup : Nil
       @lock.synchronize do
-        now = Time.utc
-        @entries.reject! { |_, entry| now - entry.last_accessed > entry.ttl }
+        BoundedRegistry.cleanup(@entries)
       end
     end
   end

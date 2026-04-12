@@ -43,14 +43,6 @@ module Fetcher
       nil
     end
 
-    # Parse ISO 8601 date string (for JSON Feed)
-    def self.parse_iso8601(time_str : String?) : Time?
-      parse(time_str) # Delegate to main parse method which handles ISO 8601
-    end
-
-    # Parse RFC 2822 date string (for RSS)
-    def self.parse_rfc2822(time_str : String?) : Time?
-      parse(time_str) # Delegate to main parse method which handles RFC 2822
-    end
+    # Legacy helpers removed; use TimeParser.parse which handles common formats.
   end
 end

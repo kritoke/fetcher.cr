@@ -110,26 +110,7 @@ module Fetcher
 
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(api_url, final_headers)
-
-      case response.status_code
-      when 200..299
-        result = try_stream(response.body, subreddit, limit, config)
-        return result if result
-
-        build_result(parse_reddit_response(response.body, limit), subreddit)
-      when 404
-        error = Error.invalid_url("Subreddit '#{subreddit}' not found", api_url)
-        raise InvalidURLError.new(error.message, error)
-      when 429
-        error = Error.rate_limited("Rate limited by Reddit API", api_url)
-        raise RateLimitError.new(error.message, error)
-      when 500..599
-        error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
-        raise HTTPServerError.new(error.message, response.status_code, error)
-      else
-        error = Error.http(response.status_code, "HTTP error #{response.status_code}", api_url)
-        raise HTTPError.new(error.message, response.status_code, error)
-      end
+      handle_reddit_response(response, api_url, subreddit, limit, config)
     rescue ex : IO::TimeoutError
       error = Error.timeout("Timeout: #{ex.message}", api_url)
       raise RedditFetchError.new(error.message, TimeoutError.new(error.message, error))
@@ -171,6 +152,28 @@ module Fetcher
       nil
     end
 
+    private def self.handle_reddit_response(response, api_url : String, subreddit : String, limit : Int32, config : RequestConfig) : Result
+      case response.status_code
+      when 200..299
+        result = try_stream(response.body, subreddit, limit, config)
+        return result if result
+
+        build_result(parse_reddit_response(response.body, limit), subreddit)
+      when 404
+        error = Error.invalid_url("Subreddit '#{subreddit}' not found", api_url)
+        raise InvalidURLError.new(error.message, error)
+      when 429
+        error = Error.rate_limited("Rate limited by Reddit API", api_url)
+        raise RateLimitError.new(error.message, error)
+      when 500..599
+        error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
+        raise HTTPServerError.new(error.message, response.status_code, error)
+      else
+        error = Error.http(response.status_code, "HTTP error #{response.status_code}", api_url)
+        raise HTTPError.new(error.message, response.status_code, error)
+      end
+    end
+
     private def self.build_result(entries : Array(Entry), subreddit : String) : Result
       Result.success(
         entries: entries,
@@ -201,11 +204,11 @@ module Fetcher
     end
 
     def self.ttl_for_sort(sort : String) : Time::Span
-      REDDIT_TTLS[sort] || Cache::DEFAULT_TTL
+      REDDIT_TTLS[sort]? || Cache::DEFAULT_TTL
     end
 
     def self.old_ttl_for_sort(sort : String) : Time::Span
-      OLD_REDDIT_TTLS[sort] || OLD_REDDIT_TTLS["default"]
+      OLD_REDDIT_TTLS[sort]? || OLD_REDDIT_TTLS["default"]
     end
 
     def self.clear_cache(subreddit : String) : Nil

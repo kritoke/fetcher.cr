@@ -40,12 +40,13 @@ describe "Fetcher::Reddit old.reddit.com fallback" do
     end
 
     it "defines old Reddit cache TTL constants" do
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_NEW.should eq(5.minutes)
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_RISING.should eq(5.minutes)
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_HOT.should eq(15.minutes)
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_TOP.should eq(30.minutes)
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_CONTROVERSIAL.should eq(30.minutes)
-      Fetcher::Reddit::OLD_REDDIT_CACHE_TTL_DEFAULT.should eq(15.minutes)
+      # Ensure mapping provides expected values
+      Fetcher::Reddit.old_ttl_for_sort("new").should eq(5.minutes)
+      Fetcher::Reddit.old_ttl_for_sort("rising").should eq(5.minutes)
+      Fetcher::Reddit.old_ttl_for_sort("hot").should eq(15.minutes)
+      Fetcher::Reddit.old_ttl_for_sort("top").should eq(30.minutes)
+      Fetcher::Reddit.old_ttl_for_sort("controversial").should eq(30.minutes)
+      Fetcher::Reddit.old_ttl_for_sort("unknown").should eq(15.minutes)
     end
   end
 

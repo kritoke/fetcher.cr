@@ -68,7 +68,7 @@ module Fetcher
         published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
         body = release["description"]?.try(&.as_s) || ""
 
-        pub_date = TimeParser.parse_iso8601(published_at.try(&.as_s))
+        pub_date = TimeParser.parse(published_at.try(&.as_s))
 
         links = release["_links"]?.try(&.as_h?)
         html_url = links.try(&.["self"]?).try(&.as_s) || "#{provider.base_url}/#{provider.repo}/-/releases/#{tag}"

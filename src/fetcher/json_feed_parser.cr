@@ -97,7 +97,7 @@ module Fetcher
 
       published = item["date_published"]?.try(&.as_s)
       modified = item["date_modified"]?.try(&.as_s)
-      pub_date = TimeParser.parse_iso8601(published || modified)
+      pub_date = TimeParser.parse(published || modified)
 
       tags = item["tags"]?.try(&.as_a).try(&.map(&.as_s)) || [] of String
 

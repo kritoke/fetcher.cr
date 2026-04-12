@@ -1,5 +1,7 @@
 require "time"
 require "mutex"
+require "./registry_helpers"
+require "./periodic_cleanup"
 
 module Fetcher
   class CircuitBreaker
@@ -87,14 +89,10 @@ module Fetcher
 
       def get(domain : String, config) : CircuitBreaker
         @@lock.synchronize do
-          RegistryHelpers.enforce_registry_limit(@@entries, MAX_REGISTRY_ENTRIES, DEFAULT_TTL)
+          BoundedRegistry.ensure_limit(@@entries, MAX_REGISTRY_ENTRIES, DEFAULT_TTL)
           entry = @@entries[domain]?
           if entry
-            @@entries[domain] = RegistryEntry.new(
-              breaker: entry.breaker,
-              last_accessed: Time.utc,
-              ttl: entry.ttl
-            )
+            @@entries[domain] = RegistryEntry.new(breaker: entry.breaker, last_accessed: Time.utc, ttl: entry.ttl)
             return entry.breaker
           end
 
@@ -104,7 +102,7 @@ module Fetcher
           )
           entry = RegistryEntry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
           @@entries[domain] = entry
-          RegistryHelpers.start_periodic_cleanup(60.seconds) { cleanup }
+          PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
           breaker
         end
       end
@@ -123,30 +121,11 @@ module Fetcher
 
       def cleanup : Nil
         @@lock.synchronize do
-          now = Time.utc
-          @@entries.reject! do |_, entry|
-            now - entry.last_accessed > entry.ttl
-          end
+          BoundedRegistry.cleanup(@@entries)
         end
       end
 
-      private def start_cleanup_if_needed : Nil
-        @@cleanup_lock.synchronize do
-          return if @@cleanup_running
-          @@cleanup_running = true
-        end
-        spawn do
-          begin
-            loop do
-              sleep 60.seconds
-              cleanup
-            end
-          rescue ex
-            ::Log.for("fetcher").warn { "Circuit breaker cleanup fiber error: #{ex.class} - #{ex.message}" }
-            @@cleanup_lock.synchronize { @@cleanup_running = false }
-          end
-        end
-      end
+      # periodic cleanup is handled by PeriodicCleanup
     end
   end
 end

@@ -51,7 +51,7 @@ module Fetcher
         published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
         body = release["body"]?.try(&.as_s) || release["description"]?.try(&.as_s) || ""
 
-        pub_date = TimeParser.parse_iso8601(published_at.try(&.as_s))
+        pub_date = TimeParser.parse(published_at.try(&.as_s))
         html_url = release["html_url"]?.try(&.as_s) || ""
 
         Entry.create(

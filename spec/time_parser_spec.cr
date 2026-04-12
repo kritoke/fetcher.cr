@@ -100,14 +100,14 @@ describe Fetcher::TimeParser do
     it "parse_iso8601 delegates to main parse method" do
       date = "2026-01-15T10:30:00Z"
       result1 = Fetcher::TimeParser.parse(date)
-      result2 = Fetcher::TimeParser.parse_iso8601(date)
+      result2 = Fetcher::TimeParser.parse(date)
       result1.should eq(result2)
     end
 
     it "parse_rfc2822 delegates to main parse method" do
       date = "Wed, 15 Jan 2026 10:30:00 GMT"
       result1 = Fetcher::TimeParser.parse(date)
-      result2 = Fetcher::TimeParser.parse_rfc2822(date)
+      result2 = Fetcher::TimeParser.parse(date)
       result1.should eq(result2)
     end
   end

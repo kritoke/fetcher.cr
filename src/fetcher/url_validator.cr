@@ -1,5 +1,6 @@
 require "uri"
 require "socket"
+require "./bounded_registry"
 
 module Fetcher
   module URLValidator
@@ -43,12 +44,8 @@ module Fetcher
 
     private def self.enforce_validated_limit : Nil
       return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
-      now = Time.utc
-      @@validated_ips.reject! { |_, entry| (now - entry.timestamp) > @@validation_ttl }
-      return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
-      sorted = @@validated_ips.to_a.sort_by { |_, entry| entry.timestamp }
-      excess = sorted.first(@@validated_ips.size - MAX_VALIDATED_ENTRIES + 1000)
-      excess.each { |key, _| @@validated_ips.delete(key) }
+      # Use BoundedRegistry helpers for eviction/cleanup logic
+      BoundedRegistry.ensure_limit(@@validated_ips, MAX_VALIDATED_ENTRIES, @@validation_ttl)
     end
 
     def self.check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool

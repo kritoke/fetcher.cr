@@ -92,9 +92,17 @@ module Fetcher
       content_type = response.headers["content-type"]?.try(&.downcase)
 
       if content_type
-        if jsonfeed_type?(content_type)
+        # application/feed+json is a strong signal for JSON Feed
+        if content_type.includes?("application/feed+json")
           return DriverType::JSONFeed
-        elsif rss_type?(content_type)
+        end
+
+        # application/json by itself is ambiguous; use URL heuristics to confirm
+        if content_type.includes?("application/json")
+          return detect_ext(url)
+        end
+
+        if rss_type?(content_type)
           return DriverType::RSS
         end
       end

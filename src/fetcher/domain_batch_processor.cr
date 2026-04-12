@@ -8,14 +8,8 @@ module Fetcher
       groups = Hash(String, Array(String)).new { |hash, key| hash[key] = [] of String }
 
       urls.each do |url|
-        begin
-          uri = URI.parse(url)
-          domain = uri.host || "default"
-          groups[domain] << url
-        rescue
-          # Invalid URL, group under "invalid"
-          groups["invalid"] << url
-        end
+        domain = URLValidator.extract_domain(url)
+        groups[domain] << url
       end
 
       groups
