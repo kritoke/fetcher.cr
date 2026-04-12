@@ -14,7 +14,7 @@ describe Fetcher::PeriodicCleanup do
     timeout = Time.utc + 1.second
     loop do
       break if called || Time.utc > timeout
-      sleep 0.01
+      ::sleep 0.01.seconds
     end
 
     called.should be_true

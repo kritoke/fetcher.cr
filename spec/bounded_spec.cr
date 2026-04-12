@@ -33,4 +33,6 @@ describe Fetcher::BoundedRegistry do
     Fetcher::BoundedRegistry.ensure_limit(entries, 3, 60.minutes)
     entries.size.should be <= 3
   end
+
+  
 end

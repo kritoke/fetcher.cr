@@ -199,6 +199,10 @@ module Fetcher
     end
 
     private def handle_error(ex : Exception, url : String)
+      map_request_error(ex, url)
+    end
+
+    private def map_request_error(ex : Exception, url : String)
       case ex
       when MissingLocationHeaderError
         raise ex

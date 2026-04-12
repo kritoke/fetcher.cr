@@ -23,7 +23,7 @@ module Fetcher
     # a block that produces a replacement value when called with the old entry.
     def self.mark_access(entries : Hash(String, _), key : String, &updater)
       if entry = entries[key]?
-        entries[key] = updater.call(entry)
+        entries[key] = updater.call if updater
       end
     end
   end
