@@ -79,6 +79,8 @@ module Fetcher
     module Registry
       extend self
 
+      MAX_REGISTRY_ENTRIES = 10_000
+
       @@entries = {} of String => RegistryEntry
       @@lock = Mutex.new
       @@cleanup_channel = Channel(Nil).new(1)
@@ -88,6 +90,7 @@ module Fetcher
 
       def get(domain : String, config) : CircuitBreaker
         @@lock.synchronize do
+          enforce_registry_limit
           entry = @@entries[domain]?
           if entry
             @@entries[domain] = RegistryEntry.new(
@@ -117,6 +120,18 @@ module Fetcher
         @@lock.synchronize do
           @@entries.clear
         end
+      end
+
+      private def enforce_registry_limit : Nil
+        return if @@entries.size < MAX_REGISTRY_ENTRIES
+        now = Time.utc
+        @@entries.reject! do |_, entry|
+          now - entry.last_accessed > entry.ttl
+        end
+        return if @@entries.size < MAX_REGISTRY_ENTRIES
+        sorted = @@entries.to_a.sort_by { |_, entry| entry.last_accessed }
+        excess = sorted.first(@@entries.size - MAX_REGISTRY_ENTRIES + 1000)
+        excess.each { |key, _| @@entries.delete(key) }
       end
 
       def all_states : Hash(String, {State, Int32})

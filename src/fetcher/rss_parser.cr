@@ -64,7 +64,8 @@ module Fetcher
     private def parse_xml(data : String) : XML::Document
       XML.parse(data, options: XML::ParserOptions::RECOVER |
                                XML::ParserOptions::NONET |
-                               XML::ParserOptions::NOBLANKS)
+                               XML::ParserOptions::NOBLANKS |
+                               XML::ParserOptions::NODICT)
     rescue ex : XML::Error
       raise InvalidFormatError.new("XML parsing error: #{ex.message}")
     end

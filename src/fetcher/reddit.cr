@@ -11,8 +11,8 @@ require "./header_builder"
 
 module Fetcher
   module Reddit
-    USER_AGENT        = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
-    REDDIT_API_BASE   = "https://www.reddit.com"
+    USER_AGENT          = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
     class RedditFetchError < Exception
@@ -29,8 +29,8 @@ module Fetcher
     REDDIT_CACHE_TTL_TOP           = 10.minutes
     REDDIT_CACHE_TTL_CONTROVERSIAL = 10.minutes
 
-    OLD_REDDIT_CACHE_TTL_NEW           =  5.minutes
-    OLD_REDDIT_CACHE_TTL_RISING        =  5.minutes
+    OLD_REDDIT_CACHE_TTL_NEW           = 5.minutes
+    OLD_REDDIT_CACHE_TTL_RISING        = 5.minutes
     OLD_REDDIT_CACHE_TTL_HOT           = 15.minutes
     OLD_REDDIT_CACHE_TTL_TOP           = 30.minutes
     OLD_REDDIT_CACHE_TTL_CONTROVERSIAL = 30.minutes
@@ -194,14 +194,20 @@ module Fetcher
       )
     end
 
+    VALID_SUBREDDIT = /^[A-Za-z0-9_+%]+$/
+    VALID_SORTS     = {"hot", "new", "rising", "top", "controversial"}
+
     private def self.extract_sub(url : String) : String?
       match = url.match(%r{reddit\.com/r/([^/]+)}i)
-      match ? match[1] : nil
+      return unless match
+      sub = match[1]
+      sub if sub.matches?(VALID_SUBREDDIT)
     end
 
     private def self.extract_sort(url : String) : String
       match = url.match(%r{reddit\.com/r/[^/]+/([^/]+)}i)
-      match ? match[1] : "hot"
+      sort = match ? match[1] : "hot"
+      VALID_SORTS.includes?(sort.downcase) ? sort.downcase : "hot"
     end
 
     def self.generate_cache_key(subreddit : String, sort : String, limit : Int32) : String

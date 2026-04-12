@@ -75,6 +75,8 @@ module Fetcher
         RateLimiterRegistry.get(domain, @config).acquire
         crest_headers = HeaderBuilder.build_for_crest(headers)
 
+        verify_dns_rebinding(url)
+
         response = Crest::Request.execute(
           method,
           url,
@@ -122,6 +124,8 @@ module Fetcher
       transition_domain(domain, redirect_domain) if redirect_domain != domain
 
       return convert_response(response) if remaining <= 1
+
+      verify_dns_rebinding(resolved_url)
 
       crest_response = Crest::Request.execute(
         method,
@@ -173,6 +177,29 @@ module Fetcher
       end
       unless URLValidator.resolve_and_validate(url)
         raise DNSError.new("SSRF check failed: URL resolved to blocked IP range: #{url}")
+      end
+    end
+
+    private def verify_dns_rebinding(url : String) : Nil
+      uri = URI.parse(url)
+      host = uri.host
+      return if host.nil? || host.empty?
+      return unless URLValidator.looks_like_ip?(host) == false
+
+      begin
+        addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+        addr_info.each do |addr|
+          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
+            ip_address = addr.ip_address
+            unless URLValidator.validate_connected_ip(host, ip_address)
+              raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
+            end
+          end
+        end
+      rescue ex : DNSError
+        raise ex
+      rescue ex
+        ::Log.for("fetcher").debug { "DNS rebinding check failed for #{host}: #{ex.message}" }
       end
     end
 

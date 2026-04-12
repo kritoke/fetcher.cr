@@ -65,7 +65,9 @@ module Fetcher
 
     private def self.extract_channel(url : String) : String?
       match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
-      match ? match[1] : nil
+      return unless match
+      id = match[1]
+      id if id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/)
     end
   end
 end

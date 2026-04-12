@@ -18,6 +18,7 @@ module Fetcher
     @@validated_ips = {} of String => ValidatedEntry
     @@validation_lock = Mutex.new
     @@validation_ttl = 5.seconds
+    MAX_VALIDATED_ENTRIES = 50_000
 
     def self.clear_validated : Nil
       @@validation_lock.synchronize do
@@ -27,6 +28,7 @@ module Fetcher
 
     def self.register_ip(host : String, ip : Socket::IPAddress) : Nil
       @@validation_lock.synchronize do
+        enforce_validated_limit
         @@validated_ips[host] = ValidatedEntry.new(ip, Time.utc)
       end
     end
@@ -37,6 +39,15 @@ module Fetcher
       @@validation_lock.synchronize do
         @@validated_ips.reject! { |_, entry| (now - entry.timestamp) > ttl }
       end
+    end
+
+    private def self.enforce_validated_limit : Nil
+      return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
+      purge_expired
+      return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
+      sorted = @@validated_ips.to_a.sort_by { |_, entry| entry.timestamp }
+      excess = sorted.first(@@validated_ips.size - MAX_VALIDATED_ENTRIES + 1000)
+      excess.each { |key, _| @@validated_ips.delete(key) }
     end
 
     def self.check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
@@ -58,7 +69,8 @@ module Fetcher
 
       begin
         uri = URI.parse(url)
-        validate_uri(uri)
+        normalized = normalize_uri(uri)
+        validate_uri(normalized)
       rescue URI::Error
         false
       end
@@ -69,9 +81,32 @@ module Fetcher
       url.to_s
     end
 
+    SAFE_SCHEMES      = {"http", "https"}
+    DANGEROUS_SCHEMES = {"javascript", "vbscript", "data", "file", "ftp", "jar", "mailto"}
+
+    def self.safe_scheme?(url : String?) : Bool
+      return true if url.nil? || url.empty?
+
+      colon_pos = url.index(":")
+      return true unless colon_pos && colon_pos > 0
+
+      scheme = url[0...colon_pos].downcase
+
+      return false if DANGEROUS_SCHEMES.includes?(scheme)
+
+      if url.includes?("://")
+        SAFE_SCHEMES.includes?(scheme)
+      else
+        true
+      end
+    rescue
+      false
+    end
+
     def self.resolve_and_validate(url : String) : Bool
       uri = URI.parse(url)
-      return false unless validate_uri(uri)
+      normalized = normalize_uri(uri)
+      return false unless validate_uri(normalized)
 
       host = uri.host
       return true if host.nil? || host.empty?
@@ -94,7 +129,7 @@ module Fetcher
         end
         true
       rescue Exception
-        true
+        false
       end
     end
 
@@ -104,6 +139,23 @@ module Fetcher
 
     def self.valid_redirect?(redirect_url : String) : Bool
       valid?(redirect_url) && resolve_and_validate(redirect_url)
+    end
+
+    private def self.normalize_uri(uri : URI) : URI
+      path = uri.path
+      if path && (path.includes?("/..") || path.includes?("/."))
+        resolved = path.split("/").reduce([] of String) do |acc, segment|
+          case segment
+          when ".." then acc.pop?
+          when "."  then nil
+          else           acc << segment
+          end
+          acc
+        end
+        uri = uri.dup
+        uri.path = "/#{resolved.join("/")}"
+      end
+      uri
     end
 
     private def self.validate_uri(uri : URI) : Bool
@@ -119,7 +171,7 @@ module Fetcher
       !looks_like_ip?(clean_host) || validate_ip(clean_host)
     end
 
-    private def self.looks_like_ip?(host : String) : Bool
+    def self.looks_like_ip?(host : String) : Bool
       return false if host.empty?
 
       if host.starts_with?("[")
@@ -161,13 +213,15 @@ module Fetcher
       ip_address = Socket::IPAddress.new(host, 80)
       !blocked_ip?(ip_address)
     rescue Socket::Error
-      true
+      false
     end
 
     private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool
       ip_address.private? || ip_address.loopback? || link_local?(ip_address) ||
         ipv6_unique?(ip_address) || ipv6_site?(ip_address) ||
-        ipv6_mapped_ipv4?(ip_address)
+        ipv6_mapped_ipv4?(ip_address) || cgnat?(ip_address) ||
+        benchmark?(ip_address) || multicast?(ip_address) ||
+        reserved?(ip_address) || current_network?(ip_address)
     end
 
     private VALID_HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
@@ -239,6 +293,56 @@ module Fetcher
       else
         false
       end
+    rescue
+      false
+    end
+
+    # Carrier-Grade NAT (100.64.0.0/10) - RFC 6598
+    private def self.cgnat?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false if address.includes?(":")
+      parts = address.split(".").map(&.to_i)
+      parts.size == 4 && parts[0] == 100 && parts[1] >= 64 && parts[1] <= 127
+    rescue
+      false
+    end
+
+    # Network Benchmark Testing (198.18.0.0/15) - RFC 2544
+    private def self.benchmark?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false if address.includes?(":")
+      parts = address.split(".").map(&.to_i)
+      parts.size == 4 && parts[0] == 198 && (parts[1] == 18 || parts[1] == 19)
+    rescue
+      false
+    end
+
+    # Multicast (224.0.0.0/4)
+    private def self.multicast?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false if address.includes?(":")
+      parts = address.split(".").map(&.to_i)
+      parts.size == 4 && parts[0] >= 224 && parts[0] <= 239
+    rescue
+      false
+    end
+
+    # Reserved / Future Use (240.0.0.0/4)
+    private def self.reserved?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false if address.includes?(":")
+      parts = address.split(".").map(&.to_i)
+      parts.size == 4 && parts[0] >= 240
+    rescue
+      false
+    end
+
+    # Current Network (0.0.0.0/8)
+    private def self.current_network?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false if address.includes?(":")
+      parts = address.split(".").map(&.to_i)
+      parts.size == 4 && parts[0] == 0
     rescue
       false
     end

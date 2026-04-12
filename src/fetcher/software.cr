@@ -18,7 +18,7 @@ module Fetcher
   module Software
     GITHUB_RELEASES_PATTERN   = %r{https?://(?:www\.)?github\.com/([^/]+/[^/]+)(?:/[^/]*)*/releases}
     CODEBERG_RELEASES_PATTERN = %r{https?://(?:www\.)?codeberg\.org/([^/]+/[^/]+)(?:/[^/]*)*/releases}
-    GITLAB_RELEASES_PATTERN   = %r{https?://([^/]+)/([^/]+/[^/]+)/-/releases}
+    GITLAB_RELEASES_PATTERN   = %r{https?://([^/.]+\.[^/]+)/([^/]+/[^/]+)/-/releases}
 
     struct SoftwareProvider
       getter name : String
