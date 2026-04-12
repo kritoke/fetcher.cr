@@ -142,6 +142,14 @@ module Fetcher
       valid?(redirect_url) && resolve_and_validate(redirect_url)
     end
 
+    # Extract host/domain from a URL string. Returns "default" on error.
+    def self.extract_domain(url : String) : String
+      uri = URI.parse(url)
+      uri.host || "default"
+    rescue
+      "default"
+    end
+
     private def self.normalize_uri(uri : URI) : URI
       path = uri.path
       if path && (path.includes?("/..") || path.includes?("/."))

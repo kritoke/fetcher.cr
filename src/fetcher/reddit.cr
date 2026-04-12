@@ -23,18 +23,23 @@ module Fetcher
       end
     end
 
-    REDDIT_CACHE_TTL_NEW           = 30.seconds
-    REDDIT_CACHE_TTL_RISING        = 30.seconds
-    REDDIT_CACHE_TTL_HOT           = 2.minutes
-    REDDIT_CACHE_TTL_TOP           = 10.minutes
-    REDDIT_CACHE_TTL_CONTROVERSIAL = 10.minutes
+    # Data-driven TTLs for caching by sort and backend
+    REDDIT_TTLS = {
+      "new"           => 30.seconds,
+      "rising"        => 30.seconds,
+      "hot"           => 2.minutes,
+      "top"           => 10.minutes,
+      "controversial" => 10.minutes,
+    }
 
-    OLD_REDDIT_CACHE_TTL_NEW           = 5.minutes
-    OLD_REDDIT_CACHE_TTL_RISING        = 5.minutes
-    OLD_REDDIT_CACHE_TTL_HOT           = 15.minutes
-    OLD_REDDIT_CACHE_TTL_TOP           = 30.minutes
-    OLD_REDDIT_CACHE_TTL_CONTROVERSIAL = 30.minutes
-    OLD_REDDIT_CACHE_TTL_DEFAULT       = 15.minutes
+    OLD_REDDIT_TTLS = {
+      "new"           => 5.minutes,
+      "rising"        => 5.minutes,
+      "hot"           => 15.minutes,
+      "top"           => 30.minutes,
+      "controversial" => 30.minutes,
+      "default"       => 15.minutes,
+    }
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       subreddit = extract_sub(url)
@@ -143,26 +148,7 @@ module Fetcher
     end
 
     private def self.fetch_old_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      old_config = RequestConfig.new(
-        timeout: config.timeout,
-        retry: RetryConfig.new(
-          max_retries: 2,
-          base_delay: config.retry.base_delay,
-          max_delay: config.retry.max_delay,
-          exponential_base: config.retry.exponential_base
-        ),
-        circuit_breaker: config.circuit_breaker,
-        rate_limit: config.rate_limit,
-        streaming: config.streaming,
-        cache_config: config.cache_config,
-        max_redirects: config.max_redirects,
-        follow_redirects: config.follow_redirects?,
-        ssl_verify: config.ssl_verify?,
-        driver_detection_mode: config.driver_detection_mode,
-        error_detail_level: config.error_detail_level,
-        max_concurrent_requests: config.max_concurrent_requests,
-        ssl_verify_bypass_acknowledged: config.ssl_verify_bypass_acknowledged,
-      )
+      old_config = config.with_retry_max_retries(2)
       Fetcher.with_retry(old_config) do
         fetch_reddit(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
       end
@@ -215,23 +201,11 @@ module Fetcher
     end
 
     def self.ttl_for_sort(sort : String) : Time::Span
-      case sort
-      when "new"           then REDDIT_CACHE_TTL_NEW
-      when "rising"        then REDDIT_CACHE_TTL_RISING
-      when "hot"           then REDDIT_CACHE_TTL_HOT
-      when "top"           then REDDIT_CACHE_TTL_TOP
-      when "controversial" then REDDIT_CACHE_TTL_CONTROVERSIAL
-      else                      Cache::DEFAULT_TTL
-      end
+      REDDIT_TTLS[sort] || Cache::DEFAULT_TTL
     end
 
     def self.old_ttl_for_sort(sort : String) : Time::Span
-      case sort
-      when "new", "rising"        then OLD_REDDIT_CACHE_TTL_NEW
-      when "hot"                  then OLD_REDDIT_CACHE_TTL_HOT
-      when "top", "controversial" then OLD_REDDIT_CACHE_TTL_TOP
-      else                             OLD_REDDIT_CACHE_TTL_DEFAULT
-      end
+      OLD_REDDIT_TTLS[sort] || OLD_REDDIT_TTLS["default"]
     end
 
     def self.clear_cache(subreddit : String) : Nil

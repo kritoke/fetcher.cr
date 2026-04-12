@@ -68,7 +68,7 @@ module Fetcher
 
     private def perform_request(method : Symbol, url : String, headers : ::HTTP::Headers) : ::HTTP::Client::Response
       check_ssrf(url)
-      domain = extract_domain(url)
+      domain = URLValidator.extract_domain(url)
       acquire_semaphore
       begin
         check_circuit_breaker(domain)
@@ -120,7 +120,7 @@ module Fetcher
         raise DNSError.new("Redirect to blocked URL: #{resolved_url}")
       end
 
-      redirect_domain = extract_domain(resolved_url)
+      redirect_domain = URLValidator.extract_domain(resolved_url)
       transition_domain(domain, redirect_domain) if redirect_domain != domain
 
       return convert_response(response) if remaining <= 1
@@ -164,12 +164,7 @@ module Fetcher
       end
     end
 
-    private def extract_domain(url : String) : String
-      uri = URI.parse(url)
-      uri.host || "default"
-    rescue
-      "default"
-    end
+    # extract_domain moved to URLValidator
 
     private def check_ssrf(url : String) : Nil
       unless URLValidator.valid?(url)

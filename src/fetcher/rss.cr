@@ -9,7 +9,8 @@ require "./error_handler"
 
 module Fetcher
   module RSS
-    MAX_FEED_SIZE = 10 * 1024 * 1024
+    # Use global config for feed size limits to avoid duplication
+    MAX_FEED_SIZE = Fetcher::Config::MAX_FEED_SIZE
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       Fetcher.with_retry(config) do

@@ -83,14 +83,11 @@ module Fetcher
 
       @@entries = {} of String => RegistryEntry
       @@lock = Mutex.new
-      @@cleanup_channel = Channel(Nil).new(1)
-      @@cleanup_running = false
-      @@cleanup_lock = Mutex.new
       DEFAULT_TTL = 5.minutes
 
       def get(domain : String, config) : CircuitBreaker
         @@lock.synchronize do
-          enforce_registry_limit
+          RegistryHelpers.enforce_registry_limit(@@entries, MAX_REGISTRY_ENTRIES, DEFAULT_TTL)
           entry = @@entries[domain]?
           if entry
             @@entries[domain] = RegistryEntry.new(
@@ -105,13 +102,9 @@ module Fetcher
             failure_threshold: config.circuit_breaker.failure_threshold,
             recovery_timeout: config.circuit_breaker.recovery_timeout
           )
-          entry = RegistryEntry.new(
-            breaker: breaker,
-            last_accessed: Time.utc,
-            ttl: DEFAULT_TTL
-          )
+          entry = RegistryEntry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
           @@entries[domain] = entry
-          start_cleanup_if_needed
+          RegistryHelpers.start_periodic_cleanup(60.seconds) { cleanup }
           breaker
         end
       end
@@ -120,18 +113,6 @@ module Fetcher
         @@lock.synchronize do
           @@entries.clear
         end
-      end
-
-      private def enforce_registry_limit : Nil
-        return if @@entries.size < MAX_REGISTRY_ENTRIES
-        now = Time.utc
-        @@entries.reject! do |_, entry|
-          now - entry.last_accessed > entry.ttl
-        end
-        return if @@entries.size < MAX_REGISTRY_ENTRIES
-        sorted = @@entries.to_a.sort_by { |_, entry| entry.last_accessed }
-        excess = sorted.first(@@entries.size - MAX_REGISTRY_ENTRIES + 1000)
-        excess.each { |key, _| @@entries.delete(key) }
       end
 
       def all_states : Hash(String, {State, Int32})

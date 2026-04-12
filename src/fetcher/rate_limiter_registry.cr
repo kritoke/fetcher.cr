@@ -30,18 +30,12 @@ module Fetcher
 
     @entries = {} of String => Entry
     @lock = Mutex.new
-    @cleanup_running = false
-    @cleanup_lock = Mutex.new
 
     def get(domain : String, config : RequestConfig) : TokenBucketRateLimiter
       @lock.synchronize do
         entry = @entries[domain]?
         if entry
-          @entries[domain] = Entry.new(
-            limiter: entry.limiter,
-            last_accessed: Time.utc,
-            ttl: entry.ttl
-          )
+          @entries[domain] = Entry.new(limiter: entry.limiter, last_accessed: Time.utc, ttl: entry.ttl)
           return entry.limiter
         end
 
@@ -49,12 +43,8 @@ module Fetcher
           config.rate_limit.capacity,
           config.rate_limit.refill_rate
         )
-        @entries[domain] = Entry.new(
-          limiter: limiter,
-          last_accessed: Time.utc,
-          ttl: DEFAULT_TTL
-        )
-        start_cleanup_if_needed
+        @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.utc, ttl: DEFAULT_TTL)
+        RegistryHelpers.start_periodic_cleanup(60.seconds) { cleanup }
         limiter
       end
     end
@@ -68,27 +58,7 @@ module Fetcher
     def cleanup : Nil
       @lock.synchronize do
         now = Time.utc
-        @entries.reject! do |_, entry|
-          now - entry.last_accessed > entry.ttl
-        end
-      end
-    end
-
-    def start_cleanup_if_needed : Nil
-      @cleanup_lock.synchronize do
-        return if @cleanup_running
-        @cleanup_running = true
-      end
-      spawn do
-        begin
-          loop do
-            sleep 60.seconds
-            cleanup
-          end
-        rescue ex
-          ::Log.for("fetcher").warn { "Rate limiter cleanup fiber error: #{ex.class} - #{ex.message}" }
-          @cleanup_lock.synchronize { @cleanup_running = false }
-        end
+        @entries.reject! { |_, entry| now - entry.last_accessed > entry.ttl }
       end
     end
   end

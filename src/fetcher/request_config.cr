@@ -88,5 +88,32 @@ module Fetcher
       delay = retry.base_delay * (retry.exponential_base ** capped_attempt)
       delay > retry.max_delay ? retry.max_delay : delay
     end
+
+    # Return a copy of this RequestConfig with the retry.max_retries overridden.
+    # This avoids constructing a new RequestConfig by copying every field manually.
+    def with_retry_max_retries(max_retries : Int32) : RequestConfig
+      new_retry = RetryConfig.new(
+        max_retries: max_retries,
+        base_delay: @retry.base_delay,
+        max_delay: @retry.max_delay,
+        exponential_base: @retry.exponential_base
+      )
+
+      RequestConfig.new(
+        timeout: @timeout,
+        retry: new_retry,
+        circuit_breaker: @circuit_breaker,
+        rate_limit: @rate_limit,
+        streaming: @streaming,
+        cache_config: @cache_config,
+        max_redirects: @max_redirects,
+        follow_redirects: @follow_redirects,
+        ssl_verify: @ssl_verify,
+        driver_detection_mode: @driver_detection_mode,
+        error_detail_level: @error_detail_level,
+        max_concurrent_requests: @max_concurrent_requests,
+        ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged
+      )
+    end
   end
 end
