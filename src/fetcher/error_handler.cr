@@ -9,9 +9,6 @@ module Fetcher
       when 500..599
         error = Error.server_error(response.status_code, "Server error: #{response.status_code}", url)
         Result.error(error)
-      when 400..499
-        error = Error.http(response.status_code, "HTTP #{response.status_code}", url)
-        Result.error(error)
       else
         error = Error.http(response.status_code, "HTTP #{response.status_code}", url)
         Result.error(error)
