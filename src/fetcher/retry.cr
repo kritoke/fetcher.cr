@@ -2,6 +2,9 @@ require "./fetch_error"
 require "./exceptions"
 
 module Fetcher
+  RETRY_JITTER_MIN = 0.9
+  RETRY_JITTER_MAX = 1.1
+
   class RetriableError < Exception
     def initialize(message : String)
       super(message)
@@ -26,7 +29,7 @@ module Fetcher
             return error_result(Error.unknown("Max retries (#{max_retries}) exceeded: #{ex.class}: #{ex.message}"))
           end
           delay = config.delay_for_attempt(attempt)
-          jitter_factor = 0.9 + (Random.rand * 0.2)
+          jitter_factor = RETRY_JITTER_MIN + (Random.rand * (RETRY_JITTER_MAX - RETRY_JITTER_MIN))
           actual_delay = delay * jitter_factor
           sleep(actual_delay)
         else

@@ -3,7 +3,7 @@ require "time"
 require "../src/fetcher/bounded_registry"
 
 struct TestEntry
-  getter last_accessed : Time
+  property last_accessed : Time
   getter ttl : Time::Span
 
   def initialize(@last_accessed : Time, @ttl : Time::Span); end
@@ -14,7 +14,7 @@ describe Fetcher::BoundedRegistry do
     now = Time.utc
     entries = {
       "a" => TestEntry.new(now - 3600.seconds, 30.seconds),
-      "b" => TestEntry.new(now, 30.seconds)
+      "b" => TestEntry.new(now, 30.seconds),
     }
 
     Fetcher::BoundedRegistry.cleanup(entries)
@@ -34,5 +34,11 @@ describe Fetcher::BoundedRegistry do
     entries.size.should be <= 3
   end
 
-  
+  it "marks access" do
+    entries = {} of String => TestEntry
+    entries["x"] = TestEntry.new(Time.utc - 60.seconds, 60.minutes)
+
+    Fetcher::BoundedRegistry.mark_access(entries, "x").should be_true
+    entries["x"].last_accessed.should be > Time.utc - 120.seconds
+  end
 end

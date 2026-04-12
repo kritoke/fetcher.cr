@@ -109,14 +109,6 @@ module Fetcher
           @computing.delete(key)
         end
       end
-
-      private def wake_waiting_fibers(key : K, ex : Exception?) : Nil
-        @mutex.synchronize do
-          if waiters = @computing.delete(key)
-            waiters.each(&.enqueue)
-          end
-        end
-      end
     end
   end
 end
