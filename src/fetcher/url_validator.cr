@@ -43,7 +43,8 @@ module Fetcher
 
     private def self.enforce_validated_limit : Nil
       return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
-      purge_expired
+      now = Time.utc
+      @@validated_ips.reject! { |_, entry| (now - entry.timestamp) > @@validation_ttl }
       return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
       sorted = @@validated_ips.to_a.sort_by { |_, entry| entry.timestamp }
       excess = sorted.first(@@validated_ips.size - MAX_VALIDATED_ENTRIES + 1000)
@@ -146,14 +147,15 @@ module Fetcher
       if path && (path.includes?("/..") || path.includes?("/."))
         resolved = path.split("/").reduce([] of String) do |acc, segment|
           case segment
-          when ".." then acc.pop?
-          when "."  then nil
-          else           acc << segment
+          when ".."    then acc.pop?
+          when ".", "" then nil
+          else              acc << segment
           end
           acc
         end
         uri = uri.dup
-        uri.path = "/#{resolved.join("/")}"
+        uri.path = resolved.join("/")
+        uri.path = "/#{uri.path}" unless uri.path.starts_with?("/")
       end
       uri
     end
