@@ -11,8 +11,9 @@ require "./header_builder"
 
 module Fetcher
   module Reddit
-    USER_AGENT      = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
-    REDDIT_API_BASE = "https://www.reddit.com"
+    USER_AGENT        = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    REDDIT_API_BASE   = "https://www.reddit.com"
+    OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
     class RedditFetchError < Exception
       getter original_cause : Exception?
@@ -27,6 +28,13 @@ module Fetcher
     REDDIT_CACHE_TTL_HOT           = 2.minutes
     REDDIT_CACHE_TTL_TOP           = 10.minutes
     REDDIT_CACHE_TTL_CONTROVERSIAL = 10.minutes
+
+    OLD_REDDIT_CACHE_TTL_NEW           =  5.minutes
+    OLD_REDDIT_CACHE_TTL_RISING        =  5.minutes
+    OLD_REDDIT_CACHE_TTL_HOT           = 15.minutes
+    OLD_REDDIT_CACHE_TTL_TOP           = 30.minutes
+    OLD_REDDIT_CACHE_TTL_CONTROVERSIAL = 30.minutes
+    OLD_REDDIT_CACHE_TTL_DEFAULT       = 15.minutes
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       subreddit = extract_sub(url)
@@ -45,12 +53,12 @@ module Fetcher
 
       result = fetch_fallback(subreddit, sort, actual_limit, headers, config)
 
-      if config.cache_config.enabled && result.success?
-        ttl = ttl_for_sort(sort)
-        config.cache.set(cache_key, result, ttl)
+      if config.cache_config.enabled && result[:result].success?
+        ttl = result[:source] == :old_reddit ? old_ttl_for_sort(sort) : ttl_for_sort(sort)
+        config.cache.set(cache_key, result[:result], ttl)
       end
 
-      result
+      result[:result]
     end
 
     private def self.fetch_rss(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
@@ -60,23 +68,34 @@ module Fetcher
       RSS.pull(rss_url, rss_headers, limit, config)
     end
 
-    private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+    private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : NamedTuple(result: Result, source: Symbol)
       result = Fetcher.with_retry(config) do
         fetch_reddit(subreddit, sort, limit, headers, config)
       end
 
-      return result if result.success?
+      if result.success?
+        return {result: result, source: :api}
+      end
 
       error = result.error
       if error && transient_error?(error.kind) && error.kind != ErrorKind::RateLimited
-        fetch_rss(subreddit, sort, limit, headers, config)
-      else
-        result
+        rss_result = fetch_rss(subreddit, sort, limit, headers, config)
+        if rss_result.success?
+          return {result: rss_result, source: :rss}
+        end
       end
+
+      old_result = fetch_old_reddit(subreddit, sort, limit, headers, config)
+
+      if old_result.success?
+        return {result: old_result, source: :old_reddit}
+      end
+
+      {result: old_result, source: :old_reddit}
     end
 
-    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      api_url = "#{REDDIT_API_BASE}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
+    private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig, api_base : String = REDDIT_API_BASE) : Result
+      api_url = "#{api_base}/r/#{subreddit}/#{sort}.json?limit=#{limit}&raw_json=1"
       reddit_headers = ::HTTP::Headers{
         "User-Agent" => USER_AGENT,
         "Accept"     => "application/json",
@@ -121,6 +140,32 @@ module Fetcher
       raise RedditFetchError.new(ex.message || "Reddit API failed", ex)
     rescue ex
       raise RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
+    end
+
+    private def self.fetch_old_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
+      old_config = RequestConfig.new(
+        timeout: config.timeout,
+        retry: RetryConfig.new(
+          max_retries: 2,
+          base_delay: config.retry.base_delay,
+          max_delay: config.retry.max_delay,
+          exponential_base: config.retry.exponential_base
+        ),
+        circuit_breaker: config.circuit_breaker,
+        rate_limit: config.rate_limit,
+        streaming: config.streaming,
+        cache_config: config.cache_config,
+        max_redirects: config.max_redirects,
+        follow_redirects: config.follow_redirects?,
+        ssl_verify: config.ssl_verify?,
+        driver_detection_mode: config.driver_detection_mode,
+        error_detail_level: config.error_detail_level,
+        max_concurrent_requests: config.max_concurrent_requests,
+        ssl_verify_bypass_acknowledged: config.ssl_verify_bypass_acknowledged,
+      )
+      Fetcher.with_retry(old_config) do
+        fetch_reddit(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
+      end
     end
 
     private def self.try_stream(body : String, subreddit : String, limit : Int32, config : RequestConfig) : Result?
@@ -171,6 +216,15 @@ module Fetcher
       when "top"           then REDDIT_CACHE_TTL_TOP
       when "controversial" then REDDIT_CACHE_TTL_CONTROVERSIAL
       else                      Cache::DEFAULT_TTL
+      end
+    end
+
+    def self.old_ttl_for_sort(sort : String) : Time::Span
+      case sort
+      when "new", "rising"        then OLD_REDDIT_CACHE_TTL_NEW
+      when "hot"                  then OLD_REDDIT_CACHE_TTL_HOT
+      when "top", "controversial" then OLD_REDDIT_CACHE_TTL_TOP
+      else                             OLD_REDDIT_CACHE_TTL_DEFAULT
       end
     end
 
