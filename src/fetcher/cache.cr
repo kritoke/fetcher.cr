@@ -1,5 +1,6 @@
 require "time"
 require "mutex"
+require "./cache_store"
 
 module Fetcher
   struct CacheEntry
@@ -64,127 +65,62 @@ module Fetcher
   class Cache
     DEFAULT_TTL = 5.minutes
 
-    @data : Hash(String, CacheEntry) = {} of String => CacheEntry
-    @eviction_order : Deque(String) = Deque(String).new
-    @eviction_set : Set(String) = Set(String).new
-    @mutex : Mutex = Mutex.new
-    @stats : CacheStats = CacheStats.new
-    @max_size : Int32 = 1000
-    @enabled : Bool = true
+    # Store-based implementation to own mutation while preserving the existing
+    # Cache API. We keep a default store instance for backward compatibility.
+    def self.store : CacheStore
+      @@store_lock.synchronize { @@store ||= CacheStore.new }
+    end
 
+    @@store : CacheStore? = nil
+    @@store_lock = Mutex.new
+
+    def self.default : CacheStore
+      store
+    end
+
+    # Keep instance constructor compatible with existing tests / usage that
+    # create Cache instances. Instances are lightweight facades over the
+    # shared store.
     def initialize(@max_size : Int32 = 1000, @enabled : Bool = true)
+      # Instance-local store preserves the original per-instance behavior.
+      @store = CacheStore.new(@max_size, @enabled)
     end
 
-    def enabled? : Bool
-      @enabled
-    end
-
-    def enabled=(value : Bool)
-      @enabled = value
-    end
-
-    def max_size : Int32
-      @max_size
-    end
-
-    def max_size=(value : Int32)
-      @max_size = value
-    end
-
+    # Instance API (delegate to the instance-local store)
     def get(key : String) : Result?
-      return unless @enabled
-
-      @mutex.synchronize do
-        entry = @data[key]?
-        if entry.nil?
-          @stats.record_miss
-          nil
-        elsif entry.expired?
-          remove_entry(key)
-          @stats.record_miss
-          nil
-        else
-          @stats.record_hit
-          entry.value
-        end
-      end
+      @store.get(key)
     end
 
-    def set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
-      return unless @enabled
-
-      @mutex.synchronize do
-        if @data[key]?
-          @data[key] = CacheEntry.new(value, Time.utc, ttl)
-          @eviction_order.reject! { |k| k == key }
-          @eviction_set.delete(key)
-          @eviction_order << key
-          @eviction_set.add(key)
-        else
-          evict_if_needed
-          @data[key] = CacheEntry.new(value, Time.utc, ttl)
-          @eviction_order << key
-          @eviction_set.add(key)
-        end
-      end
+    def set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL)
+      @store.set(key, value, ttl)
     end
 
-    def clear : Nil
-      @mutex.synchronize do
-        @data.clear
-        @eviction_order.clear
-        @eviction_set.clear
-        @stats = CacheStats.new
-      end
+    def clear
+      @store.clear
     end
 
-    def clear_by_prefix(prefix : String) : Nil
-      @mutex.synchronize do
-        keys_to_remove = [] of String
-        @data.each_key do |key|
-          keys_to_remove << key if key.starts_with?(prefix)
-        end
-        keys_to_remove.each do |key|
-          @data.delete(key)
-          @eviction_set.delete(key)
-        end
-        @eviction_order.reject!(&.starts_with?(prefix))
-      end
+    def clear_by_prefix(prefix : String)
+      @store.clear_by_prefix(prefix)
     end
 
     def stats : CacheStats
-      @mutex.synchronize do
-        CacheStats.new(
-          hits: Atomic.new(@stats.hits),
-          misses: Atomic.new(@stats.misses),
-          evictions: Atomic.new(@stats.evictions)
-        )
-      end
+      @store.stats
     end
 
-    private def remove_entry(key : String)
-      @data.delete(key)
-      @eviction_set.delete(key)
-      @eviction_order.reject! { |k| k == key }
+    def enabled? : Bool
+      @store.enabled?
     end
 
-    private def evict_if_needed
-      while @data.size >= @max_size && !@eviction_order.empty?
-        oldest_key = @eviction_order.shift?
-        if oldest_key
-          @data.delete(oldest_key)
-          @eviction_set.delete(oldest_key)
-          @stats.record_eviction
-        end
-      end
+    def enabled=(value : Bool)
+      @store.enabled = value
     end
 
-    # Shared instance for backward compatibility
-    @@default : Cache? = nil
-    @@default_lock = Mutex.new
+    def max_size : Int32
+      @store.max_size
+    end
 
-    def self.default : Cache
-      @@default_lock.synchronize { @@default ||= new }
+    def max_size=(value : Int32)
+      @store.max_size = value
     end
 
     {% for method, ret in {
@@ -193,26 +129,37 @@ module Fetcher
                             "clear_by_prefix" => "Void",
                             "stats"           => "CacheStats",
                             "enabled?"        => "Bool",
+                            "max_size"        => "Int32",
                           } %}
       def self.{{ method.id }}(*args) : {{ ret.id }}
-        default.{{ method.id }}(*args)
+        store.{{ method.id }}(*args)
       end
     {% end %}
 
-    def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
-      default.set(key, value, ttl)
-    end
-
+    # Setters with special signatures
     def self.enabled=(value : Bool)
-      default.enabled = value
-    end
-
-    def self.max_size : Int32
-      default.max_size
+      store.enabled = value
     end
 
     def self.max_size=(value : Int32)
-      default.max_size = value
+      store.max_size = value
+    end
+
+
+    def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
+      store.set(key, value, ttl)
+    end
+
+    def self.enabled=(value : Bool)
+      store.enabled = value
+    end
+
+    def self.max_size : Int32
+      store.max_size
+    end
+
+    def self.max_size=(value : Int32)
+      store.max_size = value
     end
 
     def self.generate_key(subreddit : String, sort : String, limit : Int32) : String
