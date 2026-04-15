@@ -12,7 +12,7 @@ require "./config"
 
 module Fetcher
   module Reddit
-    USER_AGENT          = "fetcher.cr/0.9.2 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    USER_AGENT          = "fetcher.cr/0.9.3 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
@@ -118,13 +118,17 @@ module Fetcher
         uri = URI.parse(api_url)
         host = uri.host
         addresses = [] of String
-        begin
-          addrs = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-          addrs.each do |a|
-            addresses << a.ip_address
+        if host && !host.empty?
+          begin
+            addrs = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+            addrs.each do |a|
+              addresses << a.ip_address.to_s
+            end
+          rescue ex
+            addresses = ["resolve_failed: #{ex.message}"]
           end
-        rescue ex
-          addresses = ["resolve_failed: #{ex.message}"]
+        else
+          addresses = ["no_host"]
         end
         ::Log.for("fetcher.reddit").debug { "Fetching Reddit API #{api_url} from resolved addresses: #{addresses.join(", ")}" }
         # Log a summary of headers that may affect blocking (User-Agent and Accept)
