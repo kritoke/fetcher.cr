@@ -40,7 +40,6 @@ module Fetcher
       end
 
       begin
-        # Use string for now (can optimize with pull parser later if needed)
         block.call(content)
       rescue ex : JSON::ParseException
         raise InvalidFormatError.new("JSON parsing error: #{ex.message}")

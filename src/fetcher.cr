@@ -25,6 +25,7 @@ require "./fetcher/domain_batch_processor"
 require "./fetcher/request_config"
 require "./fetcher/entry_iterator"
 require "./fetcher/xml_streaming_parser"
+require "./fetcher/xml_text_reader"
 require "./fetcher/json_streaming_parser"
 require "./fetcher/error_handler"
 require "./fetcher/rss"
@@ -49,6 +50,14 @@ module Fetcher
     YouTube
   end
 
+  PATTERN_DRIVERS = {
+    REDDIT_URL_PATTERN        => DriverType::Reddit,
+    GITHUB_RELEASES_PATTERN   => DriverType::Software,
+    GITLAB_RELEASES_PATTERN   => DriverType::Software,
+    CODEBERG_RELEASES_PATTERN => DriverType::Software,
+    YOUTUBE_CHANNEL_PATTERN   => DriverType::YouTube,
+  }
+
   def self.detect_driver(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, config : RequestConfig = RequestConfig.new) : DriverType
     case config.driver_detection_mode
     when .explicit_only?
@@ -70,17 +79,8 @@ module Fetcher
   end
 
   private def self.detect_pattern(url : String) : DriverType?
-    if url.matches?(REDDIT_URL_PATTERN)
-      DriverType::Reddit
-    elsif url.matches?(GITHUB_RELEASES_PATTERN)
-      DriverType::Software
-    elsif url.matches?(GITLAB_RELEASES_PATTERN)
-      DriverType::Software
-    elsif url.matches?(CODEBERG_RELEASES_PATTERN)
-      DriverType::Software
-    elsif url.matches?(YOUTUBE_CHANNEL_PATTERN)
-      DriverType::YouTube
-    end
+    PATTERN_DRIVERS.each { |pattern, driver| return driver if url.matches?(pattern) }
+    nil
   end
 
   private def self.detect_content(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
@@ -113,11 +113,6 @@ module Fetcher
     nil
   end
 
-  private def self.jsonfeed_type?(content_type : String) : Bool
-    # Content-type based detection only. URL-based heuristics live in detect_ext.
-    content_type.includes?("application/feed+json") || content_type.includes?("application/json")
-  end
-
   private def self.rss_type?(content_type : String) : Bool
     content_type.includes?("application/rss+xml") ||
       content_type.includes?("application/atom+xml") ||
@@ -148,41 +143,27 @@ module Fetcher
     ::Log.for("fetcher").debug { "Pulling URL #{url} with driver #{driver}" }
 
     case driver
-    when .rss?
-      RSS.pull(url, headers, actual_limit, config)
-    when .reddit?
-      Reddit.pull(url, headers, actual_limit, config)
-    when .software?
-      Software.pull(url, headers, actual_limit, config)
-    when .json_feed?
-      JSONFeed.pull(url, headers, actual_limit, config)
-    when .you_tube?
-      YouTube.pull(url, headers, actual_limit, config)
-    else
-      RSS.pull(url, headers, actual_limit, config)
+    when .rss?       then RSS.pull(url, headers, actual_limit, config)
+    when .reddit?    then Reddit.pull(url, headers, actual_limit, config)
+    when .software?  then Software.pull(url, headers, actual_limit, config)
+    when .json_feed? then JSONFeed.pull(url, headers, actual_limit, config)
+    when .you_tube?  then YouTube.pull(url, headers, actual_limit, config)
+    else                  RSS.pull(url, headers, actual_limit, config)
     end
   rescue ex
     ErrorHandler.log_error(url, ex, config)
     raise ex
   end
 
-  def self.pull_rss(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    RSS.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
+  macro define_pull_method(driver_method, module_name)
+    def self.{{ driver_method.id }}(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
+      {{ module_name.id }}.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
+    end
   end
 
-  def self.pull_reddit(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    Reddit.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
-  end
-
-  def self.pull_software(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    Software.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
-  end
-
-  def self.pull_json_feed(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    JSONFeed.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
-  end
-
-  def self.pull_youtube(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new, limit : Int32 = Config::DEFAULT_LIMIT, config : RequestConfig = RequestConfig.new) : Result
-    YouTube.pull(url, Fetcher::CrestHttpClient.build_headers(headers), Math.min(limit, Config::MAX_LIMIT), config)
-  end
+  define_pull_method pull_rss, RSS
+  define_pull_method pull_reddit, Reddit
+  define_pull_method pull_software, Software
+  define_pull_method pull_json_feed, JSONFeed
+  define_pull_method pull_youtube, YouTube
 end

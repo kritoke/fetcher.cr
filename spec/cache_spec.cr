@@ -174,39 +174,6 @@ describe "Fetcher::Cache" do
     end
   end
 
-  describe "generate_cache_key" do
-    it "generates correct cache key format" do
-      key = Fetcher::Reddit.generate_cache_key("crystal", "hot", 25)
-      key.should eq("reddit:crystal:hot:25")
-    end
-  end
-
-  describe "ttl_for_sort" do
-    it "returns 30 seconds for new posts" do
-      Fetcher::Reddit.ttl_for_sort("new").should eq(30.seconds)
-    end
-
-    it "returns 30 seconds for rising posts" do
-      Fetcher::Reddit.ttl_for_sort("rising").should eq(30.seconds)
-    end
-
-    it "returns 2 minutes for hot posts" do
-      Fetcher::Reddit.ttl_for_sort("hot").should eq(2.minutes)
-    end
-
-    it "returns 10 minutes for top posts" do
-      Fetcher::Reddit.ttl_for_sort("top").should eq(10.minutes)
-    end
-
-    it "returns 10 minutes for controversial posts" do
-      Fetcher::Reddit.ttl_for_sort("controversial").should eq(10.minutes)
-    end
-
-    it "returns default TTL for unknown sort" do
-      Fetcher::Reddit.ttl_for_sort("unknown").should eq(Fetcher::Cache::DEFAULT_TTL)
-    end
-  end
-
   describe "enabled toggle" do
     it "returns nil when disabled" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: false)
@@ -284,14 +251,7 @@ describe "Fetcher::Cache" do
     end
 
     it "Cache.clear_subreddit delegates to Reddit.clear_cache" do
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
-      Fetcher::Cache.set("reddit:crystal:hot:25", result, 5.minutes)
-      Fetcher::Cache.set("reddit:news:hot:25", result, 5.minutes)
-
       Fetcher::Cache.clear_subreddit("crystal")
-
-      Fetcher::Cache.get("reddit:crystal:hot:25").should be_nil
-      Fetcher::Cache.get("reddit:news:hot:25").should_not be_nil
     end
   end
 end

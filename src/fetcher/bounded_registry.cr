@@ -18,10 +18,7 @@ module Fetcher
       end
     end
 
-    # Mark an entry as accessed by updating its last_accessed field. Expects the
-    # entry value to respond to `last_accessed` and to be constructible via
-    # a block that produces a replacement value when called with the old entry.
-    # Update an entry's last_accessed timestamp to now if it supports a setter.
+    # Mark an entry as accessed by updating its last_accessed field to now.
     # Returns true if the update was performed.
     def self.mark_access(entries : Hash(String, _), key : String) : Bool
       if entry = entries[key]?

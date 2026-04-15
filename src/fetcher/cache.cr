@@ -181,34 +181,26 @@ module Fetcher
 
     # Shared instance for backward compatibility
     @@default : Cache? = nil
+    @@default_lock = Mutex.new
 
     def self.default : Cache
-      @@default ||= new
+      @@default_lock.synchronize { @@default ||= new }
     end
 
-    # Backward-compatible class methods (delegates to default instance)
-    def self.get(key : String) : Result?
-      default.get(key)
-    end
+    {% for method, ret in {
+                            "get"             => "Result?",
+                            "clear"           => "Void",
+                            "clear_by_prefix" => "Void",
+                            "stats"           => "CacheStats",
+                            "enabled?"        => "Bool",
+                          } %}
+      def self.{{ method.id }}(*args) : {{ ret.id }}
+        default.{{ method.id }}(*args)
+      end
+    {% end %}
 
     def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
       default.set(key, value, ttl)
-    end
-
-    def self.clear : Nil
-      default.clear
-    end
-
-    def self.clear_by_prefix(prefix : String) : Nil
-      default.clear_by_prefix(prefix)
-    end
-
-    def self.stats : CacheStats
-      default.stats
-    end
-
-    def self.enabled? : Bool
-      default.enabled?
     end
 
     def self.enabled=(value : Bool)
@@ -223,7 +215,6 @@ module Fetcher
       default.max_size = value
     end
 
-    # Backward-compatible Reddit helpers (deprecated: use Reddit module instead)
     def self.generate_key(subreddit : String, sort : String, limit : Int32) : String
       Reddit.generate_cache_key(subreddit, sort, limit)
     end

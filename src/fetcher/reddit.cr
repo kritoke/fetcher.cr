@@ -8,6 +8,7 @@ require "./exceptions"
 require "./json_streaming_parser"
 require "./link_resolver"
 require "./header_builder"
+require "./config"
 
 module Fetcher
   module Reddit
@@ -46,7 +47,7 @@ module Fetcher
       return Fetcher.error_result(ErrorKind::InvalidURL, "Not a Reddit subreddit URL") unless subreddit
 
       sort = extract_sort(url)
-      actual_limit = Math.min(limit, 25)
+      actual_limit = Math.min(limit, Config::REDDIT_MAX_POSTS_PER_REQUEST)
 
       cache_key = generate_cache_key(subreddit, sort, actual_limit)
 
@@ -78,25 +79,16 @@ module Fetcher
         fetch_reddit(subreddit, sort, limit, headers, config)
       end
 
-      if result.success?
-        return {result: result, source: :api}
-      end
+      return {result: result, source: :api} if result.success?
 
       error = result.error
-      if error && transient_error?(error.kind) && error.kind != ErrorKind::RateLimited
+      if transient_error?(error.try(&.kind))
         rss_result = fetch_rss(subreddit, sort, limit, headers, config)
-        if rss_result.success?
-          return {result: rss_result, source: :rss}
-        end
+        return {result: rss_result, source: :rss} if rss_result.success?
       end
 
       old_result = fetch_old_reddit(subreddit, sort, limit, headers, config)
-
-      if old_result.success?
-        return {result: old_result, source: :old_reddit}
-      end
-
-      {result: old_result, source: :old_reddit}
+      {result: old_result, source: old_result.success? ? :old_reddit : :failed}
     end
 
     private def self.fetch_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig, api_base : String = REDDIT_API_BASE) : Result
@@ -111,21 +103,28 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(api_url, final_headers)
       handle_reddit_response(response, api_url, subreddit, limit, config)
-    rescue ex : IO::TimeoutError
-      error = Error.timeout("Timeout: #{ex.message}", api_url)
-      raise RedditFetchError.new(error.message, TimeoutError.new(error.message, error))
-    rescue ex : CrestHttpClient::DNSError
-      error = Error.dns("DNS error: #{ex.message}", api_url)
-      raise RedditFetchError.new(error.message, DNSError.new(error.message, error))
-    rescue ex : JSON::ParseException
-      error = Error.invalid_format("JSON parsing error: #{ex.message}", api_url)
-      raise RedditFetchError.new(error.message, InvalidFormatError.new(error.message, error))
     rescue ex : RedditFetchError
       raise ex
     rescue ex : FetchError
       raise RedditFetchError.new(ex.message || "Reddit API failed", ex)
     rescue ex
-      raise RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
+      raise reddit_error(ex, api_url || "unknown")
+    end
+
+    private def self.reddit_error(ex : Exception, api_url : String) : RedditFetchError
+      case ex
+      when IO::TimeoutError
+        wrapped = Error.timeout("Timeout: #{ex.message}", api_url)
+        RedditFetchError.new(wrapped.message, TimeoutError.new(wrapped.message, wrapped))
+      when CrestHttpClient::DNSError
+        wrapped = Error.dns("DNS error: #{ex.message}", api_url)
+        RedditFetchError.new(wrapped.message, DNSError.new(wrapped.message, wrapped))
+      when JSON::ParseException
+        wrapped = Error.invalid_format("JSON parsing error: #{ex.message}", api_url)
+        RedditFetchError.new(wrapped.message, InvalidFormatError.new(wrapped.message, wrapped))
+      else
+        RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
+      end
     end
 
     private def self.fetch_old_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result

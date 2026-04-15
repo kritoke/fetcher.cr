@@ -130,5 +130,58 @@ module Fetcher
         Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider")
       end
     end
+
+    def self.try_software_api(provider_name : String, provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
+      response = http_client.get(provider.api_url, headers)
+
+      return if response.status_code == 404
+      return unless (200..299).includes?(response.status_code)
+
+      releases = Array(JSON::Any).from_json(response.body)
+      return if releases.empty?
+
+      entries = releases.first(limit).map do |release|
+        parse_software_entry(release, provider)
+      end
+
+      Result.success(
+        entries: entries,
+        etag: response.headers["ETag"]?,
+        last_modified: response.headers["Last-Modified"]?,
+        site_link: "#{provider.base_url}/#{provider.repo}",
+        favicon: "#{provider.base_url}/favicon.ico"
+      )
+    rescue JSON::ParseException
+      ::Log.for("fetcher.software").debug { "#{provider_name} API JSON parse failed, trying fallback: #{provider.api_url}" }
+      nil
+    rescue ex : OpenSSL::SSL::Error
+      raise DNSError.new("#{provider_name} SSL error: #{ex.message}")
+    rescue ex : FetchError
+      raise ex
+    rescue ex
+      ::Log.for("fetcher.software").debug { "#{provider_name} API request failed, trying fallback: #{ex.class} - #{ex.message}" }
+      nil
+    end
+
+    def self.parse_software_entry(release : JSON::Any, provider : SoftwareProvider, body_field : String = "body") : Entry
+      tag = release["tag_name"]?.try(&.as_s) || ""
+      name = release["name"]?.try(&.as_s).presence || tag
+      published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
+      body = release[body_field]?.try(&.as_s) || ""
+
+      pub_date = TimeParser.parse(published_at.try(&.as_s))
+
+      html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
+
+      Entry.create(
+        title: "#{provider.repo} #{name}",
+        url: html_url,
+        source_type: provider.source_type,
+        content: body,
+        content_html: body.presence,
+        published_at: pub_date,
+        version: tag
+      )
+    end
   end
 end

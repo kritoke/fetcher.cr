@@ -23,12 +23,11 @@ describe "RequestConfig retry settings" do
       retry: Fetcher::RetryConfig.new(base_delay: 10.seconds, max_delay: 30.seconds)
     )
 
-    # Test delay calculation (simulated)
     attempt = 2
     delay = config.retry.base_delay * (config.retry.exponential_base ** attempt)
     delay = config.retry.max_delay if delay > config.retry.max_delay
 
-    delay.should eq(30.seconds) # 10 * 2^2 = 40, but capped at max_delay 30
+    delay.should eq(30.seconds)
   end
 end
 
@@ -63,23 +62,5 @@ describe "RequestConfig" do
     config = Fetcher::RequestConfig.new
     config.timeout.connect.should eq(10.seconds)
     config.timeout.read.should eq(30.seconds)
-  end
-end
-
-describe "Token Bucket Rate Limiting" do
-  it "maintains backward compatibility with existing API" do
-    result = Fetcher.pull("https://httpbin.org/get")
-    result.success?.should be_true
-  end
-
-  it "allows rapid requests within burst capacity" do
-    config = Fetcher::RequestConfig.new(
-      rate_limit: Fetcher::RateLimitConfig.new(capacity: 5.0, refill_rate: 2.0)
-    )
-
-    3.times do
-      result = Fetcher.pull("https://httpbin.org/get", ::HTTP::Headers.new, 1, config)
-      result.success?.should be_true
-    end
   end
 end

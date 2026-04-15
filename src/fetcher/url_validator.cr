@@ -1,6 +1,7 @@
 require "uri"
 require "socket"
 require "./bounded_registry"
+require "./validated_ip_store"
 
 module Fetcher
   module URLValidator
@@ -16,30 +17,33 @@ module Fetcher
       ip : Socket::IPAddress,
       timestamp : Time
 
-    @@validated_ips = {} of String => ValidatedEntry
-    @@validation_lock = Mutex.new
-    @@validation_ttl = 5.seconds
-    MAX_VALIDATED_ENTRIES = 50_000
+    # Backwards-compatible store. We encapsulate the mutable cache in
+    # ValidatedIpStore but keep a class-level default instance so existing
+    # call-sites remain functional without signature changes.
+    @@validated_store : ValidatedIpStore? = nil
+    @@validated_store_lock = Mutex.new
+    def self.validated_store
+      @@validated_store_lock.synchronize { @@validated_store ||= ValidatedIpStore.new }
+    end
+
+    # Legacy names kept for compatibility with previous code that expected
+    # constants like @@validation_ttl or MAX_VALIDATED_ENTRIES. These are now
+    # provided by the default store above.
+    # Keep legacy limits accessible via method-style helpers if needed.
+    def self.max_validated_entries : Int32
+      50_000
+    end
 
     def self.clear_validated : Nil
-      @@validation_lock.synchronize do
-        @@validated_ips.clear
-      end
+      validated_store.clear
     end
 
     def self.register_ip(host : String, ip : Socket::IPAddress) : Nil
-      @@validation_lock.synchronize do
-        enforce_validated_limit
-        @@validated_ips[host] = ValidatedEntry.new(ip, Time.utc)
-      end
+      validated_store.register(host, ip)
     end
 
     def self.purge_expired(expiry : Time::Span? = nil) : Nil
-      ttl = expiry || @@validation_ttl
-      now = Time.utc
-      @@validation_lock.synchronize do
-        @@validated_ips.reject! { |_, entry| (now - entry.timestamp) > ttl }
-      end
+      validated_store.purge_expired(expiry)
     end
 
     private def self.enforce_validated_limit : Nil
@@ -49,15 +53,8 @@ module Fetcher
     end
 
     def self.check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
-      @@validation_lock.synchronize do
-        if entry = @@validated_ips[host]?
-          if (Time.utc - entry.timestamp) <= @@validation_ttl
-            return entry.ip == current_ip
-          else
-            @@validated_ips.delete(host)
-          end
-        end
-      end
+      res = validated_store.check_rebinding(host, current_ip)
+      return res unless res.nil?
       !blocked_ip?(current_ip)
     end
 
@@ -180,25 +177,10 @@ module Fetcher
 
     def self.looks_like_ip?(host : String) : Bool
       return false if host.empty?
-
-      if host.starts_with?("[")
-        return true
-      end
-
-      if host.includes?(":")
-        return true
-      end
-
-      first_char = host[0]
-      return false unless first_char.ascii_number?
-
-      valid_ip_chars = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '.', ':', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F'}
-      host.each_char do |char|
-        unless valid_ip_chars.includes?(char)
-          return false
-        end
-      end
-      true
+      return true if host.starts_with?("[")
+      return true if host.includes?(":")
+      return false unless host[0].ascii_number?
+      host.each_char.all? { |char| char.ascii_number? || char.in?('.', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F') }
     end
 
     private def self.clean_ipv6(host : String) : String
@@ -231,7 +213,17 @@ module Fetcher
         reserved?(ip_address) || current_network?(ip_address)
     end
 
-    private VALID_HEX_CHARS = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'}
+    private def self.ipv6_site?(ip_address : Socket::IPAddress) : Bool
+      address = ip_address.address
+      return false unless address.includes?(":")
+
+      downcase = address.downcase
+      second_char = downcase[2]?
+      return false unless second_char && downcase.starts_with?("fe") && second_char.in?('c', 'd', 'e', 'f')
+      true
+    rescue
+      false
+    end
 
     private def self.link_local?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
@@ -240,18 +232,16 @@ module Fetcher
         if downcase.starts_with?("fe")
           second_char = downcase[2]?
           return false unless second_char
-          return false unless VALID_HEX_CHARS.includes?(second_char)
-          second_nibble = second_char.to_i(16)
-          second_nibble >= 8 && second_nibble <= 15
+          second_nibble = second_char.to_i?(16)
+          return false unless second_nibble && second_nibble >= 8 && second_nibble <= 15
+          true
         else
           false
         end
       else
-        parts = address.split(".").map(&.to_i)
+        return false unless parts = ipv4_octets(ip_address)
         parts.size == 4 && parts[0] == 169 && parts[1] == 254
       end
-    rescue
-      false
     end
 
     # IPv6 unique local addresses (fc00::/7) - RFC 4193
@@ -261,22 +251,6 @@ module Fetcher
         # IPv6 unique local addresses (fc00::/7)
         # Covers fc00::/8 and fd00::/8
         address.downcase.starts_with?("fc") || address.downcase.starts_with?("fd")
-      else
-        false
-      end
-    rescue
-      false
-    end
-
-    # IPv6 site-local addresses (deprecated) - RFC 3874
-    private def self.ipv6_site?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      if address.includes?(":")
-        # IPv6 site-local addresses (fec0::/10) - deprecated but still in use
-        address.downcase.starts_with?("fec") ||
-          address.downcase.starts_with?("fed") ||
-          address.downcase.starts_with?("fee") ||
-          address.downcase.starts_with?("fef")
       else
         false
       end
@@ -304,54 +278,42 @@ module Fetcher
       false
     end
 
+    private def self.ipv4_octets(ip_address : Socket::IPAddress) : Array(Int32)?
+      address = ip_address.address
+      return if address.includes?(":")
+      address.split(".").map(&.to_i)
+    rescue
+      nil
+    end
+
     # Carrier-Grade NAT (100.64.0.0/10) - RFC 6598
     private def self.cgnat?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      return false if address.includes?(":")
-      parts = address.split(".").map(&.to_i)
+      return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] == 100 && parts[1] >= 64 && parts[1] <= 127
-    rescue
-      false
     end
 
     # Network Benchmark Testing (198.18.0.0/15) - RFC 2544
     private def self.benchmark?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      return false if address.includes?(":")
-      parts = address.split(".").map(&.to_i)
+      return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] == 198 && (parts[1] == 18 || parts[1] == 19)
-    rescue
-      false
     end
 
     # Multicast (224.0.0.0/4)
     private def self.multicast?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      return false if address.includes?(":")
-      parts = address.split(".").map(&.to_i)
+      return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] >= 224 && parts[0] <= 239
-    rescue
-      false
     end
 
     # Reserved / Future Use (240.0.0.0/4)
     private def self.reserved?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      return false if address.includes?(":")
-      parts = address.split(".").map(&.to_i)
+      return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] >= 240
-    rescue
-      false
     end
 
     # Current Network (0.0.0.0/8)
     private def self.current_network?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      return false if address.includes?(":")
-      parts = address.split(".").map(&.to_i)
+      return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] == 0
-    rescue
-      false
     end
   end
 end

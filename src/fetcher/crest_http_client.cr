@@ -164,8 +164,6 @@ module Fetcher
       end
     end
 
-    # extract_domain moved to URLValidator
-
     private def check_ssrf(url : String) : Nil
       unless URLValidator.valid?(url)
         raise DNSError.new("Invalid or blocked URL: #{url}")
@@ -179,7 +177,7 @@ module Fetcher
       uri = URI.parse(url)
       host = uri.host
       return if host.nil? || host.empty?
-      return unless URLValidator.looks_like_ip?(host) == false
+      return if URLValidator.looks_like_ip?(host)
 
       begin
         addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)

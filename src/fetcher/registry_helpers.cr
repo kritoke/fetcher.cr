@@ -28,8 +28,5 @@ module Fetcher
       excess = sorted.first(entries.size - max_entries + 100)
       excess.each { |key, _| entries.delete(key) }
     end
-
-    # RegistryHelpers contains eviction helpers. Periodic cleanup responsibilities
-    # have been moved to PeriodicCleanup to keep responsibilities separate.
   end
 end

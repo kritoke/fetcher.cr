@@ -58,13 +58,7 @@ module Fetcher
     when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError
       return true
     when HTTPError
-      # Client errors (4xx) are not transient, server errors (5xx) are
-      if ex.status_code.nil?
-        return true
-      else
-        status_code = ex.status_code.as(Int32)
-        return (500..599).includes?(status_code)
-      end
+      ex.status_code.nil? || (500..599).includes?(ex.status_code.as(Int32))
     end
 
     # Fallback to string matching for legacy exceptions

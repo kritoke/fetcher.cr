@@ -25,10 +25,11 @@ module Fetcher
     end
 
     def self.instance : RateLimiterRegistry
-      @@instance ||= new
+      @@instance_lock.synchronize { @@instance ||= new }
     end
 
     @@instance : RateLimiterRegistry? = nil
+    @@instance_lock = Mutex.new
 
     @entries = {} of String => Entry
     @lock = Mutex.new

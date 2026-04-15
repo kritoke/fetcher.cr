@@ -9,6 +9,16 @@ require "./safe_feed_processor"
 require "./link_resolver"
 
 module Fetcher
+  alias RSSFeedMetadata = NamedTuple(
+    site_link: String?,
+    favicon: String?,
+    feed_title: String?,
+    feed_description: String?,
+    feed_language: String?,
+    feed_authors: Array(Author))
+
+  EMPTY_FEED_METADATA = {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author}
+
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
     def parse_entries(data : String, limit : Int32) : Array(Entry)
@@ -28,25 +38,13 @@ module Fetcher
       [] of Entry
     end
 
-    def parse_feed_metadata(data : String) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
+    def parse_feed_metadata(data : String) : RSSFeedMetadata
       xml = parse_xml(data)
       parse_feed_metadata(xml)
     end
 
-    def parse_feed_metadata(xml : XML::Document) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
-      return {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author} unless xml.root
+    def parse_feed_metadata(xml : XML::Document) : RSSFeedMetadata
+      return EMPTY_FEED_METADATA unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
       return rss_metadata unless rss_metadata[:site_link].nil? && rss_metadata[:feed_title].nil?
@@ -54,7 +52,7 @@ module Fetcher
       atom_metadata = parse_atom_metadata(xml)
       return atom_metadata unless atom_metadata[:site_link].nil? && atom_metadata[:feed_title].nil?
 
-      {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author}
+      EMPTY_FEED_METADATA
     end
 
     def parse_xml_document(data : String) : XML::Document
@@ -87,13 +85,7 @@ module Fetcher
       entries
     end
 
-    private def parse_rss_metadata(xml : XML::Node) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
+    private def parse_rss_metadata(xml : XML::Node) : RSSFeedMetadata
       site_link = "#"
       feed_title = ""
       feed_description = ""
@@ -217,15 +209,9 @@ module Fetcher
       entries
     end
 
-    private def parse_atom_metadata(xml : XML::Node) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
+    private def parse_atom_metadata(xml : XML::Node) : RSSFeedMetadata
       feed_node = xml.xpath_node("//*[local-name()='feed']")
-      return {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author} unless feed_node
+      return EMPTY_FEED_METADATA unless feed_node
 
       alt = feed_node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
             feed_node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
@@ -303,13 +289,8 @@ module Fetcher
     private def extract_atom_content(children : Array(XML::Node)) : String
       content_node = children.find { |child| child.name == "content" }
       summary_node = children.find { |child| child.name == "summary" }
-      content_type = content_node.try(&.["type"]) || "text"
 
-      case content_type
-      when "html", "xhtml" then content_node.try(&.text) || ""
-      when "text"          then content_node.try(&.text) || ""
-      else                      summary_node.try(&.text) || ""
-      end
+      content_node.try(&.text) || summary_node.try(&.text) || ""
     end
 
     private def extract_atom_author(children : Array(XML::Node)) : String?

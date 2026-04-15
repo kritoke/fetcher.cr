@@ -42,7 +42,5 @@ module Fetcher
 
       nil
     end
-
-    # Legacy helpers removed; use TimeParser.parse which handles common formats.
   end
 end

@@ -21,22 +21,13 @@ module Fetcher
       results = [] of Result
 
       # Process each domain group sequentially to maximize connection reuse
-      domain_groups.each do |domain, domain_urls|
-        # Use domain-specific configuration if available
-        _ = get_config(domain, config)
-
+      domain_groups.each do |_domain, domain_urls|
         # Process all URLs in this domain group
         domain_results = ConcurrentFetcher.pull_multiple(domain_urls, headers, limit, config.max_concurrent_requests || ConcurrentFetcher::DEFAULT_MAX_CONCURRENT, config)
         results.concat(domain_results)
       end
 
       results
-    end
-
-    private def self.get_config(domain : String, base_config : RequestConfig) : RequestConfig
-      # In a real implementation, this would look up domain-specific configuration
-      # from feeds.yml or other configuration sources
-      base_config
     end
   end
 end

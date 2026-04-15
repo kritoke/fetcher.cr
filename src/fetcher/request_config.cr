@@ -86,7 +86,7 @@ module Fetcher
     def delay_for_attempt(attempt : Int32) : Time::Span
       capped_attempt = Math.min(attempt, 30)
       delay = retry.base_delay * (retry.exponential_base ** capped_attempt)
-      delay > retry.max_delay ? retry.max_delay : delay
+      Math.min(delay, retry.max_delay)
     end
 
     # Return a copy of this RequestConfig with the retry.max_retries overridden.

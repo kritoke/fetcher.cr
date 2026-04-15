@@ -35,13 +35,8 @@ module Fetcher
       when FetchError
         Result.error(Error.new(kind: ErrorKind::Unknown, message: ex.message || "Fetch error", url: url))
       else
-        if Fetcher.transient_error?(ex)
-          error = Error.unknown(ex.message || "Unknown error", url)
-          Result.error(error)
-        else
-          error = Error.unknown("#{ex.class}: #{ex.message}", url)
-          Result.error(error)
-        end
+        error = Error.unknown("#{ex.class}: #{ex.message}", url)
+        Result.error(error)
       end
     end
 

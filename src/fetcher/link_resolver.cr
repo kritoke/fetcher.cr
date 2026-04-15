@@ -48,12 +48,14 @@ module Fetcher
       )
     end
 
-    DISCUSSION_PATHS = {"/comments/", "/item?id=", "/s/", "/discuss", "/r/"}
+    DISCUSSION_PATHS           = {"/comments/", "/item?id=", "/s/", "/discuss"}
+    REDDIT_DISCUSSION_PATTERNS = {"reddit.com/r/", "old.reddit.com/r/"}
 
     private def self.discussion_url?(url : String) : Bool
       return false if url.empty? || url == "#"
 
       lower = url.downcase
+      return true if REDDIT_DISCUSSION_PATTERNS.any? { |pattern| lower.includes?(pattern) }
       DISCUSSION_PATHS.any? { |path| lower.includes?(path) }
     end
   end
