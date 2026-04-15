@@ -2,6 +2,7 @@ require "time"
 require "mutex"
 require "./registry_helpers"
 require "./periodic_cleanup"
+require "./circuit_breaker_store"
 
 module Fetcher
   class CircuitBreaker
@@ -81,51 +82,30 @@ module Fetcher
     module Registry
       extend self
 
-      MAX_REGISTRY_ENTRIES = 10_000
-
-      @@entries = {} of String => RegistryEntry
-      @@lock = Mutex.new
-      DEFAULT_TTL = 5.minutes
-
+      # Backwards-compatible facade that delegates to CircuitBreakerStore. This
+      # localizes mutation in the store while keeping the Registry API intact.
       def get(domain : String, config) : CircuitBreaker
-        @@lock.synchronize do
-          BoundedRegistry.ensure_limit(@@entries, MAX_REGISTRY_ENTRIES, DEFAULT_TTL)
-          entry = @@entries[domain]?
-          if entry
-            @@entries[domain] = RegistryEntry.new(breaker: entry.breaker, last_accessed: Time.utc, ttl: entry.ttl)
-            return entry.breaker
-          end
-
-          breaker = CircuitBreaker.new(
-            failure_threshold: config.circuit_breaker.failure_threshold,
-            recovery_timeout: config.circuit_breaker.recovery_timeout
-          )
-          entry = RegistryEntry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
-          @@entries[domain] = entry
-          PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
-          breaker
-        end
+        store.get(domain, config)
       end
 
       def clear : Nil
-        @@lock.synchronize do
-          @@entries.clear
-        end
+        store.clear
       end
 
       def all_states : Hash(String, {State, Int32})
-        @@lock.synchronize do
-          @@entries.transform_values { |entry| {entry.breaker.state, entry.breaker.failure_count} }
-        end
+        store.all_states
       end
 
       def cleanup : Nil
-        @@lock.synchronize do
-          BoundedRegistry.cleanup(@@entries)
-        end
+        store.cleanup
       end
 
-      # periodic cleanup is handled by PeriodicCleanup
+      def store : CircuitBreakerStore
+        @@store_lock.synchronize { @@store ||= CircuitBreakerStore.new }
+      end
+
+      @@store : CircuitBreakerStore? = nil
+      @@store_lock = Mutex.new
     end
   end
 end
