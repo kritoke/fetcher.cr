@@ -20,13 +20,27 @@ module Fetcher
       # Waiter queue: Array of Tuple(tokens_requested, reply_channel)
       @waiters = [] of Tuple(Float64, Channel(Nil))
 
+      # Wake scheduling flag to avoid duplicate wakeups
+      @wake_scheduled = false
+
       # Spawn owner fiber
       spawn do
-        # periodic tick to process waiters and refill tokens
-        spawn do
-          loop do
-            ::sleep(0.05.seconds)
-            @cmd.send(TickMsg.new)
+        # Helper to schedule a wakeup when waiters are present and tokens are
+        # insufficient. We schedule a single wakeup (set @wake_scheduled) to
+        # avoid spawning many sleepers; wakeups are idempotent and harmless.
+        schedule_wakeup = -> do
+          if !@wake_scheduled && @waiters.size > 0 && @refill_rate > 0.0
+            req, _ = @waiters.first
+            refill_tokens
+            tokens_needed = req - @tokens
+            if tokens_needed > 0
+              wait_time = tokens_needed / @refill_rate
+              @wake_scheduled = true
+              spawn do
+                ::sleep(wait_time.seconds)
+                @cmd.send(TickMsg.new)
+              end
+            end
           end
         end
 
@@ -49,6 +63,7 @@ module Fetcher
               msg.reply.send(nil)
             else
               @waiters << {msg.tokens_requested, msg.reply}
+              schedule_wakeup.call
             end
 
           when AvailableTokensMsg
@@ -56,6 +71,8 @@ module Fetcher
             msg.reply.send(@tokens)
 
           when TickMsg
+            # clear the scheduled flag, then refill and try to satisfy
+            @wake_scheduled = false
             refill_tokens
             # satisfy waiters in FIFO order
             while @waiters.size > 0 && @tokens > 0
@@ -68,6 +85,8 @@ module Fetcher
                 break
               end
             end
+            # If there remain waiters, schedule next wakeup
+            schedule_wakeup.call
           end
         end
       end
