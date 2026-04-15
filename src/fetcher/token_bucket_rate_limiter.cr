@@ -3,6 +3,7 @@ require "mutex"
 
 module Fetcher
   class TokenBucketRateLimiter
+    @last_refill : Float64
     # Messages for the owner fiber
     record TryAcquireMsg, tokens_requested : Float64, reply : Channel(Bool)
     record AcquireMsg, tokens_requested : Float64, reply : Channel(Nil)
@@ -15,7 +16,10 @@ module Fetcher
       # Owner channel and initial state
       @cmd = Channel(TryAcquireMsg | AcquireMsg | AvailableTokensMsg | TickMsg).new
       @tokens = @capacity
-      @last_refill = Time.utc
+      # Use a monotonic-like clock for refill calculations to avoid wall-clock jumps.
+      # We obtain seconds as Float64 from a monotonic source if available,
+      # otherwise fall back to wall-clock seconds.
+      @last_refill = now_seconds
 
       # Waiter queue: Array of Tuple(tokens_requested, reply_channel)
       @waiters = [] of Tuple(Float64, Channel(Nil))
@@ -45,48 +49,56 @@ module Fetcher
         end
 
         loop do
-          msg = @cmd.receive
-          case msg
-          when TryAcquireMsg
-            refill_tokens
-            if @tokens >= msg.tokens_requested
-              @tokens -= msg.tokens_requested
-              msg.reply.send(true)
-            else
-              msg.reply.send(false)
-            end
+          begin
+            loop do
+              msg = @cmd.receive
+              case msg
+              when TryAcquireMsg
+                refill_tokens
+                if @tokens >= msg.tokens_requested
+                  @tokens -= msg.tokens_requested
+                  msg.reply.send(true)
+                else
+                  msg.reply.send(false)
+                end
 
-          when AcquireMsg
-            refill_tokens
-            if @tokens >= msg.tokens_requested
-              @tokens -= msg.tokens_requested
-              msg.reply.send(nil)
-            else
-              @waiters << {msg.tokens_requested, msg.reply}
-              schedule_wakeup.call
-            end
+              when AcquireMsg
+                refill_tokens
+                if @tokens >= msg.tokens_requested
+                  @tokens -= msg.tokens_requested
+                  msg.reply.send(nil)
+                else
+                  @waiters << {msg.tokens_requested, msg.reply}
+                  schedule_wakeup.call
+                end
 
-          when AvailableTokensMsg
-            refill_tokens
-            msg.reply.send(@tokens)
+              when AvailableTokensMsg
+                refill_tokens
+                msg.reply.send(@tokens)
 
-          when TickMsg
-            # clear the scheduled flag, then refill and try to satisfy
-            @wake_scheduled = false
-            refill_tokens
-            # satisfy waiters in FIFO order
-            while @waiters.size > 0 && @tokens > 0
-              req, ch = @waiters.first
-              if @tokens >= req
-                @tokens -= req
-                @waiters.shift
-                ch.send(nil)
-              else
-                break
+              when TickMsg
+                # clear the scheduled flag, then refill and try to satisfy
+                @wake_scheduled = false
+                refill_tokens
+                # satisfy waiters in FIFO order
+                while @waiters.size > 0 && @tokens > 0
+                  req, ch = @waiters.first
+                  if @tokens >= req
+                    @tokens -= req
+                    @waiters.shift
+                    ch.send(nil)
+                  else
+                    break
+                  end
+                end
+                # If there remain waiters, schedule next wakeup
+                schedule_wakeup.call
               end
             end
-            # If there remain waiters, schedule next wakeup
-            schedule_wakeup.call
+          rescue ex
+            ::Log.for("fetcher").error { "TokenBucket owner fiber crashed: #{ex.class} - #{ex.message} (restarting)" }
+            ::sleep(10.milliseconds)
+            # continue and restart loops
           end
         end
       end
@@ -111,12 +123,32 @@ module Fetcher
     end
 
     private def refill_tokens
-      now = Time.utc
+      now = now_seconds
       elapsed = now - @last_refill
-      if elapsed > Time::Span.zero
-        new_tokens = elapsed.total_seconds * @refill_rate
+      if elapsed > 0.0
+        # elapsed is in seconds (Float64), multiply by refill_rate
+        new_tokens = elapsed * @refill_rate
         @tokens = [@tokens + new_tokens, @capacity].min
         @last_refill = now
+      end
+    end
+
+    private def now_seconds : Float64
+      begin
+        val = Time.monotonic
+        if val.is_a?(Time)
+          val.to_unix.to_f
+        elsif val.responds_to?(:total_seconds)
+          val.total_seconds
+        else
+          begin
+            val.to_f
+          rescue
+            val.to_unix.to_f
+          end
+        end
+      rescue
+        Time.utc.to_unix.to_f
       end
     end
   end
