@@ -82,6 +82,17 @@ module Fetcher
       return {result: result, source: :api} if result.success?
 
       error = result.error
+
+      # If Reddit returned 403 (forbidden) it's often an IP/User-Agent based
+      # block. Try the RSS endpoint as a fallback before falling back to
+      # old.reddit.com. This helps on VPSes that are blocked from the API but
+      # still serve the RSS feed.
+      if error && error.status_code == 403
+        ::Log.for("fetcher.reddit").warn { "Reddit API returned 403 for /r/#{subreddit} - trying RSS fallback" }
+        rss_result = fetch_rss(subreddit, sort, limit, headers, config)
+        return {result: rss_result, source: :rss} if rss_result.success?
+      end
+
       if transient_error?(error.try(&.kind))
         rss_result = fetch_rss(subreddit, sort, limit, headers, config)
         return {result: rss_result, source: :rss} if rss_result.success?
@@ -101,6 +112,27 @@ module Fetcher
       final_headers.merge!(headers)
 
       http_client = Fetcher::CrestHttpClient.new(config)
+      # Diagnostic: resolve host addresses and log selected header info. This
+      # helps investigate cases where certain VPS IPs are blocked by Reddit.
+      begin
+        uri = URI.parse(api_url)
+        host = uri.host
+        addresses = [] of String
+        begin
+          addrs = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+          addrs.each do |a|
+            addresses << a.ip_address
+          end
+        rescue ex
+          addresses = ["resolve_failed: #{ex.message}"]
+        end
+        ::Log.for("fetcher.reddit").debug { "Fetching Reddit API #{api_url} from resolved addresses: #{addresses.join(", ")}" }
+        # Log a summary of headers that may affect blocking (User-Agent and Accept)
+        ::Log.for("fetcher.reddit").debug { "Request headers: User-Agent=#{final_headers["User-Agent"]?}, Accept=#{final_headers["Accept"]?}" }
+      rescue ex
+        ::Log.for("fetcher.reddit").debug { "Failed to resolve/log diagnostics for #{api_url}: #{ex.message}" }
+      end
+
       response = http_client.get(api_url, final_headers)
       handle_reddit_response(response, api_url, subreddit, limit, config)
     rescue ex : RedditFetchError
@@ -168,7 +200,34 @@ module Fetcher
         error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
         raise HTTPServerError.new(error.message, response.status_code, error)
       else
-        error = Error.http(response.status_code, "HTTP error #{response.status_code}", api_url)
+        # Gather a few useful response details to aid debugging on blocked IPs
+        server = response.headers["server"]? || response.headers["Server"]?
+        via = response.headers["via"]? || response.headers["Via"]?
+        rate_remaining = response.headers["x-ratelimit-remaining"]? || response.headers["X-Ratelimit-Remaining"]?
+        content_type = response.headers["content-type"]? || response.headers["Content-Type"]?
+
+        body_snippet = nil
+        begin
+          if response.body && response.body.is_a?(String)
+            body_snippet = response.body[0, 512]
+            # normalize whitespace for logging
+            body_snippet = body_snippet.gsub(/\s+/, " ").strip
+          end
+        rescue
+          body_snippet = nil
+        end
+
+        detail_parts = ["status=#{response.status_code}"]
+        detail_parts << "server=#{server}" if server
+        detail_parts << "via=#{via}" if via
+        detail_parts << "rate_remaining=#{rate_remaining}" if rate_remaining
+        detail_parts << "content_type=#{content_type}" if content_type
+        detail_parts << "body=#{body_snippet}" if body_snippet
+
+        detail = detail_parts.join("; ")
+        ::Log.for("fetcher.reddit").warn { "Reddit API returned non-OK status: #{detail} for #{api_url}" }
+
+        error = Error.http(response.status_code, "HTTP error #{response.status_code}: #{detail}", api_url)
         raise HTTPError.new(error.message, response.status_code, error)
       end
     end
