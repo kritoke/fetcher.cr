@@ -9,15 +9,7 @@ require "./safe_feed_processor"
 require "./link_resolver"
 
 module Fetcher
-  alias RSSFeedMetadata = NamedTuple(
-    site_link: String?,
-    favicon: String?,
-    feed_title: String?,
-    feed_description: String?,
-    feed_language: String?,
-    feed_authors: Array(Author))
-
-  EMPTY_FEED_METADATA = {site_link: nil, favicon: nil, feed_title: nil, feed_description: nil, feed_language: nil, feed_authors: [] of Author}
+  EMPTY_FEED_METADATA = FeedMetadata.new
 
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
@@ -38,19 +30,19 @@ module Fetcher
       [] of Entry
     end
 
-    def parse_feed_metadata(data : String) : RSSFeedMetadata
+    def parse_feed_metadata(data : String) : FeedMetadata
       xml = parse_xml(data)
       parse_feed_metadata(xml)
     end
 
-    def parse_feed_metadata(xml : XML::Document) : RSSFeedMetadata
+    def parse_feed_metadata(xml : XML::Document) : FeedMetadata
       return EMPTY_FEED_METADATA unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
-      return rss_metadata unless rss_metadata[:site_link].nil? && rss_metadata[:feed_title].nil?
+      return rss_metadata unless rss_metadata.site_link.nil? && rss_metadata.feed_title.nil?
 
       atom_metadata = parse_atom_metadata(xml)
-      return atom_metadata unless atom_metadata[:site_link].nil? && atom_metadata[:feed_title].nil?
+      return atom_metadata unless atom_metadata.site_link.nil? && atom_metadata.feed_title.nil?
 
       EMPTY_FEED_METADATA
     end
@@ -85,7 +77,7 @@ module Fetcher
       entries
     end
 
-    private def parse_rss_metadata(xml : XML::Node) : RSSFeedMetadata
+    private def parse_rss_metadata(xml : XML::Node) : FeedMetadata
       site_link = "#"
       feed_title = ""
       feed_description = ""
@@ -101,14 +93,14 @@ module Fetcher
 
       favicon = xml.xpath_node("//*[local-name()='channel']/*[local-name()='image']/*[local-name()='url']").try(&.text)
 
-      {
-        site_link:        site_link,
-        favicon:          favicon,
-        feed_title:       feed_title.presence,
+      FeedMetadata.new(
+        site_link: site_link,
+        favicon: favicon,
+        feed_title: feed_title.presence,
         feed_description: feed_description.presence,
-        feed_language:    feed_language.presence,
-        feed_authors:     [] of Author,
-      }
+        feed_language: feed_language.presence,
+        feed_authors: [] of Author,
+      )
     end
 
     private def resolve_rss_site_link(channel : XML::Node) : String
@@ -209,7 +201,7 @@ module Fetcher
       entries
     end
 
-    private def parse_atom_metadata(xml : XML::Node) : RSSFeedMetadata
+    private def parse_atom_metadata(xml : XML::Node) : FeedMetadata
       feed_node = xml.xpath_node("//*[local-name()='feed']")
       return EMPTY_FEED_METADATA unless feed_node
 
@@ -233,14 +225,14 @@ module Fetcher
       favicon = feed_node.xpath_node("./*[local-name()='icon']").try(&.text) ||
                 feed_node.xpath_node("./*[local-name()='logo']").try(&.text)
 
-      {
-        site_link:        site_link,
-        favicon:          favicon,
-        feed_title:       feed_title.presence,
+      FeedMetadata.new(
+        site_link: site_link,
+        favicon: favicon,
+        feed_title: feed_title.presence,
         feed_description: subtitle.presence,
-        feed_language:    feed_language.presence,
-        feed_authors:     feed_authors,
-      }
+        feed_language: feed_language.presence,
+        feed_authors: feed_authors,
+      )
     end
 
     private def parse_atom_entry(node : XML::Node) : Entry

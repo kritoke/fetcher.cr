@@ -24,24 +24,12 @@ module Fetcher
       items.first(limit).compact_map { |item| parse_item(item) }
     end
 
-    def parse_feed_metadata(data : String) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
+    def parse_feed_metadata(data : String) : FeedMetadata
       parsed = parse_json(data)
       parse_feed_metadata(parsed)
     end
 
-    def parse_feed_metadata(parsed : JSON::Any) : NamedTuple(
-      site_link: String?,
-      favicon: String?,
-      feed_title: String?,
-      feed_description: String?,
-      feed_language: String?,
-      feed_authors: Array(Author))
+    def parse_feed_metadata(parsed : JSON::Any) : FeedMetadata
       home_url = parsed["home_page_url"]?.try(&.as_s)
       favicon = parsed["favicon"]?.try(&.as_s)
       icon = parsed["icon"]?.try(&.as_s)
@@ -51,14 +39,14 @@ module Fetcher
 
       feed_authors = parse_authors(parsed)
 
-      {
-        site_link:        home_url,
-        favicon:          favicon || icon,
-        feed_title:       feed_title,
+      FeedMetadata.new(
+        site_link: home_url,
+        favicon: favicon || icon,
+        feed_title: feed_title,
         feed_description: description,
-        feed_language:    feed_language,
-        feed_authors:     feed_authors,
-      }
+        feed_language: feed_language,
+        feed_authors: feed_authors,
+      )
     end
 
     private def parse_json(data : String) : JSON::Any

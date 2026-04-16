@@ -1,4 +1,5 @@
 require "json"
+require "../error_handler"
 require "./atom_parser"
 
 module Fetcher
@@ -15,6 +16,8 @@ module Fetcher
         return result if result && result.success?
 
         Fetcher.error_result(ErrorKind::HTTPError, "GitLab fetch error: No releases found", 404)
+      rescue ex : Exception
+        ErrorHandler.handle_network_error(ex, provider.api_url)
       end
 
       private def self.try_atom(provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient, headers : ::HTTP::Headers) : Result?
@@ -25,6 +28,8 @@ module Fetcher
             return atom_result if atom_result && atom_result.success?
           rescue ex : DNSError
             return Fetcher.error_result(ErrorKind::DNSError, "GitLab DNS error: #{ex.message}")
+          rescue ex
+            ::Log.for("fetcher.software").debug { "GitLab atom feed failed for #{atom_url}: #{ex.class} - #{ex.message}" }
           end
         end
         nil

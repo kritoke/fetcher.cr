@@ -1,5 +1,6 @@
 require "xml"
 require "../rss_parser"
+require "../link_resolver"
 
 module Fetcher
   module Software
@@ -34,6 +35,7 @@ module Fetcher
         entries = parser.parse_entries(body, limit)
         entries.map do |entry|
           version = entry.version || extract_version(entry.title)
+          link_data = LinkResolver.resolve_from_url(entry.url)
           Entry.create(
             title: entry.title,
             url: entry.url,
@@ -46,6 +48,9 @@ module Fetcher
             categories: entry.categories,
             attachments: entry.attachments,
             version: version,
+            comment_url: link_data.comment_url,
+            commentary_url: link_data.commentary_url,
+            is_discussion_url: link_data.is_discussion_url
           )
         end
       rescue XML::Error

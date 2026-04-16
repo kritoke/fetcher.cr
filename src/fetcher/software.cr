@@ -9,6 +9,7 @@ require "./time_parser"
 require "./exceptions"
 require "./error_handler"
 require "./rss_parser"
+require "./link_resolver"
 require "./software/github"
 require "./software/gitlab"
 require "./software/codeberg"
@@ -173,6 +174,8 @@ module Fetcher
 
       html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
 
+      link_data = LinkResolver.resolve_from_url(html_url)
+
       Entry.create(
         title: "#{provider.repo} #{name}",
         url: html_url,
@@ -180,7 +183,10 @@ module Fetcher
         content: body,
         content_html: body.presence,
         published_at: pub_date,
-        version: tag
+        version: tag,
+        comment_url: link_data.comment_url,
+        commentary_url: link_data.commentary_url,
+        is_discussion_url: link_data.is_discussion_url
       )
     end
   end

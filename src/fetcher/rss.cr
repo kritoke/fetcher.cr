@@ -57,12 +57,12 @@ module Fetcher
 
         Result.success(
           entries: entries,
-          site_link: metadata[:site_link],
-          favicon: metadata[:favicon],
-          feed_title: metadata[:feed_title],
-          feed_description: metadata[:feed_description],
-          feed_language: metadata[:feed_language],
-          feed_authors: metadata[:feed_authors]
+          site_link: metadata.site_link,
+          favicon: metadata.favicon,
+          feed_title: metadata.feed_title,
+          feed_description: metadata.feed_description,
+          feed_language: metadata.feed_language,
+          feed_authors: metadata.feed_authors
         )
       rescue ex : InvalidFormatError
         Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Invalid format error")

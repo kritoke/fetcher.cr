@@ -6,6 +6,9 @@ module Fetcher
         Result.success(entries: [] of Entry, etag: response.headers["ETag"]?, last_modified: response.headers["Last-Modified"]?)
       when 200..299
         yield
+      when 429
+        error = Error.rate_limited("Rate limited", url)
+        Result.error(error)
       when 500..599
         error = Error.server_error(response.status_code, "Server error: #{response.status_code}", url)
         Result.error(error)

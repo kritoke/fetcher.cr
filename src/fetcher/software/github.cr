@@ -1,4 +1,5 @@
 require "json"
+require "../link_resolver"
 
 module Fetcher
   module Software
@@ -10,11 +11,6 @@ module Fetcher
 
         http_client = Fetcher::CrestHttpClient.new(config)
         response = http_client.get(provider.api_url, merged)
-
-        if response.status_code == 429
-          error = Error.rate_limited("GitHub rate limited", provider.api_url)
-          raise RateLimitError.new(error.message, error)
-        end
 
         ErrorHandler.handle_response(response, provider.api_url) do
           releases = parse_json(response.body, provider.api_url)
@@ -54,6 +50,8 @@ module Fetcher
         pub_date = TimeParser.parse(published_at.try(&.as_s))
         html_url = release["html_url"]?.try(&.as_s) || ""
 
+        link_data = LinkResolver.resolve_from_url(html_url)
+
         Entry.create(
           title: "#{provider.repo} #{name}",
           url: html_url,
@@ -61,7 +59,10 @@ module Fetcher
           content: body,
           content_html: body.presence,
           published_at: pub_date,
-          version: tag
+          version: tag,
+          comment_url: link_data.comment_url,
+          commentary_url: link_data.commentary_url,
+          is_discussion_url: link_data.is_discussion_url
         )
       end
     end

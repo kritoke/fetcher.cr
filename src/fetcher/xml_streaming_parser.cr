@@ -1,31 +1,11 @@
 require "xml"
 require "./entry"
 require "./result"
+require "./entry_parser"
 require "./streaming_rss_parser"
 require "./xml_text_reader"
 
 module Fetcher
-  record FeedMetadata,
-    site_link : String? = nil,
-    favicon : String? = nil,
-    feed_title : String? = nil,
-    feed_description : String? = nil,
-    feed_language : String? = nil,
-    feed_authors : Array(Author) = [] of Author do
-    def to_result(entries : Array(Entry)) : Result
-      Result.success(
-        entries: entries,
-        site_link: site_link,
-        favicon: favicon,
-        feed_title: feed_title,
-        feed_description: feed_description,
-        feed_language: feed_language,
-        feed_authors: feed_authors
-      )
-    end
-  end
-
-  # XML streaming parser using existing StreamingRSSParser with lazy iterator pattern
   class XMLStreamingParser
     def initialize(@limit : Int32 = 100)
     end
