@@ -14,7 +14,7 @@ describe "CacheStore stress" do
           key = "key_#{j % 50}"
           res = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://#{i}-#{j}.example")
           cache.set(key, res, 5.minutes)
-          cached = cache.get(key)
+          cache.get(key)
           # occasionally check stats
           if j % 20 == 0
             s = cache.stats
@@ -27,6 +27,6 @@ describe "CacheStore stress" do
     end
 
     # wait for completions
-    completions.each { |c| c.receive }
+    completions.each(&.receive)
   end
 end
