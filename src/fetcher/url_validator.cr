@@ -22,6 +22,7 @@ module Fetcher
     # call-sites remain functional without signature changes.
     @@validated_store : ValidatedIpStore? = nil
     @@validated_store_lock = Mutex.new
+
     def self.validated_store
       @@validated_store_lock.synchronize { @@validated_store ||= ValidatedIpStore.new }
     end
@@ -44,12 +45,6 @@ module Fetcher
 
     def self.purge_expired(expiry : Time::Span? = nil) : Nil
       validated_store.purge_expired(expiry)
-    end
-
-    private def self.enforce_validated_limit : Nil
-      return if @@validated_ips.size < MAX_VALIDATED_ENTRIES
-      # Use BoundedRegistry helpers for eviction/cleanup logic
-      BoundedRegistry.ensure_limit(@@validated_ips, MAX_VALIDATED_ENTRIES, @@validation_ttl)
     end
 
     def self.check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool
@@ -149,11 +144,10 @@ module Fetcher
       if path && (path.includes?("/..") || path.includes?("/."))
         resolved = path.split("/").reduce([] of String) do |acc, segment|
           case segment
-          when ".."    then acc.pop?
-          when ".", "" then nil
+          when ".."    then acc.pop?; acc
+          when ".", "" then acc
           else              acc << segment
           end
-          acc
         end
         uri = uri.dup
         uri.path = resolved.join("/")
@@ -175,12 +169,14 @@ module Fetcher
       !looks_like_ip?(clean_host) || validate_ip(clean_host)
     end
 
+    IPV4_OR_HEX = /^[0-9a-fA-F.:]+$/
+
     def self.looks_like_ip?(host : String) : Bool
       return false if host.empty?
       return true if host.starts_with?("[")
       return true if host.includes?(":")
       return false unless host[0].ascii_number?
-      host.each_char.all? { |char| char.ascii_number? || char.in?('.', 'a', 'b', 'c', 'd', 'e', 'f', 'A', 'B', 'C', 'D', 'E', 'F') }
+      host.matches?(IPV4_OR_HEX)
     end
 
     private def self.clean_ipv6(host : String) : String

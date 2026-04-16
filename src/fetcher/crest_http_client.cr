@@ -267,15 +267,14 @@ module Fetcher
 
     private def build_tls_context : OpenSSL::SSL::Context::Client?
       return if @config.ssl_verify?
-
-      unless @config.responds_to?(:ssl_verify_bypass_acknowledged) && @config.ssl_verify_bypass_acknowledged
-        raise InvalidURLError.new("SSL verification bypass requires explicit acknowledgment via ssl_verify_bypass_acknowledged: true in RequestConfig")
-      end
-
+      ensure_ssl_bypass_acknowledged
       ::Log.for("fetcher").warn { "SSL certificate verification is disabled - connections are vulnerable to MITM attacks" }
-      ctx = OpenSSL::SSL::Context::Client.new
-      ctx.verify_mode = OpenSSL::SSL::VerifyMode::NONE
-      ctx
+      OpenSSL::SSL::Context::Client.new.tap { |ctx| ctx.verify_mode = OpenSSL::SSL::VerifyMode::NONE }
+    end
+
+    private def ensure_ssl_bypass_acknowledged : Nil
+      return if @config.responds_to?(:ssl_verify_bypass_acknowledged) && @config.ssl_verify_bypass_acknowledged
+      raise InvalidURLError.new("SSL verification bypass requires explicit acknowledgment via ssl_verify_bypass_acknowledged: true in RequestConfig")
     end
   end
 end

@@ -26,97 +26,87 @@ module Fetcher
       @max_size = max_size
       @enabled = enabled
 
-      # start owner fiber
-      spawn do
-        loop do
-          begin
-            loop do
-              msg = @cmd.receive
-              case msg
-              when GetMsg
-                unless @enabled
-                  msg.reply.send(nil)
-                  next
-                end
+      spawn { run_owner_fiber }
 
-                entry = @entries[msg.key]?
-                if entry.nil?
-                  @stats.record_miss
-                  msg.reply.send(nil)
-                elsif entry.expired?
-                  remove_entry(msg.key)
-                  @stats.record_miss
-                  msg.reply.send(nil)
-                else
-                  @stats.record_hit
-                  msg.reply.send(entry.value)
-                end
-
-              when SetMsg
-                next unless @enabled
-                if @entries[msg.key]?
-                  @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
-                  @eviction_order.reject! { |k| k == msg.key }
-                  @eviction_set.delete(msg.key)
-                  @eviction_order << msg.key
-                  @eviction_set.add(msg.key)
-                else
-                  evict_if_needed
-                  @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
-                  @eviction_order << msg.key
-                  @eviction_set.add(msg.key)
-                end
-
-              when ClearMsg
-                @entries.clear
-                @eviction_order.clear
-                @eviction_set.clear
-                @stats = CacheStats.new
-
-              when ClearByPrefixMsg
-                keys_to_remove = [] of String
-                @entries.each_key do |key|
-                  keys_to_remove << key if key.starts_with?(msg.prefix)
-                end
-                keys_to_remove.each do |key|
-                  @entries.delete(key)
-                  @eviction_set.delete(key)
-                end
-                @eviction_order.reject!(&.starts_with?(msg.prefix))
-
-              when StatsMsg
-                # return a snapshot
-                msg.reply.send(CacheStats.new(hits: Atomic.new(@stats.hits), misses: Atomic.new(@stats.misses), evictions: Atomic.new(@stats.evictions)))
-
-              when EnabledSetMsg
-                @enabled = msg.value
-
-              when EnabledGetMsg
-                msg.reply.send(@enabled)
-
-              when MaxSizeSetMsg
-                @max_size = msg.value
-
-              when MaxSizeGetMsg
-                msg.reply.send(@max_size)
-
-              when CleanupMsg
-                BoundedRegistry.cleanup(@entries)
-              end
-            end
-          rescue ex
-            ::Log.for("fetcher").error { "CacheStore owner fiber crashed: #{ex.class} - #{ex.message} (restarting)" }
-            ::sleep(10.milliseconds)
-            # continue to restart loop
-          end
-        end
-      end
-
-      # start periodic cleanup to evict expired entries
       PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
     end
 
-    # Synchronous APIs that communicate with the owner fiber
+    private def run_owner_fiber
+      loop do
+        begin
+          loop { handle_message }
+        rescue ex
+          ::Log.for("fetcher").error { "CacheStore owner fiber crashed: #{ex.class} - #{ex.message} (restarting)" }
+          ::sleep(10.milliseconds)
+        end
+      end
+    end
+
+    private def handle_message
+      msg = @cmd.receive
+      case msg
+      when GetMsg
+        unless @enabled
+          msg.reply.send(nil)
+          return
+        end
+
+        entry = @entries[msg.key]?
+        if entry.nil?
+          @stats.record_miss
+          msg.reply.send(nil)
+        elsif entry.expired?
+          remove_entry(msg.key)
+          @stats.record_miss
+          msg.reply.send(nil)
+        else
+          @stats.record_hit
+          msg.reply.send(entry.value)
+        end
+      when SetMsg
+        return unless @enabled
+        if @entries[msg.key]?
+          @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
+          @eviction_order.reject! { |k| k == msg.key }
+          @eviction_set.delete(msg.key)
+          @eviction_order << msg.key
+          @eviction_set.add(msg.key)
+        else
+          evict_if_needed
+          @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
+          @eviction_order << msg.key
+          @eviction_set.add(msg.key)
+        end
+      when ClearMsg
+        @entries.clear
+        @eviction_order.clear
+        @eviction_set.clear
+        @stats = CacheStats.new
+      when ClearByPrefixMsg
+        keys_to_remove = [] of String
+        @entries.each_key do |key|
+          keys_to_remove << key if key.starts_with?(msg.prefix)
+        end
+        keys_to_remove.each do |key|
+          @entries.delete(key)
+          @eviction_set.delete(key)
+        end
+        @eviction_order.reject!(&.starts_with?(msg.prefix))
+      when StatsMsg
+        msg.reply.send(CacheStats.snapshot(@stats.hits, @stats.misses, @stats.evictions))
+      when EnabledSetMsg
+        @enabled = msg.value
+      when EnabledGetMsg
+        msg.reply.send(@enabled)
+      when MaxSizeSetMsg
+        @max_size = msg.value
+      when MaxSizeGetMsg
+        msg.reply.send(@max_size)
+      when CleanupMsg
+        BoundedRegistry.cleanup(@entries)
+      end
+    end
+
     def get(key : String) : Result?
       ch = Channel(Result?).new
       @cmd.send(GetMsg.new(key, ch))

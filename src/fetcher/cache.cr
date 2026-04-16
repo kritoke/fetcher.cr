@@ -28,9 +28,14 @@ module Fetcher
     )
     end
 
+    def self.snapshot(hits : UInt64, misses : UInt64, evictions : UInt64) : CacheStats
+      new(hits: Atomic.new(hits), misses: Atomic.new(misses), evictions: Atomic.new(evictions))
+    end
+
     def hit_ratio : Float64
-      total = @hits.get + @misses.get
-      total > 0 ? @hits.get.to_f / total : 0.0
+      hits = @hits.get
+      total = hits + @misses.get
+      total > 0 ? hits.to_f / total : 0.0
     end
 
     def record_hit : Nil
@@ -137,7 +142,6 @@ module Fetcher
     {% end %}
 
     # Setters with special signatures (defined below once each)
-
 
     def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
       store.set(key, value, ttl)

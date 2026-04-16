@@ -28,7 +28,7 @@ module Fetcher
 
     # Convert iterator to array with optional limit
     # Note: This consumes the iterator. Call only once.
-    def to_a(limit : Int32? = nil) : Array(Entry)
+    def collect(limit : Int32? = nil) : Array(Entry)
       entries = [] of Entry
       count = 0
       while limit.nil? || count < limit

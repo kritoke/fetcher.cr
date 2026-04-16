@@ -84,32 +84,23 @@ module Fetcher
   end
 
   private def self.detect_content(url : String, headers : ::HTTP::Headers, config : RequestConfig) : DriverType?
-    begin
-      head_headers = Fetcher::CrestHttpClient.build_headers(headers)
-      http_client = Fetcher::CrestHttpClient.new(config)
-      response = http_client.head(url, head_headers)
+    head_headers = Fetcher::CrestHttpClient.build_headers(headers)
+    http_client = Fetcher::CrestHttpClient.new(config)
+    response = http_client.head(url, head_headers)
 
-      content_type = response.headers["content-type"]?.try(&.downcase)
+    content_type = response.headers["content-type"]?.try(&.downcase)
+    return nil unless content_type
 
-      if content_type
-        # application/feed+json is a strong signal for JSON Feed
-        if content_type.includes?("application/feed+json")
-          return DriverType::JSONFeed
-        end
+    classify_content_type(content_type, url)
+  rescue ex
+    ::Log.for("fetcher").debug { "Content-type detection failed for #{url}: #{ex.class} - #{ex.message}" }
+    nil
+  end
 
-        # application/json by itself is ambiguous; use URL heuristics to confirm
-        if content_type.includes?("application/json")
-          return detect_ext(url)
-        end
-
-        if rss_type?(content_type)
-          return DriverType::RSS
-        end
-      end
-    rescue ex
-      ::Log.for("fetcher").debug { "Content-type detection failed for #{url}: #{ex.class} - #{ex.message}" }
-    end
-
+  private def self.classify_content_type(content_type : String, url : String) : DriverType?
+    return DriverType::JSONFeed if content_type.includes?("application/feed+json")
+    return detect_ext(url) if content_type.includes?("application/json")
+    return DriverType::RSS if rss_type?(content_type)
     nil
   end
 

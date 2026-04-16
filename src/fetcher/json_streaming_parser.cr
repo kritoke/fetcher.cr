@@ -18,7 +18,7 @@ module Fetcher
 
     def parse_entries(io : IO, limit : Int32? = nil) : Array(Entry)
       actual_limit = limit || @limit
-      parse(io).to_a(actual_limit)
+      parse(io).collect(actual_limit)
     end
   end
 
@@ -48,27 +48,7 @@ module Fetcher
     end
 
     private def determine_feed_type
-      begin
-        @pull.read_object do |key|
-          if key == "data"
-            @pull.read_object do |data_key|
-              if data_key == "children"
-                @parser = RedditJSONParser.new(@limit)
-                break
-              else
-                @pull.skip
-              end
-            end
-          elsif key == "version" && @pull.read_string.includes?("jsonfeed")
-            @parser = JSONFeedStreamingParser.new(@limit)
-            break
-          else
-            @pull.skip
-          end
-        end
-      rescue ex
-        ::Log.for("fetcher.streaming").warn { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
-      end
+      detect_parser_type
 
       if @io.responds_to?(:rewind)
         @io.rewind
@@ -76,6 +56,35 @@ module Fetcher
       else
         ::Log.for("fetcher.streaming").warn { "JSON streaming parser received non-seekable IO; type detection consumed data and cannot be rewound - falling back to DOM parser" }
         raise MemoryLimitExceeded.new("Non-seekable IO cannot be used with streaming JSON parser after type detection")
+      end
+    end
+
+    private def detect_parser_type
+      @pull.read_object do |key|
+        case key
+        when "data"
+          detect_reddit_parser
+        when "version"
+          if @pull.read_string.includes?("jsonfeed")
+            @parser = JSONFeedStreamingParser.new(@limit)
+            break
+          end
+        else
+          @pull.skip
+        end
+      end
+    rescue ex
+      ::Log.for("fetcher.streaming").warn { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
+    end
+
+    private def detect_reddit_parser
+      @pull.read_object do |data_key|
+        if data_key == "children"
+          @parser = RedditJSONParser.new(@limit)
+          break
+        else
+          @pull.skip
+        end
       end
     end
   end
