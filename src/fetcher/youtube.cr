@@ -6,16 +6,22 @@ require "./rss"
 require "./exceptions"
 require "./error_handler"
 require "./link_resolver"
+require "./html_utils"
 
 module Fetcher
   module YouTube
-    YOUTUBE_RSS_BASE = "https://www.youtube.com/feeds/videos.xml?channel_id="
+    YOUTUBE_RSS_BASE = "https://www.youtube.com/feeds/videos.xml?"
 
     YOUTUBE_CACHE_TTL = 5.minutes
+    YOUTUBE_RESOLVE_CACHE_TTL = 1.hour
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       channel_id = extract_channel(url)
-      return Fetcher.error_result(ErrorKind::InvalidURL, "Not a valid YouTube channel URL. Only /channel/UC... URLs are supported.") unless channel_id
+
+      unless channel_id
+        channel_id = resolve_channel_id(url, config)
+        return Fetcher.error_result(ErrorKind::InvalidURL, "Not a valid YouTube channel URL. Could not resolve channel ID for #{url}") unless channel_id
+      end
 
       cache_key = "youtube:#{channel_id}:#{limit}"
 
@@ -25,7 +31,7 @@ module Fetcher
         end
       end
 
-      rss_url = "#{YOUTUBE_RSS_BASE}#{channel_id}"
+      rss_url = "#{YOUTUBE_RSS_BASE}channel_id=#{channel_id}"
 
       result = Fetcher.with_retry(config) do
         fetch_youtube(rss_url, channel_id, headers, limit, config)
@@ -87,10 +93,111 @@ module Fetcher
     end
 
     private def self.extract_channel(url : String) : String?
-      match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
-      return unless match
-      id = match[1]
-      id if id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/)
+      if match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
+        id = match[1]
+        return id if id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/)
+      end
+
+      if url.includes?("/@")
+        if match = url.match(%r{youtube\.com/@([^/?]+)}i)
+          return resolve_handle_to_channel_id(match[1], url)
+        end
+      end
+
+      if url.includes?("/c/")
+        if match = url.match(%r{youtube\.com/c/([^/?]+)}i)
+          return resolve_custom_url_to_channel_id(match[1], url)
+        end
+      end
+
+      if url.includes?("/user/")
+        if match = url.match(%r{youtube\.com/user/([^/?]+)}i)
+          return resolve_user_to_channel_id(match[1], url)
+        end
+      end
+
+      nil
+    end
+
+    private def self.resolve_channel_id(url : String, config : RequestConfig) : String?
+      if url.includes?("/@")
+        match = url.match(%r{youtube\.com/@([^/?]+)}i)
+        return resolve_handle_to_channel_id(match[1], url, config) if match
+      end
+
+      if url.includes?("/c/")
+        match = url.match(%r{youtube\.com/c/([^/?]+)}i)
+        return resolve_custom_url_to_channel_id(match[1], url, config) if match
+      end
+
+      if url.includes?("/user/")
+        match = url.match(%r{youtube\.com/user/([^/?]+)}i)
+        return resolve_user_to_channel_id(match[1], url, config) if match
+      end
+
+      nil
+    end
+
+    private def self.resolve_handle_to_channel_id(handle : String, url : String, config : RequestConfig? = nil) : String?
+      try_rss_with_params(url, {"slug" => handle})
+    end
+
+    private def self.resolve_custom_url_to_channel_id(name : String, url : String, config : RequestConfig? = nil) : String?
+      try_rss_with_params(url, {"name" => name})
+    end
+
+    private def self.resolve_user_to_channel_id(username : String, url : String, config : RequestConfig? = nil) : String?
+      try_rss_with_params(url, {"user" => username})
+    end
+
+    private def self.try_rss_with_params(original_url : String, params : Hash(String, String)) : String?
+      rss_url = "#{YOUTUBE_RSS_BASE}#{params.map { |k, v| "#{k}=#{URI.encode_path(v)}" }.join("&")}"
+
+      http_client = Fetcher::CrestHttpClient.new(RequestConfig.new)
+      response = http_client.get(rss_url, Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new))
+
+      return nil unless response.status_code == 200
+
+      channel_id = extract_channel_id_from_feed(response.body)
+      return channel_id if channel_id && channel_id.starts_with?("UC")
+      nil
+    rescue
+      nil
+    end
+
+    private def self.extract_channel_id_from_feed(body : String) : String?
+      if match = body.match(/<yt:channelId>UC[^<]+<\/yt:channelId>/i)
+        match[0].gsub(/<\/?yt:channelId>/i, "")
+      elsif match = body.match(/yt:channelId="(UC[^"]+)"/i)
+        match[1]
+      end
+    end
+
+    private def self.resolve_channel_id_from_page(url : String, config : RequestConfig) : String?
+      http_client = Fetcher::CrestHttpClient.new(config)
+      response = http_client.get(url, Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new))
+
+      return nil unless response.status_code == 200
+
+      extract_channel_id_from_html(response.body)
+    rescue
+      nil
+    end
+
+    private def self.extract_channel_id_from_html(html : String) : String?
+      if match = html.match(/"channelId":"(UC[^"]+)"/i)
+        return match[1]
+      end
+
+      if match = html.match(/<link rel="canonical" href="https:\/\/www\.youtube\.com\/channel\/(UC[^"]+)"/i)
+        return match[1]
+      end
+
+      if match = html.match(/["']externalId["']\s*:\s*["'](UC[^"']+)["']/i)
+        return match[1]
+      end
+
+      nil
     end
   end
 end

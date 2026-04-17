@@ -1,32 +1,24 @@
 require "time"
 
 module Fetcher
-  # Small helper module that encapsulates common bounded registry operations so
-  # individual registries don't duplicate eviction and cleanup code.
   module BoundedRegistry
-    # Ensure the provided entries hash is within size limits by evicting old items.
-    def self.ensure_limit(entries : Hash(String, _), max_entries : Int32, default_ttl : Time::Span)
+    def self.ensure_limit(entries : Hash(String, T), max_entries : Int32, default_ttl : Time::Span) : Nil forall T
       RegistryHelpers.enforce_registry_limit(entries, max_entries, default_ttl)
     end
 
-    # Remove expired entries from the provided entries hash.
-    def self.cleanup(entries : Hash(String, _))
+    def self.cleanup(entries : Hash(String, T)) : Nil forall T
       now = Time.utc
       entries.reject! do |_, entry|
-        last = entry.responds_to?(:last_accessed) ? entry.last_accessed : (entry.responds_to?(:timestamp) ? entry.timestamp : now)
-        now - last > entry.ttl
+        now - entry.last_accessed > entry.ttl
       end
     end
 
-    # Mark an entry as accessed by updating its last_accessed field to now.
-    # Returns true if the update was performed.
-    def self.mark_access(entries : Hash(String, _), key : String) : Bool
+    def self.mark_access(entries : Hash(String, T), key : String) : Bool forall T
       if entry = entries[key]?
         begin
           entry.last_accessed = Time.utc
           return true
         rescue
-          # not writable
         end
       end
       false

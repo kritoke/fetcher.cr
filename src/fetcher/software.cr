@@ -29,6 +29,7 @@ module Fetcher
       getter api_url : String
       getter atom_url : String
       getter atom_fallback_urls : Array(String)
+      getter body_field : String
 
       def initialize(
         @name : String,
@@ -38,6 +39,7 @@ module Fetcher
         @api_url : String,
         @atom_url : String,
         @atom_fallback_urls : Array(String) = [] of String,
+        @body_field : String = "body",
       )
       end
     end
@@ -71,6 +73,7 @@ module Fetcher
           api_url: "#{base_url}/api/v4/projects/#{repo.split('/').map { |segment| URI.encode_path(segment) }.join('/')}/releases",
           atom_url: "#{base_url}/#{repo}/-/releases.atom",
           atom_fallback_urls: ["#{base_url}/#{repo}/-/tags?format=atom"],
+          body_field: "description",
         )
       end
 
@@ -142,7 +145,7 @@ module Fetcher
       return if releases.empty?
 
       entries = releases.first(limit).map do |release|
-        parse_software_entry(release, provider)
+        parse_software_entry(release, provider, provider.body_field)
       end
 
       Result.success(

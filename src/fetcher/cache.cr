@@ -5,14 +5,14 @@ require "./cache_store"
 module Fetcher
   struct CacheEntry
     getter value : Result
-    getter timestamp : Time
+    getter last_accessed : Time
     getter ttl : Time::Span
 
-    def initialize(@value : Result, @timestamp : Time, @ttl : Time::Span)
+    def initialize(@value : Result, @last_accessed : Time, @ttl : Time::Span)
     end
 
     def expired? : Bool
-      Time.utc - @timestamp > @ttl
+      Time.utc - @last_accessed > @ttl
     end
   end
 

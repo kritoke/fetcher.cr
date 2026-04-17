@@ -116,7 +116,8 @@ module Fetcher
     end
 
     private def now_seconds : Float64
-      Time.monotonic.total_seconds
+      instant = Time.instant
+      instant.@seconds.to_f + instant.@nanoseconds.to_f / 1e9
     rescue
       Time.utc.to_unix.to_f
     end

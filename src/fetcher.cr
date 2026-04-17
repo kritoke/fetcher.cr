@@ -39,11 +39,12 @@ module Fetcher
   REDDIT_URL_PATTERN        = %r{://(www\.)?reddit\.com/r/}i
   GITHUB_RELEASES_PATTERN   = %r{://(www\.)?github\.com/[^/]+/[^/]+/releases}i
   CODEBERG_RELEASES_PATTERN = %r{://(www\.)?codeberg\.org/[^/]+/[^/]+/releases}i
-  YOUTUBE_CHANNEL_PATTERN   = %r{://(www\.)?youtube\.com/channel/}i
+  YOUTUBE_CHANNEL_PATTERN   = %r{://(www\.)?youtube\.com/(channel/|@|c/|user/)}i
   GITLAB_RELEASES_PATTERN   = %r{://[^/]+/[^/]+/[^/]+/-/releases}i
 
   enum DriverType
     RSS
+    Atom
     Reddit
     Software
     JSONFeed
@@ -100,13 +101,13 @@ module Fetcher
   private def self.classify_content_type(content_type : String, url : String) : DriverType?
     return DriverType::JSONFeed if content_type.includes?("application/feed+json")
     return detect_ext(url) if content_type.includes?("application/json")
+    return DriverType::Atom if content_type.includes?("application/atom+xml")
     return DriverType::RSS if rss_type?(content_type)
     nil
   end
 
   private def self.rss_type?(content_type : String) : Bool
     content_type.includes?("application/rss+xml") ||
-      content_type.includes?("application/atom+xml") ||
       content_type.includes?("text/xml") ||
       content_type.includes?("application/xml")
   end
@@ -135,6 +136,7 @@ module Fetcher
 
     case driver
     when .rss?       then RSS.pull(url, headers, actual_limit, config)
+    when .atom?      then RSS.pull(url, headers, actual_limit, config)
     when .reddit?    then Reddit.pull(url, headers, actual_limit, config)
     when .software?  then Software.pull(url, headers, actual_limit, config)
     when .json_feed? then JSONFeed.pull(url, headers, actual_limit, config)

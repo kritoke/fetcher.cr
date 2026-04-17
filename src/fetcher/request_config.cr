@@ -56,6 +56,8 @@ module Fetcher
     getter error_detail_level : ErrorDetailLevel
     getter max_concurrent_requests : Int32?
     getter ssl_verify_bypass_acknowledged : Bool
+    getter gitlab_token : String?
+    getter codeberg_token : String?
 
     @cache_instance : Cache? = nil
 
@@ -80,6 +82,8 @@ module Fetcher
       @error_detail_level : ErrorDetailLevel = ErrorDetailLevel::Normal,
       @max_concurrent_requests : Int32? = nil,
       @ssl_verify_bypass_acknowledged : Bool = false,
+      @gitlab_token : String? = nil,
+      @codeberg_token : String? = nil,
     )
     end
 
@@ -112,7 +116,9 @@ module Fetcher
         driver_detection_mode: @driver_detection_mode,
         error_detail_level: @error_detail_level,
         max_concurrent_requests: @max_concurrent_requests,
-        ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged
+        ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged,
+        gitlab_token: @gitlab_token,
+        codeberg_token: @codeberg_token
       )
     end
   end

@@ -55,7 +55,6 @@ module Fetcher
         @pull = JSON::PullParser.new(@io)
       else
         ::Log.for("fetcher.streaming").warn { "JSON streaming parser received non-seekable IO; type detection consumed data and cannot be rewound - falling back to DOM parser" }
-        raise MemoryLimitExceeded.new("Non-seekable IO cannot be used with streaming JSON parser after type detection")
       end
     end
 

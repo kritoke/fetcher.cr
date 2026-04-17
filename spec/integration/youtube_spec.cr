@@ -11,36 +11,16 @@ describe "Integration Tests - YouTube" do
       Fetcher.detect_driver("https://youtube.com/channel/UCxxxxxxxxxxxxxxxxxx").should eq(Fetcher::DriverType::YouTube)
     end
 
-    it "does not detect other YouTube URLs as YouTube driver" do
-      Fetcher.detect_driver("https://www.youtube.com/@handle").should_not eq(Fetcher::DriverType::YouTube)
-      Fetcher.detect_driver("https://www.youtube.com/c/customname").should_not eq(Fetcher::DriverType::YouTube)
-      Fetcher.detect_driver("https://www.youtube.com/user/username").should_not eq(Fetcher::DriverType::YouTube)
-    end
-  end
-
-  describe "channel ID extraction" do
-    it "rejects @handle URLs" do
-      url = "https://www.youtube.com/@somehandle"
-      result = Fetcher.pull_youtube(url)
-      result.success?.should be_false
-      result.error_message.should_not be_nil
-      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
+    it "detects YouTube @handle URLs" do
+      Fetcher.detect_driver("https://www.youtube.com/@somehandle").should eq(Fetcher::DriverType::YouTube)
     end
 
-    it "rejects /c/ custom URLs" do
-      url = "https://www.youtube.com/c/customname"
-      result = Fetcher.pull_youtube(url)
-      result.success?.should be_false
-      result.error_message.should_not be_nil
-      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
+    it "detects YouTube /c/ custom URLs" do
+      Fetcher.detect_driver("https://www.youtube.com/c/customname").should eq(Fetcher::DriverType::YouTube)
     end
 
-    it "rejects /user/ URLs" do
-      url = "https://www.youtube.com/user/username"
-      result = Fetcher.pull_youtube(url)
-      result.success?.should be_false
-      result.error_message.should_not be_nil
-      result.error_message.as(String).should contain("Not a valid YouTube channel URL")
+    it "detects YouTube /user/ URLs" do
+      Fetcher.detect_driver("https://www.youtube.com/user/username").should eq(Fetcher::DriverType::YouTube)
     end
   end
 
@@ -76,6 +56,26 @@ describe "Integration Tests - YouTube" do
       result.entries.first.source_type.should eq(Fetcher::SourceType::YouTube)
       result.site_link.should eq("https://www.youtube.com/channel/#{channel_id}")
       result.favicon.should eq("https://www.youtube.com/favicon.ico")
+    end
+
+    it "parses YouTube feed with yt:channelId namespace" do
+      channel_id = "UCyyyyyyyyyyyyyyyyyy"
+      youtube_rss = <<-XML
+        <?xml version="1.0" encoding="UTF-8"?>
+        <feed xmlns="http://www.w3.org/2005/Atom" xmlns:yt="http://www.youtube.com/xml/schemas/2015">
+          <entry>
+            <title>Test Video</title>
+            <link href="https://www.youtube.com/watch?v=xyz789"/>
+            <published>2024-01-20T12:00:00+00:00</published>
+            <yt:channelId>UCyyyyyyyyyyyyyyyyyy</yt:channelId>
+          </entry>
+        </feed>
+        XML
+
+      result = Fetcher::YouTube.parse_youtube_feed(youtube_rss, channel_id, 100)
+      result.success?.should be_true
+      result.entries.size.should eq(1)
+      result.entries.first.source_type.should eq(Fetcher::SourceType::YouTube)
     end
   end
 end

@@ -11,7 +11,7 @@ module Fetcher
     # Internal entry record
     record Entry,
       ip : Socket::IPAddress,
-      timestamp : Time
+      last_accessed : Time
 
     def initialize(@max_entries : Int32 = 50_000, @ttl : Time::Span = 5.seconds)
       @map = {} of String => Entry
@@ -31,7 +31,7 @@ module Fetcher
       ttl = expiry || @ttl
       now = Time.utc
       @mutex.synchronize do
-        @map.reject! { |_, entry| (now - entry.timestamp) > ttl }
+        @map.reject! { |_, entry| (now - entry.last_accessed) > ttl }
       end
     end
 
@@ -41,7 +41,7 @@ module Fetcher
     def check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool?
       @mutex.synchronize do
         if entry = @map[host]?
-          if (Time.utc - entry.timestamp) <= @ttl
+          if (Time.utc - entry.last_accessed) <= @ttl
             return entry.ip == current_ip
           else
             @map.delete(host)

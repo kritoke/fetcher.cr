@@ -53,12 +53,11 @@ module Fetcher
       return transient_error?(cause)
     end
 
-    # Check for typed exceptions first
     case ex
     when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError
       return true
     when HTTPError
-      ex.status_code.nil? || (500..599).includes?(ex.status_code.as(Int32))
+      return ex.status_code.nil? || (500..599).includes?(ex.status_code.as(Int32))
     end
 
     # Fallback to string matching for legacy exceptions
