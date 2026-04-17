@@ -260,7 +260,7 @@ module Fetcher
     end
 
     def self.clear_cache(subreddit : String) : Nil
-      Cache.default.clear_by_prefix("reddit:#{subreddit}:")
+      Cache.store.clear_by_prefix("reddit:#{subreddit}:")
     end
 
     private def self.transient_error?(kind : ErrorKind?) : Bool

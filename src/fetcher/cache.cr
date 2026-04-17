@@ -141,18 +141,12 @@ module Fetcher
       end
     {% end %}
 
-    # Setters with special signatures (defined below once each)
-
     def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
       store.set(key, value, ttl)
     end
 
     def self.enabled=(value : Bool)
       store.enabled = value
-    end
-
-    def self.max_size : Int32
-      store.max_size
     end
 
     def self.max_size=(value : Int32)

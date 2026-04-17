@@ -3,7 +3,6 @@ require "mutex"
 module Fetcher
   # Small helper mixins for registries that need eviction and periodic cleanup
   module RegistryHelpers
-    @@cleanup_lock : Mutex = Mutex.new
     @@cleanup_running : Bool = false
 
     # Enforce a max size on the provided entries Hash by evicting oldest entries.
