@@ -103,6 +103,7 @@ module Fetcher
       error = result.error
       should_try_rss = error && (error.status_code == 403 || transient_error?(error.kind))
       if should_try_rss
+        # ameba:disable Lint/NotNil
         ::Log.for("fetcher.reddit").warn { "Reddit API returned #{error.not_nil!.status_code || "transient error"} for /r/#{subreddit} - trying RSS fallback" }
         rss_result = fetch_rss(subreddit, sort, limit, headers, config)
         return {result: rss_result, source: :rss} if rss_result.success?

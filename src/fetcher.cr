@@ -90,7 +90,7 @@ module Fetcher
     response = http_client.head(url, head_headers)
 
     content_type = response.headers["content-type"]?.try(&.downcase)
-    return nil unless content_type
+    return unless content_type
 
     classify_content_type(content_type, url)
   rescue ex

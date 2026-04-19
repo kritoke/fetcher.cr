@@ -27,10 +27,8 @@ module Fetcher
       @@validated_store_lock.synchronize { @@validated_store ||= ValidatedIpStore.new }
     end
 
-    # Legacy names kept for compatibility with previous code that expected
-    # constants like @@validation_ttl or MAX_VALIDATED_ENTRIES. These are now
-    # provided by the default store above.
-    # Keep legacy limits accessible via method-style helpers if needed.
+    # Legacy compatibility: max_validated_entries method-style accessor for
+    # the limit on tracked hostname/IP associations. The default limit is 50,000.
     def self.max_validated_entries : Int32
       50_000
     end
@@ -68,7 +66,7 @@ module Fetcher
 
     def self.safe_url(url : String?) : String
       return "#" unless valid?(url)
-      url.to_s
+      url
     end
 
     SAFE_SCHEMES      = {"http", "https"}
@@ -104,18 +102,12 @@ module Fetcher
 
       begin
         addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-        valid_ips = [] of Socket::IPAddress
 
         addr_info.each do |addr|
-          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
-            ip_address = addr.ip_address
-            return false if blocked_ip?(ip_address)
-            valid_ips << ip_address
-          end
-        end
-
-        valid_ips.each do |ip|
-          register_ip(host, ip)
+          next unless addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
+          ip_address = addr.ip_address
+          return false if blocked_ip?(ip_address)
+          register_ip(host, ip_address)
         end
         true
       rescue Exception

@@ -198,7 +198,7 @@ module Fetcher
       provider : SoftwareProvider,
       limit : Int32,
       http_client : CrestHttpClient,
-      headers : ::HTTP::Headers
+      headers : ::HTTP::Headers,
     ) : Result
       result = try_software_api(provider_name, provider, limit, http_client, headers)
       return result if result && result.success?

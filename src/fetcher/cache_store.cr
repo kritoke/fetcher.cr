@@ -83,11 +83,8 @@ module Fetcher
         @eviction_set.clear
         @stats = CacheStats.new
       when ClearByPrefixMsg
-        keys_to_remove = [] of String
         @entries.each_key do |key|
-          keys_to_remove << key if key.starts_with?(msg.prefix)
-        end
-        keys_to_remove.each do |key|
+          next unless key.starts_with?(msg.prefix)
           @entries.delete(key)
           @eviction_set.delete(key)
         end

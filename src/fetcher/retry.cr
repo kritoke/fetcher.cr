@@ -48,19 +48,18 @@ module Fetcher
   end
 
   def self.transient_error?(ex : Exception) : Bool
-    # Unwrap RedditFetchError to check the original cause
-    if ex.is_a?(Reddit::RedditFetchError) && (cause = ex.original_cause)
-      return transient_error?(cause)
+    if ex.is_a?(Reddit::RedditFetchError)
+      ex.original_cause.try { |cause| return transient_error?(cause) }
     end
 
     case ex
     when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError
       return true
     when HTTPError
-      return ex.status_code.nil? || (500..599).includes?(ex.status_code.as(Int32))
+      return true unless sc = ex.status_code
+      (500..599).includes?(sc)
     end
 
-    # Fallback to string matching for legacy exceptions
     msg = ex.message.to_s.downcase
     msg.includes?("timeout") || msg.includes?("connection") || msg.includes?("dns")
   end

@@ -37,7 +37,7 @@ module Fetcher
         index, result = results.receive
         result_array[index] = result
       end
-      result_array.compact_map { |result| result }
+      result_array.compact
     end
   end
 end

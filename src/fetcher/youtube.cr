@@ -12,7 +12,7 @@ module Fetcher
   module YouTube
     YOUTUBE_RSS_BASE = "https://www.youtube.com/feeds/videos.xml?"
 
-    YOUTUBE_CACHE_TTL = 5.minutes
+    YOUTUBE_CACHE_TTL         = 5.minutes
     YOUTUBE_RESOLVE_CACHE_TTL = 1.hour
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
@@ -156,7 +156,7 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(RequestConfig.new)
       response = http_client.get(rss_url, Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new))
 
-      return nil unless response.status_code == 200
+      return unless response.status_code == 200
 
       channel_id = extract_channel_id_from_feed(response.body)
       return channel_id if channel_id && channel_id.starts_with?("UC")
@@ -177,7 +177,7 @@ module Fetcher
       http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(url, Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new))
 
-      return nil unless response.status_code == 200
+      return unless response.status_code == 200
 
       extract_channel_id_from_html(response.body)
     rescue
