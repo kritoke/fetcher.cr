@@ -9,10 +9,11 @@ require "./json_streaming_parser"
 require "./link_resolver"
 require "./header_builder"
 require "./config"
+require "./reddit_oauth"
 
 module Fetcher
   module Reddit
-    USER_AGENT          = "fetcher.cr/0.9.3 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    USER_AGENT          = "fetcher.cr/0.9.4 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
@@ -121,6 +122,10 @@ module Fetcher
       }
       final_headers = reddit_headers.dup
       final_headers.merge!(headers)
+
+      if token = RedditOAuth.get_token(config)
+        final_headers["Authorization"] = "Bearer #{token}"
+      end
 
       http_client = Fetcher::CrestHttpClient.new(config)
       log_fetch_diagnostics(api_url, final_headers)

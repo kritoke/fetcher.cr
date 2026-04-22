@@ -58,14 +58,16 @@ module Fetcher
     getter ssl_verify_bypass_acknowledged : Bool
     getter gitlab_token : String?
     getter codeberg_token : String?
+    getter reddit_client_id : String?
+    getter reddit_client_secret : String?
+    getter reddit_username : String?
+    getter reddit_password : String?
 
     @cache_instance : Cache? = nil
 
     def cache : Cache
-      @cache_instance ||= Cache.new(
-        max_size: @cache_config.max_size,
-        enabled: @cache_config.enabled
-      )
+      # Construct Cache using positional args to match Cache.new signature
+      @cache_instance ||= Cache.new(@cache_config.max_size, @cache_config.enabled)
     end
 
     def initialize(
@@ -84,6 +86,10 @@ module Fetcher
       @ssl_verify_bypass_acknowledged : Bool = false,
       @gitlab_token : String? = nil,
       @codeberg_token : String? = nil,
+      @reddit_client_id : String? = nil,
+      @reddit_client_secret : String? = nil,
+      @reddit_username : String? = nil,
+      @reddit_password : String? = nil,
     )
     end
 
@@ -118,7 +124,11 @@ module Fetcher
         max_concurrent_requests: @max_concurrent_requests,
         ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged,
         gitlab_token: @gitlab_token,
-        codeberg_token: @codeberg_token
+        codeberg_token: @codeberg_token,
+        reddit_client_id: @reddit_client_id,
+        reddit_client_secret: @reddit_client_secret,
+        reddit_username: @reddit_username,
+        reddit_password: @reddit_password
       )
     end
   end

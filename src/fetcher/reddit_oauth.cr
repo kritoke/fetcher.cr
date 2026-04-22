@@ -1,0 +1,117 @@
+require "crest"
+require "base64"
+require "json"
+require "./request_config"
+require "./header_builder"
+require "./config"
+
+module Fetcher
+  module RedditOAuth
+    Log = ::Log.for("fetcher.reddit")
+
+    TOKEN_ENDPOINT       = "https://www.reddit.com/api/v1/access_token"
+    TOKEN_REFRESH_BUFFER = 60
+
+    record CachedToken,
+      access_token : String,
+      # Absolute timestamp when the token expires
+      expires_at : Time
+
+    @@cached_token : CachedToken? = nil
+    @@mutex = Mutex.new
+    @@acquired_at : Time? = nil
+
+    def self.get_token(config : RequestConfig) : String?
+      client_id = config.reddit_client_id
+      client_secret = config.reddit_client_secret
+      username = config.reddit_username
+      password = config.reddit_password
+
+      unless client_id && client_secret && username && password
+        Log.debug { "No Reddit OAuth credentials configured, using unauthenticated requests" }
+        return
+      end
+
+      @@mutex.synchronize do
+        if (cached = @@cached_token) && !token_expired?(cached)
+          remaining = (cached.expires_at - Time.utc).to_i
+          Log.debug { "Using cached Reddit OAuth token (expires in #{remaining}s)" }
+          return cached.access_token
+        end
+
+        acquire_new_token(client_id, client_secret, username, password)
+      end
+    end
+
+    def self.clear_token : Nil
+      @@mutex.synchronize do
+        @@cached_token = nil
+      end
+    end
+
+    private def self.token_expired?(token : CachedToken) : Bool
+      # Treat expires_at as an absolute Time; refresh if within buffer
+      Time.utc > (token.expires_at - TOKEN_REFRESH_BUFFER.seconds)
+    end
+
+    private def self.truncate_body(body : String, max : Int32 = 256) : String?
+      body[0, max].gsub(/\s+/, " ").strip
+    rescue
+      nil
+    end
+
+    private def self.acquire_new_token(client_id : String, client_secret : String, username : String, password : String) : String?
+      basic_auth = Base64.strict_encode("#{client_id}:#{client_secret}")
+
+      headers = HeaderBuilder.build_for_crest(::HTTP::Headers{
+        "User-Agent"    => Reddit::USER_AGENT,
+        "Authorization" => "Basic #{basic_auth}",
+        "Content-Type"  => "application/x-www-form-urlencoded",
+      })
+
+      form = Hash(String, String){
+        "grant_type" => "password",
+        "username"   => username,
+        "password"   => password,
+      }
+
+      response = Crest::Request.execute(
+        :post,
+        TOKEN_ENDPOINT,
+        headers: headers,
+        form: form,
+        max_redirects: 0,
+        handle_errors: false,
+        connect_timeout: Config::DEFAULT_CONNECT_TIMEOUT,
+        read_timeout: Config::DEFAULT_READ_TIMEOUT,
+      )
+
+      unless response.status_code == 200
+        body_snippet = truncate_body(response.body)
+        Log.warn { "Reddit OAuth token request failed: status=#{response.status_code} body=#{body_snippet}" }
+        return
+      end
+
+      parsed = JSON.parse(response.body)
+      access_token = parsed["access_token"].as_s
+      expires_in = parsed["expires_in"]?.try(&.as_i) || 3600
+
+      @@cached_token = CachedToken.new(
+        access_token: access_token,
+        expires_at: Time.utc + expires_in.seconds
+      )
+
+      Log.info { "Reddit OAuth token acquired, expires in #{expires_in}s" }
+      access_token
+    rescue ex : JSON::ParseException
+      Log.warn { "Failed to parse Reddit OAuth response: #{ex.message}" }
+      nil
+    rescue ex : Crest::RequestFailed
+      Log.warn { "Reddit OAuth request failed: #{ex.message}" }
+      nil
+    rescue ex
+      Log.warn { "Reddit OAuth error: #{ex.class} - #{ex.message}" }
+      nil
+    end
+  end
+end

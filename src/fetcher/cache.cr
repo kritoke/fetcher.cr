@@ -71,24 +71,55 @@ module Fetcher
     DEFAULT_TTL = 5.minutes
 
     # Store-based implementation to own mutation while preserving the existing
-    # Cache API. We keep a default store instance for backward compatibility.
+    # Cache API. There are two levels of cache in this library:
+    # - Class-level (shared) store: used by Cache.class methods (Cache.set/get/clear)
+    # - Instance-level store: each Cache.new(...) produces a lightweight facade
+    #   backed by its own CacheStore instance. This preserves backwards
+    #   compatibility with callers that expect isolated caches.
+    #
+    # To avoid accidental confusion, the constructor explicitly accepts
+    # keyword arguments (max_size, enabled). Class-level access is provided by
+    # the `store` helper below.
+    @@store : CacheStore? = nil
+    @@store_lock = Mutex.new
+
     def self.store : CacheStore
       @@store_lock.synchronize { @@store ||= CacheStore.new }
     end
 
-    @@store : CacheStore? = nil
-    @@store_lock = Mutex.new
+    # Replace the default/shared store used by class-level Cache methods.
+    # This allows applications to inject a shared CacheStore instance for
+    # global caching without relying on global state construction.
+    def self.default_store=(store : CacheStore)
+      @@store_lock.synchronize { @@store = store }
+    end
+
+    # Note: prefer the `default_store=` accessor. Older callers using
+    # `set_default_store` should be updated to `default_store=`.
+
+    # Convenience: create and set a shared default store with the provided
+    # configuration.
+    def self.use_default_store(max_size : Int32 = 1000, enabled : Bool = true) : Nil
+      @@store_lock.synchronize { @@store = CacheStore.new(max_size, enabled) }
+    end
 
     def self.default : CacheStore
       store
     end
 
     # Keep instance constructor compatible with existing tests / usage that
-    # create Cache instances. Instances are lightweight facades over the
-    # shared store.
-    def initialize(@max_size : Int32 = 1000, @enabled : Bool = true)
-      # Instance-local store preserves the original per-instance behavior.
-      @store = CacheStore.new(@max_size, @enabled)
+    # create Cache instances. Instances are lightweight facades over their own
+    # CacheStore so tests and callers that expect isolated caches continue to
+    # work.
+    # Constructor: keep backwards-compatible signature but allow injecting a
+    # CacheStore. If `store` is provided, the Cache instance will wrap that
+    # store (useful for sharing a store across many Cache instances). If not
+    # provided, a new per-instance CacheStore is created (preserves legacy
+    # behavior).
+    def initialize(max_size : Int32 = 1000, enabled : Bool = true, store : CacheStore? = nil)
+      @max_size = max_size
+      @enabled = enabled
+      @store = store || CacheStore.new(@max_size, @enabled)
     end
 
     # Instance API (delegate to the instance-local store)

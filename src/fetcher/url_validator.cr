@@ -165,10 +165,23 @@ module Fetcher
 
     def self.looks_like_ip?(host : String) : Bool
       return false if host.empty?
-      return true if host.starts_with?("[")
-      return true if host.includes?(":")
-      return false unless host[0].ascii_number?
-      host.matches?(IPV4_OR_HEX)
+
+      # Bracketed IPv6 (e.g. [::1]) is clearly an IP
+      return true if host.starts_with?("[") && host.ends_with?("]")
+
+      # Try to parse using Socket::IPAddress for robust detection. This covers
+      # IPv4, IPv6, and mapped IPv4 addresses. Fallback to simple heuristics
+      # only if parsing fails.
+      begin
+        Socket::IPAddress.new(host, 80)
+        true
+      rescue
+        # Fallback: if there's a colon it's likely IPv6-ish; if it starts with
+        # a digit and matches hex/dot/colon chars, treat as IP-like.
+        return true if host.includes?(":")
+        return false unless host[0].ascii_number?
+        host.matches?(IPV4_OR_HEX)
+      end
     end
 
     private def self.clean_ipv6(host : String) : String

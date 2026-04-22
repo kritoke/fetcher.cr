@@ -1,6 +1,6 @@
 # API Reference
 
-Technical API documentation for Fetcher v0.9.0.
+Technical API documentation for Fetcher v0.9.4.
 
 ## Table of Contents
 
@@ -294,6 +294,13 @@ Fetcher.pull_json_feed(
 | `driver_detection_mode` | `DriverDetectionMode` | `Auto` | How to detect feed type |
 | `error_detail_level` | `ErrorDetailLevel` | `Debug` | Verbosity of error logging |
 | `max_concurrent_requests` | `Int32?` | `nil` | Request semaphore limit |
+| `gitlab_token` | `String?` | `nil` | GitLab API token for authenticated requests (v0.9.3+) |
+| `codeberg_token` | `String?` | `nil` | Codeberg API token for authenticated requests (v0.9.3+) |
+| `ssl_verify_bypass_acknowledged` | `Bool` | `false` | Acknowledge SSL verification bypass for self-signed certs (v0.9.3+) |
+| `reddit_client_id` | `String?` | `nil` | Reddit OAuth client ID (v0.9.4+) |
+| `reddit_client_secret` | `String?` | `nil` | Reddit OAuth client secret (v0.9.4+) |
+| `reddit_username` | `String?` | `nil` | Reddit account username for OAuth (v0.9.4+) |
+| `reddit_password` | `String?` | `nil` | Reddit account password for OAuth (v0.9.4+) |
 
 ### Usage Examples
 
@@ -483,6 +490,8 @@ end
 
 ## Version History
 
+- **v0.9.4** - Reddit OAuth2 authentication for bypassing datacenter IP blocks, token caching and auto-refresh
+- **v0.9.3** - Thread safety improvements with actor-based stores, GitLab/Codeberg token support, SSL bypass acknowledgment, improved Reddit fallback behavior, expanded YouTube URL patterns
 - **v0.9.0** - Structured configuration required (sub-configs replace flat params), Cache is now a class with singleton, Reddit cache helpers moved to Reddit module, readability improvements
 - **v0.8.3** - Fixed RSS 2.0 `<comments>` element extraction, fixed streaming parser bugs
 - **v0.8.0** - Added comment_url, commentary_url, is_discussion_url fields, LinkResolver module
