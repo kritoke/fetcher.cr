@@ -10,15 +10,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Redirect control configuration
 
-### Added
-- Cache injection API: Cache.new(max_size, enabled, store : CacheStore? = nil) allows injecting a shared CacheStore for global caching without breaking existing instance-local behavior.
+---
 
-### Changed
-- Clarified Cache behavior in docs: Cache retains both class-level (shared default) and instance-level stores. Added helpers: Cache.set_default_store and Cache.use_default_store to configure the shared store.
+## [0.9.4] - 2026-04-22
 
-### Fixes
-- Reddit OAuth token expiry stored as absolute timestamp (expires_at is now a Time). This is an internal change; public API remains unchanged.
-- URLValidator.looks_like_ip? now uses Socket::IPAddress parsing when possible for more robust IP detection.
+### New Features
+- **Reddit OAuth**: Added Reddit OAuth2 password grant authentication to bypass datacenter IP blocks (the "whoa there, pardner!" 403). Configure via `reddit_client_id`, `reddit_client_secret`, `reddit_username`, and `reddit_password` on `RequestConfig`. Tokens are cached and auto-refreshed with thread-safe acquisition. Falls back to unauthenticated requests when credentials are not configured.
+
+### New RequestConfig Options
+- `reddit_client_id : String?` - Reddit OAuth client ID (registered at reddit.com/prefs/apps)
+- `reddit_client_secret : String?` - Reddit OAuth client secret
+- `reddit_username : String?` - Reddit account username for authentication
+- `reddit_password : String?` - Reddit account password for authentication
+
+### Internal Improvements
+- Cache injection API: `Cache.new(max_size, enabled, store : CacheStore? = nil)` allows injecting a shared CacheStore for global caching without breaking existing instance-local behavior.
+- Clarified Cache behavior in docs: Cache retains both class-level (shared default) and instance-level stores. Added helpers: `Cache.default_store=` and `Cache.use_default_store` to configure the shared store.
+- Reddit OAuth token expiry stored as an absolute timestamp (expires_at is now a Time). This is an internal change; public API remains unchanged.
+- `URLValidator.looks_like_ip?` now uses `Socket::IPAddress` parsing when possible for more robust IP detection.
 
 ## [0.9.4] - 2026-04-21
 
