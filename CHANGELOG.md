@@ -10,6 +10,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned
 - Redirect control configuration
 
+### Added
+- Cache injection API: Cache.new(max_size, enabled, store : CacheStore? = nil) allows injecting a shared CacheStore for global caching without breaking existing instance-local behavior.
+
+### Changed
+- Clarified Cache behavior in docs: Cache retains both class-level (shared default) and instance-level stores. Added helpers: Cache.set_default_store and Cache.use_default_store to configure the shared store.
+
+### Fixes
+- Reddit OAuth token expiry stored as absolute timestamp (expires_at is now a Time). This is an internal change; public API remains unchanged.
+- URLValidator.looks_like_ip? now uses Socket::IPAddress parsing when possible for more robust IP detection.
+
+## [0.9.4] - 2026-04-21
+
+### New Features
+- **Reddit OAuth**: Added Reddit OAuth2 password grant authentication to bypass datacenter IP blocks (the "whoa there, pardner!" 403). Configure via `reddit_client_id`, `reddit_client_secret`, `reddit_username`, and `reddit_password` on `RequestConfig`. Tokens are cached and auto-refreshed with thread-safe acquisition. Falls back to unauthenticated requests when credentials are not configured.
+
+### New RequestConfig Options
+- `reddit_client_id : String?` - Reddit OAuth client ID (registered at reddit.com/prefs/apps)
+- `reddit_client_secret : String?` - Reddit OAuth client secret
+- `reddit_username : String?` - Reddit account username for authentication
+- `reddit_password : String?` - Reddit account password for authentication
+
+## [0.9.3] - 2026-04-20
+
+### Security
+- **SSRF Protection**: Fixed 18 security vulnerabilities including SSRF bypasses, XSS, open redirects, and DoS vectors
+- **URL Validation**: Fixed deadlock in URLValidator cache enforcement and double-slash in path normalization
+- **IPv6 Detection**: Fixed IPv6 detection bug in URLValidator
+
+### Bug Fixes
+- **Reddit Fallback**: Improved Reddit diagnostics and added RSS fallback on 403 responses
+- **Reddit Cache**: Added old.reddit.com as third-tier fallback with extended cache TTLs
+- **Semaphore Deadlock**: Fixed semaphore deadlock in high-concurrency scenarios
+- **TokenBucket**: Use monotonic timing for refills; add owner-fiber error recovery
+
+### Architecture
+- **Thread Safety**: Introduced actor-based stores (CacheStore, CircuitBreakerStore, RateLimiterStore, ValidatedIpStore) for improved thread safety
+- **PeriodicCleanup**: Track tasks per-block to avoid global cross-talk
+- **Code Sharing**: Refactored Codeberg/GitLab to share release fetching logic
+
+### Internal Improvements
+- Improved code quality and readability across the codebase
+- Added stress tests for TokenBucket and Cache
+- Better error diagnostics and logging
+
+### New RequestConfig Options
+- `gitlab_token : String?` - Optional GitLab API token for authenticated requests
+- `codeberg_token : String?` - Optional Codeberg API token for authenticated requests
+- `ssl_verify_bypass_acknowledged : Bool` - Acknowledge SSL verification bypass (for testing with self-signed certs)
+
 ## [0.9.2] - 2026-04-05
 
 ### Bug Fixes
@@ -560,7 +609,9 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.9.0..HEAD
+[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.9.4..HEAD
+[0.9.4]: https://github.com/kritoke/fetcher.cr/compare/v0.9.3..v0.9.4
+[0.9.3]: https://github.com/kritoke/fetcher.cr/compare/v0.9.2..v0.9.3
 [0.9.0]: https://github.com/kritoke/fetcher.cr/compare/v0.8.3..v0.9.0
 [0.8.3]: https://github.com/kritoke/fetcher.cr/compare/v0.8.2..v0.8.3
 [0.8.2]: https://github.com/kritoke/fetcher.cr/compare/v0.8.1.1..v0.8.2

@@ -4,7 +4,7 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 
 > ⚠️ **Unstable API**: This library is undergoing active development. The API may change until v1.0.0.
 
-v0.9.0 introduces structured `RequestConfig` (replacing flat parameters) and moves `Cache` to a class-based API with a singleton. See Breaking Changes below.
+v0.9.4 adds Reddit OAuth2 authentication to bypass datacenter IP blocks. v0.9.3 adds GitLab/Codeberg token support and thread safety improvements. v0.9.0 introduced structured `RequestConfig` (replacing flat parameters) and moves `Cache` to a class-based API with a singleton. See Breaking Changes below.
 
 ## Features
 
@@ -142,6 +142,21 @@ The circuit breaker follows a standard state machine:
 - **Half-Open**: After recovery timeout, allow one test request
 - **Closed**: If test request succeeds, return to normal operation
 
+### Reddit OAuth (v0.9.4+)
+
+Reddit blocks requests from datacenter/VPS IP addresses. To bypass this, register a "script" app at https://www.reddit.com/prefs/apps and provide the credentials via `RequestConfig`. The OAuth token is cached and auto-refreshed. When credentials are not configured, unauthenticated requests are used as a fallback.
+
+```crystal
+config = Fetcher::RequestConfig.new(
+  reddit_client_id: "your_client_id",
+  reddit_client_secret: "your_client_secret",
+  reddit_username: "your_bot_username",
+  reddit_password: "your_bot_password"
+)
+
+result = Fetcher.pull_reddit("https://www.reddit.com/r/worldnews", config: config)
+```
+
 ### Error Handling (v0.4.0+)
 
 ```crystal
@@ -220,6 +235,26 @@ config = Fetcher::RequestConfig.new(
 - `config.cache_enabled` → `config.cache_config.enabled`
 
 **Cache is now a class** with a singleton (`Cache.default`). Backward-compatible class methods (`Cache.get`, `Cache.set`, `Cache.clear`, `Cache.stats`) still work. For isolated caches, create instances with `Cache.new(max_size: 100)`.
+
+### Cache Injection (non-breaking)
+
+The Cache API allows optional injection of a CacheStore into Cache instances. This is backward-compatible and opt-in:
+
+- Preserve existing behavior (per-instance isolated caches):
+
+  cache = Fetcher::Cache.new(100, true)
+
+- Share a store across multiple Cache instances (new):
+
+  shared_store = Fetcher::CacheStore.new(100, true)
+  cache1 = Fetcher::Cache.new(100, true, shared_store)
+  cache2 = Fetcher::Cache.new(100, true, shared_store)
+
+- Configure the global shared (class-level) store used by Cache.get/set:
+
+  Fetcher::Cache.set_default_store(shared_store)
+
+This approach preserves existing behavior for library consumers while making store sharing explicit and testable.
 
 **Cache key format changed** from `fetcher:reddit:*` to `reddit:*`.
 
