@@ -29,17 +29,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reddit OAuth token expiry stored as an absolute timestamp (expires_at is now a Time). This is an internal change; public API remains unchanged.
 - `URLValidator.looks_like_ip?` now uses `Socket::IPAddress` parsing when possible for more robust IP detection.
 
-## [0.9.4] - 2026-04-21
-
-### New Features
-- **Reddit OAuth**: Added Reddit OAuth2 password grant authentication to bypass datacenter IP blocks (the "whoa there, pardner!" 403). Configure via `reddit_client_id`, `reddit_client_secret`, `reddit_username`, and `reddit_password` on `RequestConfig`. Tokens are cached and auto-refreshed with thread-safe acquisition. Falls back to unauthenticated requests when credentials are not configured.
-
-### New RequestConfig Options
-- `reddit_client_id : String?` - Reddit OAuth client ID (registered at reddit.com/prefs/apps)
-- `reddit_client_secret : String?` - Reddit OAuth client secret
-- `reddit_username : String?` - Reddit account username for authentication
-- `reddit_password : String?` - Reddit account password for authentication
-
 ## [0.9.3] - 2026-04-20
 
 ### Security
