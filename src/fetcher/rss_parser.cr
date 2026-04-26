@@ -47,6 +47,19 @@ module Fetcher
       EMPTY_FEED_METADATA
     end
 
+    def parse_all(data : String, limit : Int32) : Tuple(Array(Entry), FeedMetadata)
+      xml = parse_xml(data)
+      entries = parse_entries(xml, limit)
+      metadata = parse_feed_metadata(xml)
+      {entries, metadata}
+    end
+
+    def parse_all(xml : XML::Document, limit : Int32) : Tuple(Array(Entry), FeedMetadata)
+      entries = parse_entries(xml, limit)
+      metadata = parse_feed_metadata(xml)
+      {entries, metadata}
+    end
+
     def parse_xml_document(data : String) : XML::Document
       parse_xml(data)
     end

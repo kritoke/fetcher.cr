@@ -30,10 +30,11 @@ module Fetcher
 
         limiter = TokenBucketRateLimiter.new(
           config.rate_limit.capacity,
-          config.rate_limit.refill_rate
+          config.rate_limit.refill_rate,
+          config.rate_limit.max_waiter_queue_size || 1000
         )
         @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.utc, ttl: DEFAULT_TTL)
-        PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
+        PeriodicCleanup.register_cleanup { cleanup }
         limiter
       end
     end

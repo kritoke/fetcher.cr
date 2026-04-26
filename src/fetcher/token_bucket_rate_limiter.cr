@@ -4,18 +4,22 @@ require "mutex"
 module Fetcher
   class TokenBucketRateLimiter
     @last_refill : Float64
-    # Messages for the owner fiber
+    @max_waiters : Int32
+    @pending_wakeup : Fiber?
+    @wakeup_cancelled : Bool
+
     record TryAcquireMsg, tokens_requested : Float64, reply : Channel(Bool)
-    record AcquireMsg, tokens_requested : Float64, reply : Channel(Nil)
+    record AcquireMsg, tokens_requested : Float64, reply : Channel(Nil | QueueFullError)
     record AvailableTokensMsg, reply : Channel(Float64)
     record TickMsg
 
-    def initialize(@capacity : Float64, @refill_rate : Float64)
+    def initialize(@capacity : Float64, @refill_rate : Float64, @max_waiters : Int32 = 1000)
       @cmd = Channel(TryAcquireMsg | AcquireMsg | AvailableTokensMsg | TickMsg).new
       @tokens = @capacity
       @last_refill = now_seconds
-      @waiters = [] of Tuple(Float64, Channel(Nil))
+      @waiters = [] of Tuple(Float64, Channel(Nil | QueueFullError))
       @wake_scheduled = false
+      @wakeup_cancelled = false
 
       spawn { run_owner_fiber }
     end
@@ -48,6 +52,8 @@ module Fetcher
         if @tokens >= msg.tokens_requested
           @tokens -= msg.tokens_requested
           msg.reply.send(nil)
+        elsif @max_waiters > 0 && @waiters.size >= @max_waiters
+          msg.reply.send(QueueFullError.new)
         else
           @waiters << {msg.tokens_requested, msg.reply}
           schedule_wakeup.call
@@ -56,7 +62,7 @@ module Fetcher
         refill_tokens
         msg.reply.send(@tokens)
       when TickMsg
-        @wake_scheduled = false
+        cancel_pending_wakeup
         refill_tokens
         while @waiters.size > 0 && @tokens > 0
           req, ch = @waiters.first
@@ -68,7 +74,12 @@ module Fetcher
             break
           end
         end
-        schedule_wakeup.call
+        if @waiters.empty?
+          cancel_pending_wakeup
+        else
+          @wakeup_cancelled = false
+          schedule_wakeup.call
+        end
       end
     end
 
@@ -80,16 +91,27 @@ module Fetcher
       return unless tokens_needed > 0
       wait_time = tokens_needed / @refill_rate
       @wake_scheduled = true
-      spawn do
+      @wakeup_cancelled = false
+      fiber = spawn do
         ::sleep(wait_time.seconds)
-        @cmd.send(TickMsg.new)
+        @cmd.send(TickMsg.new) unless @wakeup_cancelled
       end
+      @pending_wakeup = fiber
+    end
+
+    private def cancel_pending_wakeup
+      @pending_wakeup = nil
+      @wakeup_cancelled = true
+      @wake_scheduled = false
     end
 
     def acquire(tokens : Float64 = 1.0)
-      ch = Channel(Nil).new
+      ch = Channel(Nil | QueueFullError).new
       @cmd.send(AcquireMsg.new(tokens, ch))
-      ch.receive
+      result = ch.receive
+      if result.is_a?(QueueFullError)
+        raise result
+      end
     end
 
     def try_acquire(tokens : Float64 = 1.0) : Bool
@@ -116,7 +138,7 @@ module Fetcher
     end
 
     private def now_seconds : Float64
-      Time.monotonic.total_seconds
+      Time.monotonic.total_milliseconds / 1000.0
     end
   end
 end

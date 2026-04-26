@@ -54,4 +54,10 @@ module Fetcher
       super(message)
     end
   end
+
+  class QueueFullError < Exception
+    def initialize(message : String = "Rate limiter waiter queue is full")
+      super(message)
+    end
+  end
 end

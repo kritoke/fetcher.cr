@@ -15,9 +15,14 @@ module Fetcher
     recovery_timeout : Time::Span = Config::DEFAULT_CIRCUIT_BREAKER_TIMEOUT
 
   record RateLimitConfig,
-    requests_per_second : Int32? = nil,
     capacity : Float64 = Config::DEFAULT_RATE_LIMIT_CAPACITY,
-    refill_rate : Float64 = Config::DEFAULT_RATE_LIMIT_REFILL_RATE
+    refill_rate : Float64 = Config::DEFAULT_RATE_LIMIT_REFILL_RATE,
+    max_waiter_queue_size : Int32? = nil
+
+  record DnsConfig,
+    cache_enabled : Bool = false,
+    cache_ttl : Time::Span = 30.seconds,
+    rebinding_check : Bool = true
 
   record StreamingConfig,
     enabled : Bool = false,
@@ -49,6 +54,7 @@ module Fetcher
     getter rate_limit : RateLimitConfig
     getter streaming : StreamingConfig
     getter cache_config : CacheConfig
+    getter dns : DnsConfig
     getter max_redirects : Int32
     getter? follow_redirects : Bool
     getter? ssl_verify : Bool
@@ -77,6 +83,7 @@ module Fetcher
       @rate_limit : RateLimitConfig = RateLimitConfig.new,
       @streaming : StreamingConfig = StreamingConfig.new,
       @cache_config : CacheConfig = CacheConfig.new,
+      @dns : DnsConfig = DnsConfig.new,
       @max_redirects : Int32 = 5,
       @follow_redirects : Bool = true,
       @ssl_verify : Bool = true,
@@ -116,6 +123,7 @@ module Fetcher
         rate_limit: @rate_limit,
         streaming: @streaming,
         cache_config: @cache_config,
+        dns: @dns,
         max_redirects: @max_redirects,
         follow_redirects: @follow_redirects,
         ssl_verify: @ssl_verify,

@@ -32,7 +32,7 @@ module Fetcher
         )
         entry = Entry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
         @entries[domain] = entry
-        PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
+        PeriodicCleanup.register_cleanup { cleanup }
         breaker
       end
     end

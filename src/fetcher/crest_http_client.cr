@@ -18,6 +18,9 @@ module Fetcher
 
     @request_semaphore : Channel(Nil)?
 
+    @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
+    @@dns_cache_lock = Mutex.new
+
     def initialize(@config : RequestConfig = RequestConfig.new)
       @request_semaphore = create_semaphore
     end
@@ -173,17 +176,53 @@ module Fetcher
       end
     end
 
+    private def get_cached_dns(host : String) : Socket::IPAddress?
+      return nil unless @config.dns.cache_enabled
+      @@dns_cache_lock.synchronize do
+        entry = @@dns_cache[host]?
+        return nil unless entry
+        if entry[:expires] > Time.utc
+          entry[:addr]
+        else
+          @@dns_cache.delete(host)
+          nil
+        end
+      end
+    end
+
+    private def cache_dns(host : String, addr : Socket::IPAddress) : Nil
+      return unless @config.dns.cache_enabled
+      ttl = @config.dns.cache_ttl
+      @@dns_cache_lock.synchronize do
+        @@dns_cache[host] = {addr: addr, expires: Time.utc + ttl}
+      end
+    end
+
+    private def clear_dns_cache : Nil
+      @@dns_cache_lock.synchronize { @@dns_cache.clear }
+    end
+
     private def verify_dns_rebinding(url : String) : Nil
+      return unless @config.dns.rebinding_check
+
       uri = URI.parse(url)
       host = uri.host
       return if host.nil? || host.empty?
       return if URLValidator.looks_like_ip?(host)
+
+      if cached = get_cached_dns(host)
+        unless URLValidator.validate_connected_ip(host, cached)
+          raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
+        end
+        return
+      end
 
       begin
         addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
         addr_info.each do |addr|
           if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
             ip_address = addr.ip_address
+            cache_dns(host, ip_address)
             unless URLValidator.validate_connected_ip(host, ip_address)
               raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
             end

@@ -3,8 +3,7 @@ require "../src/fetcher"
 
 describe "TokenBucketRateLimiter stress" do
   it "handles concurrent acquires fairly and without deadlock" do
-    # Use a high refill rate for the stress test to complete quickly in CI
-    limiter = Fetcher::TokenBucketRateLimiter.new(100.0, 500.0) # capacity 100, refill 500/sec
+    limiter = Fetcher::TokenBucketRateLimiter.new(100.0, 500.0, max_waiters: 10000)
 
     completed = Atomic.new(0_u32)
     fibers = [] of Fiber
@@ -18,12 +17,34 @@ describe "TokenBucketRateLimiter stress" do
       end
     end
 
-    # wait for fibers to finish (timeout guard)
     start = Time.utc
     while completed.get < 1000 && (Time.utc - start) < 5.seconds
       ::sleep(10.milliseconds)
     end
 
     completed.get.should eq(1000)
+  end
+
+  it "respects max waiter queue limit" do
+    limiter = Fetcher::TokenBucketRateLimiter.new(1.0, 0.1, max_waiters: 5)
+
+    completed = Atomic.new(0_u32)
+    failures = Atomic.new(0_u32)
+
+    20.times do |i|
+      spawn do
+        begin
+          limiter.acquire(1.0)
+          completed.add(1)
+        rescue Fetcher::QueueFullError
+          failures.add(1)
+        end
+      end
+    end
+
+    ::sleep(5.seconds)
+
+    failures.get.should be > 0
+    completed.get.should be > 0
   end
 end

@@ -28,7 +28,7 @@ module Fetcher
 
       spawn { run_owner_fiber }
 
-      PeriodicCleanup.start_periodic_cleanup(60.seconds) { cleanup }
+      PeriodicCleanup.register_cleanup { cleanup }
     end
 
     private def run_owner_fiber

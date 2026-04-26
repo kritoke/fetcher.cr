@@ -65,12 +65,13 @@ module Fetcher
         return unless valid_domain?(url, gitlab_domain)
         repo = match[2]
         base_url = "https://#{gitlab_domain}"
+        project_path = repo.split('/').map { |segment| URI.encode_path(segment) }.join("%2F")
         return SoftwareProvider.new(
           name: "gitlab",
           base_url: base_url,
           repo: repo,
           source_type: SourceType::GitLab,
-          api_url: "#{base_url}/api/v4/projects/#{repo.split('/').map { |segment| URI.encode_path(segment) }.join('/')}/releases",
+          api_url: "#{base_url}/api/v4/projects/#{project_path}/releases",
           atom_url: "#{base_url}/#{repo}/-/releases.atom",
           atom_fallback_urls: ["#{base_url}/#{repo}/-/tags?format=atom"],
           body_field: "description",
