@@ -202,6 +202,19 @@ module Fetcher
       @@dns_cache_lock.synchronize { @@dns_cache.clear }
     end
 
+    # Test helpers (debug) - expose limited DNS cache access for tests
+    def debug_get_cached_dns(host : String) : Socket::IPAddress?
+      get_cached_dns(host)
+    end
+
+    def debug_clear_dns_cache : Nil
+      clear_dns_cache
+    end
+
+    def debug_verify_dns_rebinding(url : String) : Nil
+      verify_dns_rebinding(url)
+    end
+
     private def verify_dns_rebinding(url : String) : Nil
       return unless @config.dns.rebinding_check
 

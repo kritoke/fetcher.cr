@@ -99,14 +99,24 @@ module Fetcher
     end
 
     private def self.build_codeberg_provider(repo : String) : SoftwareProvider
+      # Ensure path segments are properly URL-encoded. Repo may contain characters
+      # like ':' which can cause API endpoints to return HTML errors if not encoded.
+      segments = repo.split("/").map { |seg| URI.encode_path(seg) }
+      encoded_path = segments.join("/")
+
       SoftwareProvider.new(
         name: "codeberg",
         base_url: "https://codeberg.org",
         repo: repo,
         source_type: SourceType::Codeberg,
-        api_url: "https://codeberg.org/api/v1/repos/#{repo}/releases",
-        atom_url: "https://codeberg.org/#{repo}/releases.atom",
+        api_url: "https://codeberg.org/api/v1/repos/#{encoded_path}/releases",
+        atom_url: "https://codeberg.org/#{encoded_path}/releases.atom",
       )
+    end
+
+    # Debug helper for tests: construct a Codeberg provider with correct encoding
+    def self.debug_build_codeberg_provider(repo : String) : SoftwareProvider
+      build_codeberg_provider(repo)
     end
 
     private def self.valid_domain?(url : String, expected_domain : String) : Bool
