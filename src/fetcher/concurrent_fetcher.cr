@@ -5,8 +5,8 @@ require "./exceptions"
 
 module Fetcher
   class ConcurrentFetcher
-    DEFAULT_MAX_CONCURRENT = 16
-    DEFAULT_MAX_PENDING = 1000
+    DEFAULT_MAX_CONCURRENT =   16
+    DEFAULT_MAX_PENDING    = 1000
 
     def self.pull_multiple(
       urls : Array(String),
@@ -48,11 +48,11 @@ module Fetcher
       urls.size.times do
         index, result = results.receive
         result_array[index] = case result
-                             when Result
-                               result
-                             when Exception
-                               Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{result.class}: #{result.message}")
-                             end
+                              when Result
+                                result
+                              when Exception
+                                Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{result.class}: #{result.message}")
+                              end
       end
       result_array.compact
     end

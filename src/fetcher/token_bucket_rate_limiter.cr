@@ -9,7 +9,7 @@ module Fetcher
     @wakeup_cancelled : Bool
 
     record TryAcquireMsg, tokens_requested : Float64, reply : Channel(Bool)
-    record AcquireMsg, tokens_requested : Float64, reply : Channel(Nil | QueueFullError)
+    record AcquireMsg, tokens_requested : Float64, reply : Channel(QueueFullError?)
     record AvailableTokensMsg, reply : Channel(Float64)
     record TickMsg
 
@@ -17,7 +17,7 @@ module Fetcher
       @cmd = Channel(TryAcquireMsg | AcquireMsg | AvailableTokensMsg | TickMsg).new
       @tokens = @capacity
       @last_refill = now_seconds
-      @waiters = [] of Tuple(Float64, Channel(Nil | QueueFullError))
+      @waiters = [] of Tuple(Float64, Channel(QueueFullError?))
       @wake_scheduled = false
       @wakeup_cancelled = false
 
@@ -106,7 +106,7 @@ module Fetcher
     end
 
     def acquire(tokens : Float64 = 1.0)
-      ch = Channel(Nil | QueueFullError).new
+      ch = Channel(QueueFullError?).new
       @cmd.send(AcquireMsg.new(tokens, ch))
       result = ch.receive
       if result.is_a?(QueueFullError)

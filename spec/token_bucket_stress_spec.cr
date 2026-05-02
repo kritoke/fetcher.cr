@@ -31,7 +31,7 @@ describe "TokenBucketRateLimiter stress" do
     completed = Atomic.new(0_u32)
     failures = Atomic.new(0_u32)
 
-    20.times do |i|
+    20.times do |_|
       spawn do
         begin
           limiter.acquire(1.0)

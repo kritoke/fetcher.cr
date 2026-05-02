@@ -177,10 +177,10 @@ module Fetcher
     end
 
     private def get_cached_dns(host : String) : Socket::IPAddress?
-      return nil unless @config.dns.cache_enabled
+      return unless @config.dns.cache_enabled
       @@dns_cache_lock.synchronize do
         entry = @@dns_cache[host]?
-        return nil unless entry
+        return unless entry
         if entry[:expires] > Time.utc
           entry[:addr]
         else

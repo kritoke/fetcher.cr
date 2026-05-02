@@ -13,7 +13,7 @@ require "./reddit_oauth"
 
 module Fetcher
   module Reddit
-    USER_AGENT          = "fetcher.cr/0.9.4 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    USER_AGENT          = "fetcher.cr/0.9.7 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 

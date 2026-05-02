@@ -38,7 +38,7 @@ module Fetcher
         loop do
           sleep @@cleanup_interval
           @@global_cleanup_lock.synchronize do
-            @@registered_cleanups.each { |c| c.call }
+            @@registered_cleanups.each(&.call)
           end
         rescue ex
           ::Log.for("fetcher").warn { "Global periodic cleanup fiber error: #{ex.class} - #{ex.message}" }
@@ -50,7 +50,7 @@ module Fetcher
 
     def self.unregister_cleanup(&cleanup : Proc(Nil)) : Nil
       @@global_cleanup_lock.synchronize do
-        @@registered_cleanups.reject! { |c| c == cleanup }
+        @@registered_cleanups.reject! { |cleanup_item| cleanup_item == cleanup }
       end
     end
 

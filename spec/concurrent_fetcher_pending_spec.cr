@@ -14,7 +14,7 @@ describe Fetcher::ConcurrentFetcher do
 
     # Results length equals number of reachable results (pull_multiple compacts nils). We instead
     # assert that some entries are error results due to overload handling.
-    errors = results.select { |r| !r.success? }
+    errors = results.select { |result| !result.success? }
     errors.should_not be_empty
   end
 end

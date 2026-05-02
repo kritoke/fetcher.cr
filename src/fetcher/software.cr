@@ -140,7 +140,16 @@ module Fetcher
       when "gitlab"
         GitLab.pull_releases(provider, headers, limit, config)
       when "codeberg"
-        Codeberg.pull_releases(provider, headers, limit, config)
+        # Try API first, fall back to Atom feed on error
+        result = Codeberg.pull_releases(provider, headers, limit, config)
+        return result if result.success? && !result.entries.empty?
+
+        # API failed or returned empty - try Atom fallback
+        atom_result = try_atom_fallback(provider, limit, Fetcher::CrestHttpClient.new(config), Fetcher::CrestHttpClient.build_headers(headers))
+        return atom_result if atom_result && atom_result.success?
+
+        # Return the original API result (even if it was an error)
+        result
       else
         Fetcher.error_result(ErrorKind::InvalidURL, "Unknown software provider")
       end

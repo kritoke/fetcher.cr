@@ -93,6 +93,40 @@ describe "Integration Tests - Software" do
       release["tag_name"].as_s.should eq("v1.0.0")
       release["body"].as_s.should contain("Initial release")
     end
+
+    it "handles Codeberg API error responses gracefully" do
+      # Test the extract_error_message helper with various error formats
+      # This simulates what Codeberg returns when a repo doesn't exist
+      error_json = %({"message":"GetUserByName","url":"https://codeberg.org/api/swagger","errors":["user redirect does not exist [name: someuser]"]})
+
+      parsed = JSON.parse(error_json)
+      obj = parsed.as_h?
+      obj.should_not be_nil
+
+      # Should extract the message
+      message = parsed["message"]?.try(&.as_s)
+      message.should eq("GetUserByName")
+
+      # Should extract first error from array
+      case errors_obj = parsed["errors"]?
+      when JSON::Any
+        errors_array = errors_obj.as_a
+        first_error = errors_array.first
+        first_error.as_s.should contain("user redirect does not exist")
+      else
+        fail "Expected errors to be a JSON array"
+      end
+    end
+
+    it "rejects non-array JSON responses" do
+      # Codeberg sometimes returns error objects instead of arrays
+      error_json = %({"message":"GetUserByName","errors":["user redirect does not exist"]})
+
+      # Should not be an array
+      expect_raises(JSON::ParseException) do
+        Array(JSON::Any).from_json(error_json)
+      end
+    end
   end
 
   describe "Software version extraction" do
