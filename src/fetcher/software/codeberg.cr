@@ -22,7 +22,11 @@ module Fetcher
         when 200..299
           # Success - now validate we got an array, not an error response
           result = parse_json_response(response.body, provider.api_url)
-          return result if result.is_a?(Result) && !result.success?
+          if result.is_a?(Result)
+            # Non-success result from JSON parsing (invalid JSON or error response)
+            # Return this error to let caller handle fallback
+            return result
+          end
 
           releases = result.as(Array(JSON::Any))
           stable_releases = releases.reject do |release|
