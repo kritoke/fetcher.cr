@@ -92,7 +92,7 @@ module Fetcher
           if name == "channel" || name == "feed"
             @in_feed = true
             @feed_depth = depth
-          elsif @in_feed && depth <= @feed_depth && (name == "item" || name == "entry")
+          elsif @in_feed && depth == @feed_depth + 1 && (name == "item" || name == "entry")
             @entries_yielded += 1
             return @parser.parse_single_entry(@reader)
           elsif @in_feed && depth == @feed_depth + 1

@@ -37,7 +37,7 @@ module Fetcher
           parser = Fetcher::XMLStreamingParser.new(limit)
           result = parser.parse_complete(io, limit, config)
 
-          return result if result.success?
+          return result if result.success? && !result.entries.empty?
 
           ::Log.for("fetcher.rss").debug { "Streaming parser returned error, falling back to DOM parser" }
         rescue ex : Fetcher::MemoryLimitExceeded
