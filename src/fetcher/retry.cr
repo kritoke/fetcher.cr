@@ -53,8 +53,11 @@ module Fetcher
     end
 
     case ex
-    when DNSError, TimeoutError, HTTPClientError, IO::TimeoutError
+    when DNSError, TimeoutError, IO::TimeoutError
       return true
+    when HTTPClientError
+      # 4xx client errors (403, 404, etc.) are not transient — do not retry
+      return false
     when HTTPError
       return true unless sc = ex.status_code
       (500..599).includes?(sc)

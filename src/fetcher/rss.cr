@@ -55,6 +55,12 @@ module Fetcher
         entries = parser.parse_entries(xml, limit)
         metadata = parser.parse_feed_metadata(xml)
 
+        if entries.empty?
+          body_preview = body[0..Math.min(200, body.size - 1)]
+          ::Log.for("fetcher.rss").warn { "No items parsed from #{url}. Body preview: #{body_preview}" }
+          return Fetcher.error_result(ErrorKind::InvalidFormat, "No items found in feed")
+        end
+
         Result.success(
           entries: entries,
           site_link: metadata.site_link,

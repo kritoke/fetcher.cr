@@ -99,6 +99,9 @@ module Fetcher
 
         record_success(domain)
         final_response
+      rescue ex : HTTPClientError
+        # 4xx client errors are not transient server issues — don't circuit-break
+        handle_error(ex, url)
       rescue ex
         record_failure(domain) unless domain.empty?
         handle_error(ex, url)
