@@ -2,11 +2,15 @@ version: 2.0
 shards:
   ameba:
     git: https://github.com/crystal-ameba/ameba.git
-    version: 1.7.0-dev+git.commit.0bc878de36c1f10afde766bdae74d6c74f265c70
+    version: 1.7.0-dev+git.commit.41b12e4fba6ab4bd68b746a6b942dd16e432f21c
+
+  cookie_jar:
+    git: https://github.com/mamantoha/http-cookie_jar.git
+    version: 0.1.0
 
   crest:
     git: https://github.com/mamantoha/crest.git
-    version: 1.6.2
+    version: 1.7.0
 
   http-client-digest_auth:
     git: https://github.com/mamantoha/http-client-digest_auth.git
