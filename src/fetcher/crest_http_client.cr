@@ -122,11 +122,17 @@ module Fetcher
       redirect_url_str = redirect_url.is_a?(Array) ? redirect_url.join(", ") : redirect_url.to_s
       resolved_url = resolve_redirect_url(redirect_url_str, original_url)
 
-      unless URLValidator.valid_redirect?(resolved_url)
+      # Validate URL format and SSRF checks
+      unless URLValidator.valid?(resolved_url) && URLValidator.resolve_and_validate(resolved_url)
         raise DNSError.new("Redirect to blocked URL: #{resolved_url}")
       end
 
+      # Validate redirect is allowed (same domain or explicit allowlist)
       redirect_domain = URLValidator.extract_domain(resolved_url)
+      unless allow_redirect?(domain, redirect_domain)
+        raise DNSError.new("External redirect blocked: #{resolved_url} (from #{original_url})")
+      end
+
       transition_domain(domain, redirect_domain) if redirect_domain != domain
 
       return convert_response(response) if remaining <= 1
@@ -145,6 +151,30 @@ module Fetcher
       )
 
       handle_redirects(crest_response, resolved_url, headers, redirect_domain, method, remaining - 1)
+    end
+
+    # Check if redirect to target_domain from source_domain is allowed
+    private def allow_redirect?(source_domain : String, target_domain : String) : Bool
+      # Same domain is always allowed
+      return true if source_domain == target_domain
+
+      # Subdomain of source is allowed (e.g., blog.example.com from example.com)
+      return true if target_domain.ends_with?(".#{source_domain}")
+
+      # Check redirect config
+      redirect_config = @config.redirect
+
+      # If allow_external is true, external redirects are allowed
+      return true if redirect_config.allow_external
+
+      # If allowed_domains is set, check if target is in the allowlist
+      if allowed = redirect_config.allowed_domains
+        # Allow exact match or subdomain of allowed domain
+        return true if allowed.includes?(target_domain)
+        return true if allowed.any? { |d| target_domain.ends_with?(".#{d}") }
+      end
+
+      false
     end
 
     private def transition_domain(from_domain : String, to_domain : String) : Nil

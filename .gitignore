@@ -40,3 +40,6 @@ lib/
 .opencode/
 SPEC*
 openspec/
+
+# Planning
+planning/

@@ -34,6 +34,13 @@ module Fetcher
     max_size : Int32 = 1000,
     default_ttl : Time::Span = Cache::DEFAULT_TTL
 
+  # Redirect security configuration
+  # allow_external: if false (default), redirects to external domains are blocked
+  # allowed_domains: optional allowlist of specific domains for external redirects
+  record RedirectConfig,
+    allow_external : Bool = false,
+    allowed_domains : Array(String)? = nil
+
   enum DriverDetectionMode
     Auto
     ContentType
@@ -55,6 +62,7 @@ module Fetcher
     getter streaming : StreamingConfig
     getter cache_config : CacheConfig
     getter dns : DnsConfig
+    getter redirect : RedirectConfig
     getter max_redirects : Int32
     getter? follow_redirects : Bool
     getter? ssl_verify : Bool
@@ -84,6 +92,7 @@ module Fetcher
       @streaming : StreamingConfig = StreamingConfig.new,
       @cache_config : CacheConfig = CacheConfig.new,
       @dns : DnsConfig = DnsConfig.new,
+      @redirect : RedirectConfig = RedirectConfig.new,
       @max_redirects : Int32 = 5,
       @follow_redirects : Bool = true,
       @ssl_verify : Bool = true,
@@ -124,6 +133,39 @@ module Fetcher
         streaming: @streaming,
         cache_config: @cache_config,
         dns: @dns,
+        redirect: @redirect,
+        max_redirects: @max_redirects,
+        follow_redirects: @follow_redirects,
+        ssl_verify: @ssl_verify,
+        driver_detection_mode: @driver_detection_mode,
+        error_detail_level: @error_detail_level,
+        max_concurrent_requests: @max_concurrent_requests,
+        ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged,
+        gitlab_token: @gitlab_token,
+        codeberg_token: @codeberg_token,
+        reddit_client_id: @reddit_client_id,
+        reddit_client_secret: @reddit_client_secret,
+        reddit_username: @reddit_username,
+        reddit_password: @reddit_password
+      )
+    end
+
+    # Return a copy of this RequestConfig with specific allowed domains for redirects.
+    def with_redirect_allowed_domains(domains : Array(String)) : RequestConfig
+      new_redirect = RedirectConfig.new(
+        allow_external: @redirect.allow_external,
+        allowed_domains: domains
+      )
+
+      RequestConfig.new(
+        timeout: @timeout,
+        retry: @retry,
+        circuit_breaker: @circuit_breaker,
+        rate_limit: @rate_limit,
+        streaming: @streaming,
+        cache_config: @cache_config,
+        dns: @dns,
+        redirect: new_redirect,
         max_redirects: @max_redirects,
         follow_redirects: @follow_redirects,
         ssl_verify: @ssl_verify,
