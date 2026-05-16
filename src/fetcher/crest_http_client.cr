@@ -60,7 +60,7 @@ module Fetcher
 
     private def create_semaphore_internal : Channel(Nil)?
       limit = @config.max_concurrent_requests
-      return nil unless limit && limit > 0
+      return unless limit && limit > 0
 
       sem = Channel(Nil).new(limit)
       limit.times { sem.send(nil) }

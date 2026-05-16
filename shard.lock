@@ -2,7 +2,7 @@ version: 2.0
 shards:
   ameba:
     git: https://github.com/crystal-ameba/ameba.git
-    version: 1.7.0-dev+git.commit.41b12e4fba6ab4bd68b746a6b942dd16e432f21c
+    version: 1.7.0-dev+git.commit.d2c9dddd245777f7548d91ba42f6a5cd2bc53a15
 
   cookie_jar:
     git: https://github.com/mamantoha/http-cookie_jar.git

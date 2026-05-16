@@ -18,7 +18,7 @@ module Fetcher
 
     # Find first element child by name
     def find_child(node : XML::Node, name : String) : XML::Node?
-      node.children.find { |c| c.element? && c.name == name }
+      node.children.find { |child| child.element? && child.name == name }
     end
 
     # Find element by name and get attribute
@@ -47,6 +47,7 @@ module Fetcher
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
     include XMLHelper
+
     def parse_entries(data : String, limit : Int32) : Array(Entry)
       xml = parse_xml(data)
       parse_entries(xml, limit)
