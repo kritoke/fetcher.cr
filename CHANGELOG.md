@@ -25,6 +25,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.9.12] - 2026-05-16
+
+### Security
+- **SSRF Protection Confirmed**: Documented SSRF protection is properly enforced via `CrestHttpClient.check_ssrf()` and `URLValidator`. All HTTP requests flow through validated boundaries.
+
+### Bug Fixes
+- **Semaphore Race Condition**: Fixed potential deadlock in `CrestHttpClient` where concurrent requests could call `acquire_semaphore` before the semaphore was fully initialized. Now uses lazy initialization with mutex for thread-safe setup.
+- **Fiber Error Handling**: Added error handling to `TokenBucketRateLimiter.try_schedule_wakeup` spawned fiber. Previously, unhandled exceptions in wakeup fibers would silently terminate.
+
+### Code Quality
+- **Result.success() Refactoring**: Reduced `Result.success()` from 9 to 3 parameters (entries, etag, last_modified). All callers now use the `Result.builder` pattern for optional metadata. Added `Result.with_site_link()` helper for test compatibility.
+- **CacheStore Handler Decomposition**: Extracted 5 named handlers (`handle_enabled_set`, `handle_enabled_get`, `handle_max_size_set`, `handle_max_size_get`, `handle_cleanup`) from the 10-branch case expression for improved testability.
+- **Reddit Deep Nesting**: Refactored `extract_post_data` from 8 nesting levels to 3, extracting helper methods: `extract_title`, `extract_permalink`, `build_discussion_url`, `determine_effective_url`, `extract_pub_date`.
+- **RSS Parser Message Chains**: Created `XMLHelper` module with reusable XPath helpers (`xpath_text`, `find_child`, `find_attr`, `find_link`, `extract_href`) to reduce Law of Demeter violations.
+- **Software Release Consolidation**: Created `release_helpers.cr` module with shared parsing helpers (`extract_tag`, `extract_name`, `extract_html_url`, `parse_release_date`, `prerelease?`) used by GitHub, GitLab, and Codeberg providers.
+
+
+---
+
 ## [0.9.4] - 2026-04-22
 
 ### New Features
