@@ -4,6 +4,7 @@ require "json"
 require "./request_config"
 require "./header_builder"
 require "./config"
+require "./exceptions"
 
 module Fetcher
   module RedditOAuth
@@ -56,7 +57,8 @@ module Fetcher
 
     private def self.truncate_body(body : String, max : Int32 = 256) : String?
       body[0, max].gsub(/\s+/, " ").strip
-    rescue
+    rescue ex
+      Log.debug { "Failed to truncate OAuth response body: #{ex.message}" }
       nil
     end
 
@@ -88,8 +90,8 @@ module Fetcher
 
       unless response.status_code == 200
         body_snippet = truncate_body(response.body)
-        Log.warn { "Reddit OAuth token request failed: status=#{response.status_code} body=#{body_snippet}" }
-        return
+        Log.error { "Reddit OAuth token request failed: status=#{response.status_code} body=#{body_snippet}" }
+        raise RedditOAuthError.new("OAuth token request failed: HTTP #{response.status_code}")
       end
 
       parsed = JSON.parse(response.body)
@@ -104,14 +106,16 @@ module Fetcher
       Log.info { "Reddit OAuth token acquired, expires in #{expires_in}s" }
       access_token
     rescue ex : JSON::ParseException
-      Log.warn { "Failed to parse Reddit OAuth response: #{ex.message}" }
-      nil
+      Log.error { "Failed to parse Reddit OAuth response: #{ex.message}" }
+      raise RedditOAuthError.new("Failed to parse OAuth token response", cause: ex)
     rescue ex : Crest::RequestFailed
-      Log.warn { "Reddit OAuth request failed: #{ex.message}" }
-      nil
+      Log.error { "Reddit OAuth request failed: #{ex.message}" }
+      raise RedditOAuthError.new("OAuth request failed: #{ex.message}", cause: ex)
+    rescue ex : RedditOAuthError
+      raise ex
     rescue ex
-      Log.warn { "Reddit OAuth error: #{ex.class} - #{ex.message}" }
-      nil
+      Log.error { "Reddit OAuth error: #{ex.class} - #{ex.message}" }
+      raise RedditOAuthError.new("OAuth error: #{ex.message}", cause: ex)
     end
   end
 end

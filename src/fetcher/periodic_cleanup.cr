@@ -1,3 +1,4 @@
+require "log"
 require "mutex"
 
 module Fetcher
@@ -7,6 +8,7 @@ module Fetcher
     @@global_cleanup_fiber : Fiber?
     @@cleanup_running : Bool = false
     @@cleanup_interval : Time::Span = 60.seconds
+    @@cleanup_stopped : Bool = false # Flag to signal fiber should stop
 
     def self.start_periodic_cleanup(interval : Time::Span = 60.seconds, force : Bool = false, &cleanup)
       raise ArgumentError.new("start_periodic_cleanup requires a block") unless cleanup
@@ -33,16 +35,32 @@ module Fetcher
     end
 
     private def self.restart_fiber : Nil
+      # Signal existing fiber to stop by setting flag
+      @@cleanup_stopped = true
+
       @@cleanup_running = true
+      @@cleanup_stopped = false # Reset flag before spawning new fiber
       @@global_cleanup_fiber = spawn do
         loop do
+          # Check stop flag on each iteration
+          if @@cleanup_stopped
+            @@cleanup_running = false
+            break
+          end
+
           sleep @@cleanup_interval
+
+          # Check stop flag again before cleanup
+          if @@cleanup_stopped
+            @@cleanup_running = false
+            break
+          end
+
           @@global_cleanup_lock.synchronize do
             @@registered_cleanups.each(&.call)
           end
         rescue ex
-          ::Log.for("fetcher").warn { "Global periodic cleanup fiber error: #{ex.class} - #{ex.message}" }
-        ensure
+          ::Log.for("fetcher").error { "Global periodic cleanup fiber crashed: #{ex.class} - #{ex.message}" }
           @@cleanup_running = false
         end
       end

@@ -32,7 +32,7 @@ describe Fetcher::CrestHttpClient do
     if cached_after
       cached_after.should be_a(Socket::IPAddress)
       # Wait for TTL to expire
-      sleep(1.2)
+      ::sleep(1.2.seconds)
       expired = client.debug_get_cached_dns(host)
       expired.should be_nil
     else

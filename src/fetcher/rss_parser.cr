@@ -91,29 +91,33 @@ module Fetcher
     end
 
     private def parse_rss_metadata(xml : XML::Node) : FeedMetadata
-      site_link = "#"
-      feed_title = ""
-      feed_description = ""
-      feed_language = ""
-
       channel = xml.xpath_node("//*[local-name()='channel']")
-      if channel
-        site_link = resolve_rss_site_link(channel)
-        feed_title = channel.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip) || ""
-        feed_description = channel.xpath_node("./*[local-name()='description']").try(&.text).try(&.strip) || ""
-        feed_language = channel.xpath_node("./*[local-name()='language']").try(&.text).try(&.strip) || ""
-      end
-
-      favicon = xml.xpath_node("//*[local-name()='channel']/*[local-name()='image']/*[local-name()='url']").try(&.text)
+      return EMPTY_FEED_METADATA unless channel
 
       FeedMetadata.new(
-        site_link: site_link,
-        favicon: favicon,
-        feed_title: feed_title.presence,
-        feed_description: feed_description.presence,
-        feed_language: feed_language.presence,
+        site_link: resolve_rss_site_link(channel),
+        favicon: extract_rss_favicon(xml),
+        feed_title: extract_rss_title_text(channel),
+        feed_description: extract_rss_description_text(channel),
+        feed_language: extract_rss_language(channel),
         feed_authors: [] of Author,
       )
+    end
+
+    private def extract_rss_title_text(channel : XML::Node) : String?
+      channel.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip).presence
+    end
+
+    private def extract_rss_description_text(channel : XML::Node) : String?
+      channel.xpath_node("./*[local-name()='description']").try(&.text).try(&.strip).presence
+    end
+
+    private def extract_rss_language(channel : XML::Node) : String?
+      channel.xpath_node("./*[local-name()='language']").try(&.text).try(&.strip).presence
+    end
+
+    private def extract_rss_favicon(xml : XML::Node) : String?
+      xml.xpath_node("//*[local-name()='channel']/*[local-name()='image']/*[local-name()='url']").try(&.text)
     end
 
     private def resolve_rss_site_link(channel : XML::Node) : String
@@ -218,34 +222,48 @@ module Fetcher
       feed_node = xml.xpath_node("//*[local-name()='feed']")
       return EMPTY_FEED_METADATA unless feed_node
 
+      FeedMetadata.new(
+        site_link: extract_atom_site_link(feed_node),
+        favicon: extract_atom_favicon(feed_node),
+        feed_title: extract_atom_title(feed_node),
+        feed_description: extract_atom_subtitle(feed_node),
+        feed_language: extract_atom_language(feed_node),
+        feed_authors: extract_atom_authors(feed_node),
+      )
+    end
+
+    private def extract_atom_site_link(feed_node : XML::Node) : String?
       alt = feed_node.xpath_node("./*[local-name()='link'][@rel='alternate' and (not(@type) or starts-with(@type,'text/html'))]") ||
             feed_node.xpath_node("./*[local-name()='link'][@rel='alternate']") ||
             feed_node.xpath_node("./*[local-name()='link'][not(@rel) and @href]") ||
             feed_node.xpath_node("./*[local-name()='link'][@href]")
-      site_link = alt.try(&.[]?("href")).try(&.strip) || alt.try(&.text).try(&.strip)
+      alt.try(&.[]?("href")).try(&.strip) || alt.try(&.text).try(&.strip)
+    end
 
-      feed_title = feed_node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip) || ""
-      subtitle = feed_node.xpath_node("./*[local-name()='subtitle']").try(&.text).try(&.strip) || ""
-      feed_language = feed_node.xpath_node("./*[local-name()='xml:lang']").try(&.text).try(&.strip) || ""
+    private def extract_atom_title(feed_node : XML::Node) : String?
+      feed_node.xpath_node("./*[local-name()='title']").try(&.text).try(&.strip).presence
+    end
 
-      feed_authors = feed_node.xpath_nodes("./*[local-name()='author']").compact_map do |author_node|
+    private def extract_atom_subtitle(feed_node : XML::Node) : String?
+      feed_node.xpath_node("./*[local-name()='subtitle']").try(&.text).try(&.strip).presence
+    end
+
+    private def extract_atom_language(feed_node : XML::Node) : String?
+      feed_node.xpath_node("./*[local-name()='xml:lang']").try(&.text).try(&.strip).presence
+    end
+
+    private def extract_atom_authors(feed_node : XML::Node) : Array(Author)
+      feed_node.xpath_nodes("./*[local-name()='author']").compact_map do |author_node|
         name = author_node.xpath_node("./*[local-name()='name']").try(&.text).try(&.strip)
         uri = author_node.xpath_node("./*[local-name()='uri']").try(&.text).try(&.strip)
         next unless name
         Author.new(name: name, url: uri, avatar: nil)
       end
+    end
 
-      favicon = feed_node.xpath_node("./*[local-name()='icon']").try(&.text) ||
-                feed_node.xpath_node("./*[local-name()='logo']").try(&.text)
-
-      FeedMetadata.new(
-        site_link: site_link,
-        favicon: favicon,
-        feed_title: feed_title.presence,
-        feed_description: subtitle.presence,
-        feed_language: feed_language.presence,
-        feed_authors: feed_authors,
-      )
+    private def extract_atom_favicon(feed_node : XML::Node) : String?
+      feed_node.xpath_node("./*[local-name()='icon']").try(&.text) ||
+        feed_node.xpath_node("./*[local-name()='logo']").try(&.text)
     end
 
     private def parse_atom_entry(node : XML::Node) : Entry

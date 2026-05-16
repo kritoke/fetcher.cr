@@ -1,4 +1,5 @@
 require "xml"
+require "log"
 require "./entry"
 require "./result"
 require "./entry_parser"
@@ -33,8 +34,8 @@ module Fetcher
       Fetcher.error_result(ErrorKind::InvalidFormat, error.message)
     rescue ex : MemoryLimitExceeded
       raise ex
-    rescue ex : Exception
-      ::Log.for("fetcher").warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
+    rescue ex
+      Log.warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
       raise ex
     end
 
@@ -45,10 +46,10 @@ module Fetcher
       parser = StreamingRSSParser.new
       parser.parse_entries(reader, actual_limit)
     rescue ex : XML::Error
-      ::Log.for("fetcher").warn { "XML streaming parser error: #{ex.message}" }
+      Log.warn { "XML streaming parser error: #{ex.message}" }
       [] of Entry
-    rescue ex : Exception
-      ::Log.for("fetcher").warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
+    rescue ex
+      Log.warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
       raise ex
     end
 

@@ -1,3 +1,4 @@
+require "log"
 require "uri"
 require "socket"
 require "./bounded_registry"
@@ -87,7 +88,8 @@ module Fetcher
       else
         true
       end
-    rescue
+    rescue ex
+      Log.debug { "safe_scheme? failed for URL: #{ex.message}" }
       false
     end
 
@@ -127,7 +129,8 @@ module Fetcher
     def self.extract_domain(url : String) : String
       uri = URI.parse(url)
       uri.host || "default"
-    rescue
+    rescue ex
+      Log.debug { "extract_domain failed for #{url}: #{ex.message}" }
       "default"
     end
 
@@ -175,9 +178,10 @@ module Fetcher
       begin
         Socket::IPAddress.new(host, 80)
         true
-      rescue
+      rescue ex
         # Fallback: if there's a colon it's likely IPv6-ish; if it starts with
         # a digit and matches hex/dot/colon chars, treat as IP-like.
+        Log.debug { "looks_like_ip? parse failed for #{host}: #{ex.message}" }
         return true if host.includes?(":")
         return false unless host[0].ascii_number?
         host.matches?(IPV4_OR_HEX)
@@ -222,7 +226,8 @@ module Fetcher
       second_char = downcase[2]?
       return false unless second_char && downcase.starts_with?("fe") && second_char.in?('c', 'd', 'e', 'f')
       true
-    rescue
+    rescue ex
+      Log.debug { "ipv6_site? failed: #{ex.message}" }
       false
     end
 
@@ -255,7 +260,8 @@ module Fetcher
       else
         false
       end
-    rescue
+    rescue ex
+      Log.debug { "ipv6_unique? failed: #{ex.message}" }
       false
     end
 
@@ -269,13 +275,15 @@ module Fetcher
         begin
           ipv4 = Socket::IPAddress.new(ipv4_str, 80)
           ipv4.private? || ipv4.loopback? || link_local?(ipv4)
-        rescue
+        rescue ex
+          Log.debug { "ipv6_mapped_ipv4? nested failed: #{ex.message}" }
           false
         end
       else
         false
       end
-    rescue
+    rescue ex
+      Log.debug { "ipv6_mapped_ipv4? failed: #{ex.message}" }
       false
     end
 
@@ -283,7 +291,8 @@ module Fetcher
       address = ip_address.address
       return if address.includes?(":")
       address.split(".").map(&.to_i)
-    rescue
+    rescue ex
+      Log.debug { "ipv4_octets failed: #{ex.message}" }
       nil
     end
 

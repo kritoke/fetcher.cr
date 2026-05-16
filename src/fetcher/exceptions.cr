@@ -49,6 +49,13 @@ module Fetcher
   define_fetch_error ResponseTooLargeError
   define_fetch_error MissingLocationHeaderError
 
+  # Raised when Reddit OAuth token acquisition fails
+  class RedditOAuthError < FetchError
+    def initialize(message : String, original_error : Error? = nil, cause : Exception? = nil)
+      super(message, original_error, cause)
+    end
+  end
+
   class MemoryLimitExceeded < FetchError
     def initialize(message : String = "Memory limit exceeded during streaming parsing")
       super(message)

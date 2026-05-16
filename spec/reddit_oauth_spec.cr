@@ -34,7 +34,7 @@ describe Fetcher::RedditOAuth do
       Fetcher::RedditOAuth.get_token(config).should be_nil
     end
 
-    it "returns nil on invalid credentials (non-200 response)" do
+    it "raises RedditOAuthError on invalid credentials (non-200 response)" do
       config = Fetcher::RequestConfig.new(
         reddit_client_id: "invalid_client_id_that_will_fail",
         reddit_client_secret: "invalid_secret",
@@ -42,8 +42,9 @@ describe Fetcher::RedditOAuth do
         reddit_password: "invalid_pass"
       )
       Fetcher::RedditOAuth.clear_token
-      result = Fetcher::RedditOAuth.get_token(config)
-      result.should be_nil
+      expect_raises(Fetcher::RedditOAuthError) do
+        Fetcher::RedditOAuth.get_token(config)
+      end
     end
   end
 

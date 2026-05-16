@@ -1,3 +1,4 @@
+require "log"
 require "time"
 
 module Fetcher
@@ -18,7 +19,8 @@ module Fetcher
         begin
           entry.last_accessed = Time.utc
           return true
-        rescue
+        rescue ex
+          Log.debug { "BoundedRegistry mark_access failed: #{ex.message}" }
         end
       end
       false

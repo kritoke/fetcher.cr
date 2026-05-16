@@ -58,78 +58,93 @@ module Fetcher
     private def parse_authors(parsed : JSON::Any) : Array(Author)
       authors_json = parsed["authors"]?.try(&.as_a) || parsed["author"]?.try(&.as_a)
       return [] of Author unless authors_json
+      authors_json.compact_map { |json| parse_single_author(json) }
+    end
 
-      authors_json.compact_map do |author_json|
-        name = author_json["name"]?.try(&.as_s)
-        next unless name
-        Author.new(
-          name: name,
-          url: author_json["url"]?.try(&.as_s),
-          avatar: author_json["avatar"]?.try(&.as_s)
-        )
-      end
+    private def parse_single_author(author_json : JSON::Any) : Author?
+      name = author_json["name"]?.try(&.as_s)
+      return unless name
+      Author.new(
+        name: name,
+        url: author_json["url"]?.try(&.as_s),
+        avatar: author_json["avatar"]?.try(&.as_s)
+      )
     end
 
     private def parse_item(item : JSON::Any) : Entry?
       id = item["id"]?.try(&.to_s)
       return if id.nil? || id.empty?
 
-      url_candidate = item["url"]?.try(&.as_s)
-      url = url_candidate || (URLValidator.valid?(id) ? id : "#")
-      title = item["title"]?.try(&.as_s)
-      title = Entry.sanitize_title(title)
-
-      content_html = item["content_html"]?.try(&.as_s)
-      content_text = item["content_text"]?.try(&.as_s)
-      content = content_html || content_text || ""
-
-      published = item["date_published"]?.try(&.as_s)
-      modified = item["date_modified"]?.try(&.as_s)
-      pub_date = TimeParser.parse(published || modified)
-
-      tags = item["tags"]?.try(&.as_a).try(&.map(&.as_s)) || [] of String
-
-      attachments = parse_attachments(item)
-
-      authors_json = item["authors"]?.try(&.as_a) || item["author"]?.try(&.as_a)
-      author = authors_json.try(&.first?).try(&.["name"]?.try(&.as_s))
-      author_url = authors_json.try(&.first?).try(&.["url"]?.try(&.as_s))
-
-      link_data = LinkResolver.resolve_from_url(url)
-
       Entry.create(
-        title: title,
-        url: url,
+        title: sanitize_item_title(item),
+        url: resolve_item_url(item, id),
         source_type: SourceType::JSONFeed,
-        content: content,
-        author: author,
-        author_url: author_url,
-        published_at: pub_date,
-        categories: tags,
-        attachments: attachments,
-        comment_url: link_data.comment_url,
-        commentary_url: link_data.commentary_url,
-        is_discussion_url: link_data.is_discussion_url
+        content: extract_item_content(item),
+        author: extract_item_author(item),
+        author_url: extract_item_author_url(item),
+        published_at: parse_item_date(item),
+        categories: extract_item_tags(item),
+        attachments: parse_attachments(item),
+        comment_url: nil,
+        commentary_url: nil,
+        is_discussion_url: false
       )
     end
 
+    private def sanitize_item_title(item : JSON::Any) : String?
+      title = item["title"]?.try(&.as_s)
+      Entry.sanitize_title(title)
+    end
+
+    private def resolve_item_url(item : JSON::Any, id : String) : String
+      url_candidate = item["url"]?.try(&.as_s)
+      return "#" unless url_candidate
+      URLValidator.valid?(url_candidate) ? url_candidate : "#"
+    end
+
+    private def extract_item_content(item : JSON::Any) : String
+      content_html = item["content_html"]?.try(&.as_s)
+      content_text = item["content_text"]?.try(&.as_s)
+      content_html || content_text || ""
+    end
+
+    private def extract_item_author(item : JSON::Any) : String?
+      authors_json = item["authors"]?.try(&.as_a) || item["author"]?.try(&.as_a)
+      authors_json.try(&.first?).try(&.["name"]?.try(&.as_s))
+    end
+
+    private def extract_item_author_url(item : JSON::Any) : String?
+      authors_json = item["authors"]?.try(&.as_a) || item["author"]?.try(&.as_a)
+      authors_json.try(&.first?).try(&.["url"]?.try(&.as_s))
+    end
+
+    private def parse_item_date(item : JSON::Any) : Time?
+      published = item["date_published"]?.try(&.as_s)
+      modified = item["date_modified"]?.try(&.as_s)
+      TimeParser.parse(published || modified)
+    end
+
+    private def extract_item_tags(item : JSON::Any) : Array(String)
+      item["tags"]?.try(&.as_a).try(&.map(&.as_s)) || [] of String
+    end
+
     private def parse_attachments(item : JSON::Any) : Array(Attachment)
-      attachments_json = item["attachments"]?.try(&.as_a)
-      return [] of Attachment unless attachments_json
+      attachments_json = item["attachments"]?.try(&.as_a) || return [] of Attachment
+      attachments_json.compact_map { |att| extract_attachment(att) }
+    end
 
-      attachments_json.compact_map do |att_json|
-        url = att_json["url"]?.try(&.as_s)
-        mime_type = att_json["mime_type"]?.try(&.as_s)
-        next unless url && mime_type
+    private def extract_attachment(att_json : JSON::Any) : Attachment?
+      url = att_json["url"]?.try(&.as_s)
+      mime_type = att_json["mime_type"]?.try(&.as_s)
+      return unless url && mime_type
 
-        Attachment.new(
-          url: url,
-          mime_type: mime_type,
-          title: att_json["title"]?.try(&.as_s),
-          size_in_bytes: att_json["size_in_bytes"]?.try(&.as_i64),
-          duration_in_seconds: att_json["duration_in_seconds"]?.try(&.as_i)
-        )
-      end
+      Attachment.new(
+        url: url,
+        mime_type: mime_type,
+        title: att_json["title"]?.try(&.as_s),
+        size_in_bytes: att_json["size_in_bytes"]?.try(&.as_i64),
+        duration_in_seconds: att_json["duration_in_seconds"]?.try(&.as_i)
+      )
     end
   end
 end
