@@ -8,20 +8,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Performance Improvements
-- **Bounded Rate Limiter Waiter Queue**: Added `max_waiter_queue_size` config to prevent unbounded memory growth. When the queue is full, requests fail fast with `QueueFullError` instead of queuing indefinitely.
-- **DNS Resolution Caching**: Added optional DNS cache with configurable TTL to reduce redundant DNS lookups. Enable via `dns.cache_enabled = true` in RequestConfig.
-- **Cancelable Wakeup Fibers**: Rate limiter now tracks and cancels pending wakeup fibers when they are no longer needed.
-- **Shared Cleanup Fibers**: Periodic cleanup now uses a single fiber shared across all stores (CacheStore, RateLimiterStore, CircuitBreakerStore) instead of one fiber per store.
-- **Concurrent Fetcher Backpressure**: Added `max_pending` parameter to limit queued work and prevent unbounded memory growth.
 
-### New RequestConfig Options
-- `rate_limit.max_waiter_queue_size : Int32?` - Maximum waiters in rate limiter queue (default: 1000, 0 = unlimited)
-- `dns.cache_enabled : Bool` - Enable DNS caching (default: false)
-- `dns.cache_ttl : Time::Span` - DNS cache TTL (default: 30 seconds)
-- `dns.rebinding_check : Bool` - Enable DNS rebinding check (default: true)
+---
 
-### Planned
-- Redirect control configuration
+## [0.9.13] - 2026-05-16
+
+### Bug Fixes
+- **ReleaseHelpers Class Methods**: Crystal's `include` doesn't bring in class methods (`def self.*`). Changed all helper methods to `def self.*` syntax. GitHub, GitLab, and Codeberg now call `ReleaseHelpers.method_name` explicitly.
+- **CrestHttpClient.clear_dns_cache**: Added class method convenience wrapper `self.clear_dns_cache`.
 
 ---
 
