@@ -17,12 +17,13 @@ module Fetcher
     REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
 
     @request_semaphore : Channel(Nil)?
+    @semaphore_lock : Mutex = Mutex.new
 
     @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
     @@dns_cache_lock = Mutex.new
 
     def initialize(@config : RequestConfig = RequestConfig.new)
-      @request_semaphore = create_semaphore
+      # Semaphore created lazily on first request to avoid race condition
     end
 
     def self.clear_rate_limiters : Nil
@@ -48,23 +49,37 @@ module Fetcher
       result
     end
 
-    private def create_semaphore : Channel(Nil)?
+    private def ensure_semaphore : Channel(Nil)?
+      existing = @request_semaphore
+      return existing if existing
+
+      @semaphore_lock.synchronize do
+        @request_semaphore ||= create_semaphore_internal
+      end
+    end
+
+    private def create_semaphore_internal : Channel(Nil)?
       limit = @config.max_concurrent_requests
-      return unless limit && limit > 0
+      return nil unless limit && limit > 0
 
       sem = Channel(Nil).new(limit)
       limit.times { sem.send(nil) }
       sem
     end
 
+    private def create_semaphore : Channel(Nil)?
+      # Backwards compatibility — delegates to internal implementation
+      ensure_semaphore
+    end
+
     private def acquire_semaphore : Nil
-      sem = @request_semaphore
+      sem = ensure_semaphore
       return unless sem
       sem.receive
     end
 
     private def release_semaphore : Nil
-      sem = @request_semaphore
+      sem = ensure_semaphore
       return unless sem
       sem.send(nil)
     end
@@ -111,37 +126,46 @@ module Fetcher
     end
 
     private def handle_redirects(response : Crest::Response, original_url : String, headers : Hash(String, String), domain : String, method : Symbol, remaining_redirects : Int32? = nil) : ::HTTP::Client::Response
-      remaining = remaining_redirects || @config.max_redirects
-      return convert_response(response) unless REDIRECT_STATUS_CODES.includes?(response.status_code)
+      return convert_response(response) unless should_follow_redirect?(response)
 
-      redirect_url = response.headers["location"]? || response.headers["Location"]?
-      if redirect_url.nil? || redirect_url.empty?
-        raise MissingLocationHeaderError.new("Redirect response without Location header for #{original_url}")
-      end
+      redirect_url = extract_redirect_url(response)
+      resolved_url = resolve_redirect_url(redirect_url, original_url)
+      target_domain = extract_domain(resolved_url)
 
-      redirect_url_str = redirect_url.is_a?(Array) ? redirect_url.join(", ") : redirect_url.to_s
-      resolved_url = resolve_redirect_url(redirect_url_str, original_url)
-
-      # Validate URL format and SSRF checks
-      unless URLValidator.valid?(resolved_url) && URLValidator.resolve_and_validate(resolved_url)
-        raise DNSError.new("Redirect to blocked URL: #{resolved_url}")
-      end
-
-      # Validate redirect is allowed (same domain or explicit allowlist)
-      redirect_domain = URLValidator.extract_domain(resolved_url)
-      unless allow_redirect?(domain, redirect_domain)
-        raise DNSError.new("External redirect blocked: #{resolved_url} (from #{original_url})")
-      end
-
-      transition_domain(domain, redirect_domain) if redirect_domain != domain
-
-      return convert_response(response) if remaining <= 1
+      validate_redirect_target(resolved_url)
+      validate_redirect_domain(original_url, domain, resolved_url)
+      transition_domain(domain, target_domain) if domain != target_domain
+      return convert_response(response) if (remaining_redirects || @config.max_redirects) <= 1
 
       verify_dns_rebinding(resolved_url)
+      perform_follow_redirect(method, resolved_url, headers, target_domain, remaining_redirects)
+    end
 
+    private def should_follow_redirect?(response : Crest::Response) : Bool
+      REDIRECT_STATUS_CODES.includes?(response.status_code)
+    end
+
+    private def extract_redirect_url(response : Crest::Response) : String
+      redirect_url = response.headers["location"]? || response.headers["Location"]?
+      raise MissingLocationHeaderError.new("Redirect response without Location header") if redirect_url.nil? || redirect_url.empty?
+      redirect_url.is_a?(Array) ? redirect_url.join(", ") : redirect_url.to_s
+    end
+
+    private def validate_redirect_target(url : String) : Nil
+      return if URLValidator.valid?(url) && URLValidator.resolve_and_validate(url)
+      raise DNSError.new("Redirect to blocked URL: #{url}")
+    end
+
+    private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String) : Nil
+      target_domain = URLValidator.extract_domain(target_url)
+      return if allow_redirect?(source_domain, target_domain)
+      raise DNSError.new("External redirect blocked: #{target_url} (from #{original_url})")
+    end
+
+    private def perform_follow_redirect(method : Symbol, url : String, headers : Hash(String, String), domain : String, remaining : Int32?) : ::HTTP::Client::Response
       crest_response = Crest::Request.execute(
         method,
-        resolved_url,
+        url,
         headers: headers,
         max_redirects: 0,
         handle_errors: false,
@@ -149,8 +173,11 @@ module Fetcher
         read_timeout: @config.timeout.read,
         tls: build_tls_context
       )
+      handle_redirects(crest_response, url, headers, domain, method, remaining.try(&.- 1))
+    end
 
-      handle_redirects(crest_response, resolved_url, headers, redirect_domain, method, remaining - 1)
+    private def extract_domain(url : String) : String
+      URLValidator.extract_domain(url)
     end
 
     # Check if redirect to target_domain from source_domain is allowed
@@ -171,7 +198,7 @@ module Fetcher
       if allowed = redirect_config.allowed_domains
         # Allow exact match or subdomain of allowed domain
         return true if allowed.includes?(target_domain)
-        return true if allowed.any? { |d| target_domain.ends_with?(".#{d}") }
+        return true if allowed.any? { |domain| target_domain.ends_with?(".#{domain}") }
       end
 
       false
@@ -231,7 +258,7 @@ module Fetcher
       end
     end
 
-    private def clear_dns_cache : Nil
+    def clear_dns_cache : Nil
       @@dns_cache_lock.synchronize { @@dns_cache.clear }
     end
 
@@ -249,36 +276,56 @@ module Fetcher
     end
 
     private def verify_dns_rebinding(url : String) : Nil
-      return unless @config.dns.rebinding_check
+      return unless should_check_dns_rebinding?
 
-      uri = URI.parse(url)
-      host = uri.host
-      return if host.nil? || host.empty?
-      return if URLValidator.looks_like_ip?(host)
+      host = extract_host(url)
+      return unless host && valid_host?(host)
 
       if cached = get_cached_dns(host)
-        unless URLValidator.validate_connected_ip(host, cached)
-          raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
-        end
-        return
+        validate_cached_dns(host, cached)
+      else
+        resolve_and_validate_new_dns(host)
       end
+    rescue ex : DNSError
+      raise ex
+    rescue ex
+      ::Log.for("fetcher").debug { "DNS rebinding check failed for #{host}: #{ex.message}" }
+    end
 
-      begin
-        addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-        addr_info.each do |addr|
-          if addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
-            ip_address = addr.ip_address
-            cache_dns(host, ip_address)
-            unless URLValidator.validate_connected_ip(host, ip_address)
-              raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
-            end
-          end
-        end
-      rescue ex : DNSError
-        raise ex
-      rescue ex
-        ::Log.for("fetcher").debug { "DNS rebinding check failed for #{host}: #{ex.message}" }
+    private def should_check_dns_rebinding? : Bool
+      @config.dns.rebinding_check
+    end
+
+    private def extract_host(url : String) : String?
+      URI.parse(url).host
+    end
+
+    private def valid_host?(host : String?) : Bool
+      return false unless host
+      !URLValidator.looks_like_ip?(host)
+    end
+
+    private def validate_cached_dns(host : String, cached : Socket::IPAddress) : Nil
+      return if URLValidator.validate_connected_ip(host, cached)
+      raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
+    end
+
+    private def resolve_and_validate_new_dns(host : String) : Nil
+      addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+      addr_info.each do |addr|
+        validate_address_for_host(host, addr) if valid_address?(addr)
       end
+    end
+
+    private def valid_address?(addr : Socket::Addrinfo) : Bool
+      addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
+    end
+
+    private def validate_address_for_host(host : String, addr : Socket::Addrinfo) : Nil
+      ip_address = addr.ip_address
+      cache_dns(host, ip_address)
+      return if URLValidator.validate_connected_ip(host, ip_address)
+      raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
     end
 
     private def handle_error(ex : Exception, url : String)
@@ -287,36 +334,63 @@ module Fetcher
 
     private def map_request_error(ex : Exception, url : String)
       case ex
-      when MissingLocationHeaderError
-        raise ex
-      when URI::Error
-        error = Error.invalid_url("Invalid URL: #{ex.message}", url)
-        raise DNSError.new(error.message, error, ex)
-      when Socket::Error
-        error = Error.dns("DNS/Connection error: #{ex.message}", url)
-        raise DNSError.new(error.message, error, ex)
-      when IO::TimeoutError
-        error = Error.timeout("Timeout: #{ex.message}", url)
-        raise TimeoutError.new(error.message, error, ex)
-      when OpenSSL::SSL::Error
-        error = Error.dns("SSL error: #{ex.message}", url)
-        raise DNSError.new(error.message, error, ex)
-      when Crest::RequestFailed
-        status = ex.response.status_code
-        if (400..499).includes?(status)
-          error = Error.http(status, "HTTP #{status}: #{ex.message}", url)
-          raise HTTPClientError.new(error.message, status, error, ex)
-        elsif (500..599).includes?(status)
-          error = Error.server_error(status, "HTTP #{status}: #{ex.message}", url)
-          raise HTTPServerError.new(error.message, status, error, ex)
-        else
-          error = Error.http(status, "HTTP #{status}: #{ex.message}", url)
-          raise HTTPError.new(error.message, status, error, ex)
-        end
-      else
-        error = Error.unknown("#{ex.class}: #{ex.message}", url)
-        raise FetchError.new("Request error: #{ex.class}: #{ex.message}", error, ex)
+      when MissingLocationHeaderError then raise ex
+      when URI::Error                 then handle_uri_error(ex, url)
+      when Socket::Error              then handle_socket_error(ex, url)
+      when IO::TimeoutError           then handle_timeout_error(ex, url)
+      when OpenSSL::SSL::Error        then handle_ssl_error(ex, url)
+      when Crest::RequestFailed       then handle_request_failed(ex, url)
+      else                                 handle_unknown_error(ex, url)
       end
+    end
+
+    private def handle_uri_error(ex : URI::Error, url : String) : Nil
+      error = Error.invalid_url("Invalid URL: #{ex.message}", url)
+      raise DNSError.new(error.message, error, ex)
+    end
+
+    private def handle_socket_error(ex : Socket::Error, url : String) : Nil
+      error = Error.dns("DNS/Connection error: #{ex.message}", url)
+      raise DNSError.new(error.message, error, ex)
+    end
+
+    private def handle_timeout_error(ex : IO::TimeoutError, url : String) : Nil
+      error = Error.timeout("Timeout: #{ex.message}", url)
+      raise TimeoutError.new(error.message, error, ex)
+    end
+
+    private def handle_ssl_error(ex : OpenSSL::SSL::Error, url : String) : Nil
+      error = Error.dns("SSL error: #{ex.message}", url)
+      raise DNSError.new(error.message, error, ex)
+    end
+
+    private def handle_request_failed(ex : Crest::RequestFailed, url : String) : Nil
+      status = ex.response.status_code
+      case status
+      when 400..499 then handle_client_error(status, ex.message, url)
+      when 500..599 then handle_server_error(status, ex.message, url)
+      else               handle_http_error(status, ex.message, url)
+      end
+    end
+
+    private def handle_client_error(status : Int32, message : String, url : String) : Nil
+      error = Error.http(status, "HTTP #{status}: #{message}", url)
+      raise HTTPClientError.new(error.message, status, error, nil)
+    end
+
+    private def handle_server_error(status : Int32, message : String, url : String) : Nil
+      error = Error.server_error(status, "HTTP #{status}: #{message}", url)
+      raise HTTPServerError.new(error.message, status, error, nil)
+    end
+
+    private def handle_http_error(status : Int32, message : String, url : String) : Nil
+      error = Error.http(status, "HTTP #{status}: #{message}", url)
+      raise HTTPError.new(error.message, status, error, nil)
+    end
+
+    private def handle_unknown_error(ex : Exception, url : String) : Nil
+      error = Error.unknown("#{ex.class}: #{ex.message}", url)
+      raise FetchError.new("Request error: #{ex.class}: #{ex.message}", error, ex)
     end
 
     private def check_circuit_breaker(domain : String) : Nil

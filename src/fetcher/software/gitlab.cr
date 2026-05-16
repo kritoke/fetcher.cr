@@ -1,4 +1,5 @@
 require "json"
+require "log"
 require "../link_resolver"
 require "../error_handler"
 
@@ -27,15 +28,18 @@ module Fetcher
             parse_entry(release, provider)
           end
 
-          Result.success(
-            entries: entries,
-            etag: response.headers["ETag"]?,
-            last_modified: response.headers["Last-Modified"]?,
-            site_link: "#{provider.base_url}/#{provider.repo}",
-            favicon: "#{provider.base_url}/favicon.ico"
-          )
+          Result.builder
+            .entries(entries)
+            .etag(response.headers["ETag"]?)
+            .last_modified(response.headers["Last-Modified"]?)
+            .site_link("#{provider.base_url}/#{provider.repo}")
+            .favicon("#{provider.base_url}/favicon.ico")
+            .build
         end
-      rescue ex : Exception
+      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error
+        ErrorHandler.handle_network_error(ex, provider.api_url)
+      rescue ex
+        Log.warn { "Unexpected error in GitLab fetch: #{ex.class} - #{ex.message}" }
         ErrorHandler.handle_network_error(ex, provider.api_url)
       end
 

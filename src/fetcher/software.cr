@@ -1,4 +1,5 @@
 require "json"
+require "log"
 require "xml"
 require "uri"
 require "./entry"
@@ -54,37 +55,46 @@ module Fetcher
     end
 
     private def self.detect(url : String) : SoftwareProvider?
-      if _ = url.match(GITHUB_RELEASES_PATTERN)
-        return unless valid_domain?(url, "github.com")
-        repo = extract_repo(url, "github.com")
-        return build_github_provider(repo) if repo
-      end
-
-      if match = url.match(GITLAB_RELEASES_PATTERN)
-        gitlab_domain = match[1]
-        return unless valid_domain?(url, gitlab_domain)
-        repo = match[2]
-        base_url = "https://#{gitlab_domain}"
-        project_path = repo.split('/').map { |segment| URI.encode_path(segment) }.join("%2F")
-        return SoftwareProvider.new(
-          name: "gitlab",
-          base_url: base_url,
-          repo: repo,
-          source_type: SourceType::GitLab,
-          api_url: "#{base_url}/api/v4/projects/#{project_path}/releases",
-          atom_url: "#{base_url}/#{repo}/-/releases.atom",
-          atom_fallback_urls: ["#{base_url}/#{repo}/-/tags?format=atom"],
-          body_field: "description",
-        )
-      end
-
-      if _ = url.match(CODEBERG_RELEASES_PATTERN)
-        return unless valid_domain?(url, "codeberg.org")
-        repo = extract_repo(url, "codeberg.org")
-        return build_codeberg_provider(repo) if repo
-      end
-
+      return detect_github(url) if url.match(GITHUB_RELEASES_PATTERN)
+      return detect_gitlab(url) if url.match(GITLAB_RELEASES_PATTERN)
+      return detect_codeberg(url) if url.match(CODEBERG_RELEASES_PATTERN)
       nil
+    end
+
+    private def self.detect_github(url : String) : SoftwareProvider?
+      return unless valid_domain?(url, "github.com")
+      repo = extract_repo(url, "github.com")
+      build_github_provider(repo) if repo
+    end
+
+    private def self.detect_gitlab(url : String) : SoftwareProvider?
+      match = url.match(GITLAB_RELEASES_PATTERN)
+      return unless match
+
+      gitlab_domain = match[1]
+      return unless valid_domain?(url, gitlab_domain)
+      repo = match[2]
+
+      SoftwareProvider.new(
+        name: "gitlab",
+        base_url: "https://#{gitlab_domain}",
+        repo: repo,
+        source_type: SourceType::GitLab,
+        api_url: "https://#{gitlab_domain}/api/v4/projects/#{encode_project_path(repo)}/releases",
+        atom_url: "https://#{gitlab_domain}/#{repo}/-/releases.atom",
+        atom_fallback_urls: ["https://#{gitlab_domain}/#{repo}/-/tags?format=atom"],
+        body_field: "description",
+      )
+    end
+
+    private def self.encode_project_path(repo : String) : String
+      repo.split('/').map { |segment| URI.encode_path(segment) }.join("%2F")
+    end
+
+    private def self.detect_codeberg(url : String) : SoftwareProvider?
+      return unless valid_domain?(url, "codeberg.org")
+      repo = extract_repo(url, "codeberg.org")
+      build_codeberg_provider(repo) if repo
     end
 
     private def self.build_github_provider(repo : String) : SoftwareProvider
@@ -168,13 +178,13 @@ module Fetcher
         parse_software_entry(release, provider, provider.body_field)
       end
 
-      Result.success(
-        entries: entries,
-        etag: response.headers["ETag"]?,
-        last_modified: response.headers["Last-Modified"]?,
-        site_link: "#{provider.base_url}/#{provider.repo}",
-        favicon: "#{provider.base_url}/favicon.ico"
-      )
+      Result.builder
+        .entries(entries)
+        .etag(response.headers["ETag"]?)
+        .last_modified(response.headers["Last-Modified"]?)
+        .site_link("#{provider.base_url}/#{provider.repo}")
+        .favicon("#{provider.base_url}/favicon.ico")
+        .build
     rescue JSON::ParseException
       ::Log.for("fetcher.software").debug { "#{provider_name} API JSON parse failed, trying fallback: #{provider.api_url}" }
       nil
@@ -183,35 +193,55 @@ module Fetcher
     rescue ex : FetchError
       raise ex
     rescue ex
-      ::Log.for("fetcher.software").debug { "#{provider_name} API request failed, trying fallback: #{ex.class} - #{ex.message}" }
+      ::Log.for("fetcher.software").warn { "#{provider_name} API request failed, trying fallback: #{ex.class} - #{ex.message}" }
       nil
     end
 
     def self.parse_software_entry(release : JSON::Any, provider : SoftwareProvider, body_field : String = "body") : Entry
-      tag = release["tag_name"]?.try(&.as_s) || ""
-      name = release["name"]?.try(&.as_s).presence || tag
-      published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
-      body = release[body_field]?.try(&.as_s) || ""
-
-      pub_date = TimeParser.parse(published_at.try(&.as_s))
-
-      html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
-
-      link_data = LinkResolver.resolve_from_url(html_url)
+      entry_data = extract_release_data(release, provider, body_field)
 
       Entry.create(
-        title: "#{provider.repo} #{name}",
-        url: html_url,
+        title: "#{provider.repo} #{entry_data.name}",
+        url: entry_data.html_url,
         source_type: provider.source_type,
-        content: body,
-        content_html: body.presence,
-        published_at: pub_date,
-        version: tag,
-        comment_url: link_data.comment_url,
-        commentary_url: link_data.commentary_url,
-        is_discussion_url: link_data.is_discussion_url
+        content: entry_data.body,
+        content_html: entry_data.body.presence,
+        published_at: entry_data.pub_date,
+        version: entry_data.tag,
+        comment_url: entry_data.link_data.comment_url,
+        commentary_url: entry_data.link_data.commentary_url,
+        is_discussion_url: entry_data.link_data.is_discussion_url
       )
     end
+
+    private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider, body_field : String) : ReleaseData
+      tag = release["tag_name"]?.try(&.as_s) || ""
+      name = release["name"]?.try(&.as_s).presence || tag
+      body = release[body_field]?.try(&.as_s) || ""
+      html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
+
+      ReleaseData.new(
+        tag: tag,
+        name: name,
+        body: body,
+        html_url: html_url,
+        pub_date: parse_release_date(release),
+        link_data: LinkResolver.resolve_from_url(html_url)
+      )
+    end
+
+    private def self.parse_release_date(release : JSON::Any) : Time?
+      published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
+      TimeParser.parse(published_at.try(&.as_s))
+    end
+
+    record ReleaseData,
+      tag : String,
+      name : String,
+      body : String,
+      html_url : String,
+      pub_date : Time?,
+      link_data : LinkResolver::LinkData
 
     def self.try_releases_sequence(
       provider_name : String,
@@ -227,7 +257,10 @@ module Fetcher
       return result if result && result.success?
 
       Fetcher.error_result(ErrorKind::HTTPError, "#{provider_name} fetch error: No releases found", 404)
-    rescue ex : Exception
+    rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError
+      ErrorHandler.handle_network_error(ex, provider.api_url)
+    rescue ex
+      Log.warn { "Unexpected error in software fetch: #{ex.class} - #{ex.message}" }
       ErrorHandler.handle_network_error(ex, provider.api_url)
     end
 

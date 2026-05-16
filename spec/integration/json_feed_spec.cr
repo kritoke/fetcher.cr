@@ -288,14 +288,7 @@ describe "Integration Tests - JSON Feed" do
           url: "https://example.com/author",
           avatar: "https://example.com/avatar.jpg"
         )
-        result = Fetcher::Result.success(
-          entries: [] of Fetcher::Entry,
-          feed_title: "JSON Feed Title",
-          feed_description: "JSON Feed Description",
-          feed_language: "en",
-          feed_authors: [author],
-          favicon: "https://example.com/favicon.ico"
-        )
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).feed_title("JSON Feed Title").feed_description("JSON Feed Description").feed_language("en").feed_authors([author]).favicon("https://example.com/favicon.ico").build
 
         result.feed_title.should eq("JSON Feed Title")
         result.feed_description.should eq("JSON Feed Description")

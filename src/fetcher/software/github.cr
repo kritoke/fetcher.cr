@@ -1,4 +1,5 @@
 require "json"
+require "log"
 require "../link_resolver"
 
 module Fetcher
@@ -22,15 +23,18 @@ module Fetcher
             parse_entry(release, provider)
           end
 
-          Result.success(
-            entries: entries,
-            etag: response.headers["ETag"]?,
-            last_modified: response.headers["Last-Modified"]?,
-            site_link: "#{provider.base_url}/#{provider.repo}",
-            favicon: "#{provider.base_url}/favicon.ico"
-          )
+          Result.builder
+            .entries(entries)
+            .etag(response.headers["ETag"]?)
+            .last_modified(response.headers["Last-Modified"]?)
+            .site_link("#{provider.base_url}/#{provider.repo}")
+            .favicon("#{provider.base_url}/favicon.ico")
+            .build
         end
-      rescue ex : Exception
+      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error
+        ErrorHandler.handle_network_error(ex, provider.api_url)
+      rescue ex
+        Log.warn { "Unexpected error in GitHub fetch: #{ex.class} - #{ex.message}" }
         ErrorHandler.handle_network_error(ex, provider.api_url)
       end
 
@@ -42,29 +46,50 @@ module Fetcher
       end
 
       private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
-        published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
-        body = release["body"]?.try(&.as_s) || release["description"]?.try(&.as_s) || ""
-
-        pub_date = TimeParser.parse(published_at.try(&.as_s))
-        html_url = release["html_url"]?.try(&.as_s) || ""
-
-        link_data = LinkResolver.resolve_from_url(html_url)
+        entry_data = extract_release_data(release, provider)
 
         Entry.create(
-          title: "#{provider.repo} #{name}",
-          url: html_url,
+          title: "#{provider.repo} #{entry_data.name}",
+          url: entry_data.html_url,
           source_type: provider.source_type,
-          content: body,
-          content_html: body.presence,
-          published_at: pub_date,
-          version: tag,
-          comment_url: link_data.comment_url,
-          commentary_url: link_data.commentary_url,
-          is_discussion_url: link_data.is_discussion_url
+          content: entry_data.body,
+          content_html: entry_data.body.presence,
+          published_at: entry_data.pub_date,
+          version: entry_data.tag,
+          comment_url: entry_data.link_data.comment_url,
+          commentary_url: entry_data.link_data.commentary_url,
+          is_discussion_url: entry_data.link_data.is_discussion_url
         )
       end
+
+      private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider) : GithubReleaseData
+        tag = release["tag_name"]?.try(&.as_s) || ""
+        name = release["name"]?.try(&.as_s).presence || tag
+        body = release["body"]?.try(&.as_s) || release["description"]?.try(&.as_s) || ""
+        html_url = release["html_url"]?.try(&.as_s) || ""
+
+        GithubReleaseData.new(
+          tag: tag,
+          name: name,
+          body: body,
+          html_url: html_url,
+          pub_date: parse_release_date(release),
+          link_data: LinkResolver.resolve_from_url(html_url)
+        )
+      end
+
+      private def self.parse_release_date(release : JSON::Any) : Time?
+        published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
+        TimeParser.parse(published_at.try(&.as_s))
+      end
+
+      record GithubReleaseData,
+        tag : String,
+        name : String,
+        body : String,
+        html_url : String,
+        pub_date : Time?,
+        link_data : LinkResolver::LinkData
     end
   end
 end

@@ -14,13 +14,13 @@ module Fetcher
         entries = parse_atom_entries(response.body, provider.source_type, limit)
         return if entries.empty?
 
-        Result.success(
-          entries: entries,
-          etag: response.headers["ETag"]?,
-          last_modified: response.headers["Last-Modified"]?,
-          site_link: "#{provider.base_url}/#{provider.repo}",
-          favicon: "#{provider.base_url}/favicon.ico"
-        )
+        Result.builder
+          .entries(entries)
+          .etag(response.headers["ETag"]?)
+          .last_modified(response.headers["Last-Modified"]?)
+          .site_link("#{provider.base_url}/#{provider.repo}")
+          .favicon("#{provider.base_url}/favicon.ico")
+          .build
       rescue ex : OpenSSL::SSL::Error
         raise DNSError.new("#{provider.name} SSL error: #{ex.message}")
       rescue ex : FetchError

@@ -1,3 +1,4 @@
+require "log"
 require "./entry"
 require "./result"
 require "./retry"
@@ -68,13 +69,13 @@ module Fetcher
         )
       end
 
-      Result.success(
-        entries: youtube_entries,
-        site_link: "https://www.youtube.com/channel/#{channel_id}",
-        favicon: "https://www.youtube.com/favicon.ico",
-        feed_title: metadata.feed_title,
-        feed_description: metadata.feed_description
-      )
+      Result.builder
+        .entries(youtube_entries)
+        .site_link("https://www.youtube.com/channel/#{channel_id}")
+        .favicon("https://www.youtube.com/favicon.ico")
+        .feed_title(metadata.feed_title)
+        .feed_description(metadata.feed_description)
+        .build
     rescue ex : InvalidFormatError
       Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Invalid format error")
     rescue ex
@@ -88,35 +89,44 @@ module Fetcher
       ErrorHandler.handle_response(response, rss_url) do
         parse_youtube_feed(response.body, channel_id, limit)
       end
-    rescue ex : Exception
+    rescue ex : DNSError | TimeoutError | IO::TimeoutError | Socket::Error
+      ErrorHandler.handle_network_error(ex, rss_url)
+    rescue ex
+      Log.warn { "YouTube fetch unexpected error: #{ex.class} - #{ex.message}" }
       ErrorHandler.handle_network_error(ex, rss_url)
     end
 
     private def self.extract_channel(url : String) : String?
-      if match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
-        id = match[1]
-        return id if id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/)
-      end
-
-      if url.includes?("/@")
-        if match = url.match(%r{youtube\.com/@([^/?]+)}i)
-          return resolve_handle_to_channel_id(match[1], url)
-        end
-      end
-
-      if url.includes?("/c/")
-        if match = url.match(%r{youtube\.com/c/([^/?]+)}i)
-          return resolve_custom_url_to_channel_id(match[1], url)
-        end
-      end
-
-      if url.includes?("/user/")
-        if match = url.match(%r{youtube\.com/user/([^/?]+)}i)
-          return resolve_user_to_channel_id(match[1], url)
-        end
-      end
-
+      return extract_channel_id(url) if url.includes?("/channel/")
+      return extract_handle_channel(url) if url.includes?("/@")
+      return extract_custom_channel(url) if url.includes?("/c/")
+      return extract_user_channel(url) if url.includes?("/user/")
       nil
+    end
+
+    private def self.extract_channel_id(url : String) : String?
+      match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
+      return unless match
+      id = match[1]
+      id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/) ? id : nil
+    end
+
+    private def self.extract_handle_channel(url : String) : String?
+      match = url.match(%r{youtube\.com/@([^/?]+)}i)
+      return unless match
+      resolve_handle_to_channel_id(match[1], url)
+    end
+
+    private def self.extract_custom_channel(url : String) : String?
+      match = url.match(%r{youtube\.com/c/([^/?]+)}i)
+      return unless match
+      resolve_custom_url_to_channel_id(match[1], url)
+    end
+
+    private def self.extract_user_channel(url : String) : String?
+      match = url.match(%r{youtube\.com/user/([^/?]+)}i)
+      return unless match
+      resolve_user_to_channel_id(match[1], url)
     end
 
     private def self.resolve_channel_id(url : String, config : RequestConfig) : String?

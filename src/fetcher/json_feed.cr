@@ -1,3 +1,4 @@
+require "log"
 require "./entry"
 require "./result"
 require "./retry"
@@ -21,7 +22,10 @@ module Fetcher
       ErrorHandler.handle_response(response, url) do
         parse_feed(response.body, limit, config)
       end
-    rescue ex : Exception
+    rescue ex : DNSError | TimeoutError | IO::TimeoutError | Socket::Error
+      ErrorHandler.handle_network_error(ex, url)
+    rescue ex
+      Log.warn { "JSON feed fetch unexpected error: #{ex.class} - #{ex.message}" }
       ErrorHandler.handle_network_error(ex, url)
     end
 
@@ -37,15 +41,15 @@ module Fetcher
         entries = parser.parse_entries(parsed, limit)
         metadata = parser.parse_feed_metadata(parsed)
 
-        Result.success(
-          entries: entries,
-          site_link: metadata.site_link,
-          favicon: metadata.favicon,
-          feed_title: metadata.feed_title,
-          feed_description: metadata.feed_description,
-          feed_language: metadata.feed_language,
-          feed_authors: metadata.feed_authors
-        )
+        Result.builder
+          .entries(entries)
+          .site_link(metadata.site_link)
+          .favicon(metadata.favicon)
+          .feed_title(metadata.feed_title)
+          .feed_description(metadata.feed_description)
+          .feed_language(metadata.feed_language)
+          .feed_authors(metadata.feed_authors)
+          .build
       rescue ex : InvalidFormatError
         Fetcher.error_result(ErrorKind::InvalidFormat, ex.message || "Invalid format error")
       rescue ex

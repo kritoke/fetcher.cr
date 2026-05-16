@@ -1,5 +1,7 @@
 require "time"
+require "log"
 require "mutex"
+require "./exceptions"
 
 module Fetcher
   class TokenBucketRateLimiter
@@ -26,12 +28,15 @@ module Fetcher
 
     private def run_owner_fiber
       schedule_wakeup = -> { try_schedule_wakeup }
+      consecutive_crashes = 0
       loop do
         begin
           loop { handle_message(schedule_wakeup) }
         rescue ex
-          ::Log.for("fetcher").error { "TokenBucket owner fiber crashed: #{ex.class} - #{ex.message} (restarting)" }
-          ::sleep(10.milliseconds)
+          consecutive_crashes += 1
+          backoff_ms = [100, 500, 1000, 5000].fetch(consecutive_crashes - 1, 5000)
+          ::Log.for("fetcher").error { "TokenBucket owner fiber crashed (##{consecutive_crashes}): #{ex.class} - #{ex.message} (retry in #{backoff_ms}ms)" }
+          ::sleep(backoff_ms.milliseconds)
         end
       end
     end
@@ -95,6 +100,10 @@ module Fetcher
       fiber = spawn do
         ::sleep(wait_time.seconds)
         @cmd.send(TickMsg.new) unless @wakeup_cancelled
+      rescue ex
+        ::Log.for("fetcher.token_bucket").error { "Wakeup fiber crashed: #{ex.class} - #{ex.message}" }
+        @wakeup_cancelled = true
+        @wake_scheduled = false
       end
       @pending_wakeup = fiber
     end

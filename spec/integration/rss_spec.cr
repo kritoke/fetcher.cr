@@ -344,13 +344,7 @@ describe "Integration Tests - RSS" do
     describe "Result record with feed metadata" do
       it "creates result with feed metadata" do
         author = Fetcher::Author.new(name: "Author Name", url: "https://example.com", avatar: nil)
-        result = Fetcher::Result.success(
-          entries: [] of Fetcher::Entry,
-          feed_title: "Feed Title",
-          feed_description: "Feed Description",
-          feed_language: "en",
-          feed_authors: [author]
-        )
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).feed_title("Feed Title").feed_description("Feed Description").feed_language("en").feed_authors([author]).build
         result.feed_title.should eq("Feed Title")
         result.feed_description.should eq("Feed Description")
         result.feed_language.should eq("en")
@@ -359,7 +353,7 @@ describe "Integration Tests - RSS" do
       end
 
       it "creates result with empty feed metadata by default" do
-        result = Fetcher::Result.success(entries: [] of Fetcher::Entry)
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).build
         result.feed_title.should be_nil
         result.feed_description.should be_nil
         result.feed_language.should be_nil

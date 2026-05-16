@@ -11,7 +11,10 @@ describe "Fetcher::Cache" do
 
     it "stores and retrieves a result" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder
+        .entries([] of Fetcher::Entry)
+        .site_link("https://example.com")
+        .build
       cache.set("test_key", result, 5.minutes)
 
       cached = cache.get("test_key")
@@ -21,8 +24,14 @@ describe "Fetcher::Cache" do
 
     it "updates existing entry" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result1 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example1.com")
-      result2 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example2.com")
+      result1 = Fetcher::Result.builder
+        .entries([] of Fetcher::Entry)
+        .site_link("https://example1.com")
+        .build
+      result2 = Fetcher::Result.builder
+        .entries([] of Fetcher::Entry)
+        .site_link("https://example2.com")
+        .build
 
       cache.set("test_key", result1, 5.minutes)
       cache.set("test_key", result2, 5.minutes)
@@ -38,13 +47,13 @@ describe "Fetcher::Cache" do
       cache = Fetcher::Cache.new(max_size: 3, enabled: true)
 
       3.times do |i|
-        result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example#{i}.com")
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example#{i}.com").build
         cache.set("key#{i}", result, 5.minutes)
       end
 
       cache.get("key0")
 
-      new_result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://new.com")
+      new_result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://new.com").build
       cache.set("key3", new_result, 5.minutes)
 
       cache.get("key0").should be_nil
@@ -55,7 +64,7 @@ describe "Fetcher::Cache" do
       cache = Fetcher::Cache.new(max_size: 2, enabled: true)
 
       5.times do |i|
-        result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example#{i}.com")
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example#{i}.com").build
         cache.set("key#{i}", result, 5.minutes)
       end
 
@@ -68,7 +77,7 @@ describe "Fetcher::Cache" do
   describe "TTL expiration" do
     it "returns nil for expired entry" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 1.millisecond)
 
       sleep 10.milliseconds
@@ -79,7 +88,7 @@ describe "Fetcher::Cache" do
 
     it "does not return expired entry even if recently accessed" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 1.millisecond)
 
       sleep 5.milliseconds
@@ -94,7 +103,7 @@ describe "Fetcher::Cache" do
   describe "cache statistics" do
     it "tracks hits and misses" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 5.minutes)
 
       cache.get("nonexistent")
@@ -110,7 +119,7 @@ describe "Fetcher::Cache" do
       cache = Fetcher::Cache.new(max_size: 2, enabled: true)
 
       5.times do |i|
-        result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example#{i}.com")
+        result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example#{i}.com").build
         cache.set("key#{i}", result, 5.minutes)
       end
 
@@ -120,7 +129,7 @@ describe "Fetcher::Cache" do
 
     it "calculates hit ratio" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 5.minutes)
 
       9.times { cache.get("test_key") }
@@ -134,7 +143,7 @@ describe "Fetcher::Cache" do
   describe "clear" do
     it "removes all entries" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("key1", result, 5.minutes)
       cache.set("key2", result, 5.minutes)
 
@@ -146,7 +155,7 @@ describe "Fetcher::Cache" do
 
     it "resets statistics" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 5.minutes)
       cache.get("test_key")
 
@@ -161,8 +170,8 @@ describe "Fetcher::Cache" do
   describe "clear_by_prefix" do
     it "removes only entries for specified prefix" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result1 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
-      result2 = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result1 = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
+      result2 = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
 
       cache.set("reddit:crystal:hot:25", result1, 5.minutes)
       cache.set("reddit:news:hot:25", result2, 5.minutes)
@@ -177,7 +186,7 @@ describe "Fetcher::Cache" do
   describe "enabled toggle" do
     it "returns nil when disabled" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: false)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 5.minutes)
 
       cached = cache.get("test_key")
@@ -186,7 +195,7 @@ describe "Fetcher::Cache" do
 
     it "stores entries when enabled" do
       cache = Fetcher::Cache.new(max_size: 100, enabled: true)
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       cache.set("test_key", result, 5.minutes)
 
       cached = cache.get("test_key")
@@ -202,7 +211,7 @@ describe "Fetcher::Cache" do
     end
 
     it "Cache.get delegates to default instance" do
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       Fetcher::Cache.set("test_key", result, 5.minutes)
 
       cached = Fetcher::Cache.get("test_key")
@@ -211,7 +220,7 @@ describe "Fetcher::Cache" do
     end
 
     it "Cache.clear delegates to default instance" do
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       Fetcher::Cache.set("key1", result, 5.minutes)
 
       Fetcher::Cache.clear
@@ -220,7 +229,7 @@ describe "Fetcher::Cache" do
     end
 
     it "Cache.stats delegates to default instance" do
-      result = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://example.com")
+      result = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://example.com").build
       Fetcher::Cache.set("test_key", result, 5.minutes)
       Fetcher::Cache.get("test_key")
       Fetcher::Cache.get("nonexistent")

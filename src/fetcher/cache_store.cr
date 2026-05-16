@@ -44,64 +44,107 @@ module Fetcher
 
     private def handle_message
       msg = @cmd.receive
-      case msg
-      when GetMsg
-        unless @enabled
-          msg.reply.send(nil)
-          return
-        end
+      dispatch_message(msg)
+    end
 
-        entry = @entries[msg.key]?
-        if entry.nil?
-          @stats.record_miss
-          msg.reply.send(nil)
-        elsif entry.expired?
-          remove_entry(msg.key)
-          @stats.record_miss
-          msg.reply.send(nil)
-        else
-          @stats.record_hit
-          msg.reply.send(entry.value)
-        end
-      when SetMsg
-        return unless @enabled
-        if @entries[msg.key]?
-          @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
-          @eviction_order.reject! { |k| k == msg.key }
-          @eviction_set.delete(msg.key)
-          @eviction_order << msg.key
-          @eviction_set.add(msg.key)
-        else
-          evict_if_needed
-          @entries[msg.key] = CacheEntry.new(msg.value, Time.utc, msg.ttl)
-          @eviction_order << msg.key
-          @eviction_set.add(msg.key)
-        end
-      when ClearMsg
-        @entries.clear
-        @eviction_order.clear
-        @eviction_set.clear
-        @stats = CacheStats.new
-      when ClearByPrefixMsg
-        @entries.each_key do |key|
-          next unless key.starts_with?(msg.prefix)
-          @entries.delete(key)
-          @eviction_set.delete(key)
-        end
-        @eviction_order.reject!(&.starts_with?(msg.prefix))
-      when StatsMsg
-        msg.reply.send(CacheStats.snapshot(@stats.hits, @stats.misses, @stats.evictions))
-      when EnabledSetMsg
-        @enabled = msg.value
-      when EnabledGetMsg
-        msg.reply.send(@enabled)
-      when MaxSizeSetMsg
-        @max_size = msg.value
-      when MaxSizeGetMsg
-        msg.reply.send(@max_size)
-      when CleanupMsg
-        BoundedRegistry.cleanup(@entries)
+    private def dispatch_message(msg)
+      case msg
+      when GetMsg           then handle_get(msg)
+      when SetMsg           then handle_set(msg)
+      when ClearMsg         then handle_clear
+      when ClearByPrefixMsg then handle_clear_by_prefix(msg.prefix)
+      when StatsMsg         then handle_stats(msg.reply)
+      when EnabledSetMsg    then handle_enabled_set(msg.value)
+      when EnabledGetMsg    then handle_enabled_get(msg.reply)
+      when MaxSizeSetMsg    then handle_max_size_set(msg.value)
+      when MaxSizeGetMsg    then handle_max_size_get(msg.reply)
+      when CleanupMsg       then handle_cleanup
       end
+    end
+
+    # Named handlers for testability
+    private def handle_enabled_set(value : Bool) : Nil
+      @enabled = value
+    end
+
+    private def handle_enabled_get(reply : Channel(Bool)) : Nil
+      reply.send(@enabled)
+    end
+
+    private def handle_max_size_set(value : Int32) : Nil
+      @max_size = value
+    end
+
+    private def handle_max_size_get(reply : Channel(Int32)) : Nil
+      reply.send(@max_size)
+    end
+
+    private def handle_cleanup : Nil
+      BoundedRegistry.cleanup(@entries)
+    end
+
+    private def handle_get(msg : GetMsg)
+      return handle_get_disabled(msg) unless @enabled
+      entry = @entries[msg.key]?
+      if entry.nil?
+        @stats.record_miss
+        msg.reply.send(nil)
+      elsif entry.expired?
+        remove_entry(msg.key)
+        @stats.record_miss
+        msg.reply.send(nil)
+      else
+        @stats.record_hit
+        msg.reply.send(entry.value)
+      end
+    end
+
+    private def handle_get_disabled(msg : GetMsg)
+      msg.reply.send(nil)
+    end
+
+    private def handle_set(msg : SetMsg)
+      return unless @enabled
+      if @entries[msg.key]?
+        update_entry(msg.key, msg.value, msg.ttl)
+      else
+        evict_if_needed
+        add_entry(msg.key, msg.value, msg.ttl)
+      end
+    end
+
+    private def update_entry(key : String, value : Result, ttl : Time::Span)
+      @entries[key] = CacheEntry.new(value, Time.utc, ttl)
+      @eviction_order.reject! { |k| k == key }
+      @eviction_set.delete(key)
+      @eviction_order << key
+      @eviction_set.add(key)
+    end
+
+    private def add_entry(key : String, value : Result, ttl : Time::Span)
+      @entries[key] = CacheEntry.new(value, Time.utc, ttl)
+      @eviction_order << key
+      @eviction_set.add(key)
+    end
+
+    private def handle_clear
+      @entries.clear
+      @eviction_order.clear
+      @eviction_set.clear
+      @stats = CacheStats.new
+    end
+
+    private def handle_clear_by_prefix(prefix : String)
+      @entries.each_key do |key|
+        next unless key.starts_with?(prefix)
+        @entries.delete(key)
+        @eviction_set.delete(key)
+      end
+      @eviction_order.reject!(&.starts_with?(prefix))
+    end
+
+    private def handle_stats(reply : Channel(CacheStats))
+      reply.send(CacheStats.snapshot(@stats.hits, @stats.misses, @stats.evictions))
     end
 
     def get(key : String) : Result?

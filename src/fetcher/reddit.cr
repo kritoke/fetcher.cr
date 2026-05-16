@@ -229,12 +229,11 @@ module Fetcher
     end
 
     private def self.build_result(entries : Array(Entry), subreddit : String) : Result
-      Result.success(
-        entries: entries,
-        site_link: "https://www.reddit.com/r/#{subreddit}",
-        favicon: "https://www.reddit.com/favicon.ico",
-        last_modified: nil
-      )
+      Result.builder
+        .entries(entries)
+        .site_link("https://www.reddit.com/r/#{subreddit}")
+        .favicon("https://www.reddit.com/favicon.ico")
+        .build
     end
 
     VALID_SUBREDDIT = /^[A-Za-z0-9_+%]+$/
@@ -299,7 +298,21 @@ module Fetcher
     end
 
     private def self.parse_reddit_post(child : JSON::Any) : Entry?
-      post = child["data"]? || return
+      post_data = extract_post_data(child) || return
+
+      Entry.create(
+        title: post_data.title,
+        url: post_data.url,
+        source_type: SourceType::Reddit,
+        published_at: post_data.pub_date,
+        is_discussion_url: post_data.link_data.is_discussion_url,
+        comment_url: post_data.link_data.comment_url || post_data.discussion_url
+      )
+    end
+
+    private def self.extract_post_data(child : JSON::Any) : PostData?
+      post = child["data"]?
+      return unless post
 
       title = post["title"]?.try(&.as_s) || "Untitled"
       post_url = post["url"]?.try(&.as_s) || ""
@@ -311,16 +324,20 @@ module Fetcher
       external_url = is_self || post_url.empty? ? nil : post_url
       pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
 
-      link_data = LinkResolver.resolve_from_url(external_url || discussion_url)
-
-      Entry.create(
+      PostData.new(
         title: title,
         url: external_url || discussion_url,
-        source_type: SourceType::Reddit,
-        published_at: pub_date,
-        is_discussion_url: link_data.is_discussion_url,
-        comment_url: link_data.comment_url || discussion_url
+        discussion_url: discussion_url,
+        pub_date: pub_date,
+        link_data: LinkResolver.resolve_from_url(external_url || discussion_url)
       )
     end
+
+    record PostData,
+      title : String,
+      url : String,
+      discussion_url : String,
+      pub_date : Time?,
+      link_data : LinkResolver::LinkData
   end
 end

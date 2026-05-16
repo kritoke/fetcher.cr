@@ -7,59 +7,59 @@ module Fetcher
     module Codeberg
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
+        response = http_client.get(provider.api_url, build_codeberg_headers(config))
+
+        case response.status_code
+        when 200..299 then handle_success_response(response, provider, limit)
+        when 304      then handle_not_modified(response)
+        when 429      then handle_rate_limited(provider.api_url)
+        when 500..599 then handle_server_error(response.status_code, provider.api_url)
+        else               handle_http_error(response.status_code, provider.api_url)
+        end
+      end
+
+      private def self.build_codeberg_headers(config : RequestConfig) : ::HTTP::Headers
         codeberg_headers = ::HTTP::Headers.new
         codeberg_headers["Accept"] = "application/json"
+        codeberg_headers["Authorization"] = "Bearer #{config.codeberg_token}" if config.codeberg_token
+        Fetcher::CrestHttpClient.build_headers(codeberg_headers)
+      end
 
-        if token = config.codeberg_token
-          codeberg_headers["Authorization"] = "Bearer #{token}"
-        end
+      private def self.handle_success_response(response : ::HTTP::Client::Response, provider : SoftwareProvider, limit : Int32) : Result
+        result = parse_json_response(response.body, provider.api_url)
+        return result if result.is_a?(Result)
 
-        merged = Fetcher::CrestHttpClient.build_headers(codeberg_headers)
-        response = http_client.get(provider.api_url, merged)
+        releases = result.as(Array(JSON::Any))
+        stable_releases = releases.reject { |release| release["prerelease"]?.try(&.as_bool) || false }
 
-        # Handle HTTP errors first
-        case response.status_code
-        when 200..299
-          # Success - now validate we got an array, not an error response
-          result = parse_json_response(response.body, provider.api_url)
-          if result.is_a?(Result)
-            # Non-success result from JSON parsing (invalid JSON or error response)
-            # Return this error to let caller handle fallback
-            return result
-          end
+        entries = stable_releases.first(limit).map { |release| parse_entry(release, provider) }
+        Result.builder
+          .entries(entries)
+          .etag(response.headers["ETag"]?)
+          .last_modified(response.headers["Last-Modified"]?)
+          .site_link("#{provider.base_url}/#{provider.repo}")
+          .favicon("#{provider.base_url}/favicon.ico")
+          .build
+      end
 
-          releases = result.as(Array(JSON::Any))
-          stable_releases = releases.reject do |release|
-            release["prerelease"]?.try(&.as_bool) || false
-          end
+      private def self.handle_not_modified(response : ::HTTP::Client::Response) : Result
+        Result.success(
+          entries: [] of Entry,
+          etag: response.headers["ETag"]?,
+          last_modified: response.headers["Last-Modified"]?
+        )
+      end
 
-          entries = stable_releases.first(limit).map do |release|
-            parse_entry(release, provider)
-          end
+      private def self.handle_rate_limited(url : String) : Result
+        Result.error(Error.rate_limited("Rate limited", url))
+      end
 
-          Result.success(
-            entries: entries,
-            etag: response.headers["ETag"]?,
-            last_modified: response.headers["Last-Modified"]?,
-            site_link: "#{provider.base_url}/#{provider.repo}",
-            favicon: "#{provider.base_url}/favicon.ico"
-          )
-        when 304
-          Result.success(
-            entries: [] of Entry,
-            etag: response.headers["ETag"]?,
-            last_modified: response.headers["Last-Modified"]?
-          )
-        when 429
-          error = Error.rate_limited("Rate limited", provider.api_url)
-          Result.error(error)
-        when 500..599
-          error = Error.server_error(response.status_code, "Server error: #{response.status_code}", provider.api_url)
-          Result.error(error)
-        else
-          error = Error.http(response.status_code, "HTTP #{response.status_code}", provider.api_url)
-          Result.error(error)
-        end
+      private def self.handle_server_error(status : Int32, url : String) : Result
+        Result.error(Error.server_error(status, "Server error: #{status}", url))
+      end
+
+      private def self.handle_http_error(status : Int32, url : String) : Result
+        Result.error(Error.http(status, "HTTP #{status}", url))
       end
 
       # Parse JSON response and handle error responses from Codeberg API
@@ -111,29 +111,50 @@ module Fetcher
       end
 
       private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
-        published_at = release["published_at"]? || release["created_at"]?
-        body = release[provider.body_field]?.try(&.as_s) || ""
-
-        pub_date = TimeParser.parse(published_at.try(&.as_s))
-        html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
-
-        link_data = LinkResolver.resolve_from_url(html_url)
+        entry_data = extract_release_data(release, provider)
 
         Entry.create(
-          title: "#{provider.repo} #{name}",
-          url: html_url,
+          title: "#{provider.repo} #{entry_data.name}",
+          url: entry_data.html_url,
           source_type: provider.source_type,
-          content: body,
-          content_html: body.presence,
-          published_at: pub_date,
-          version: tag,
-          comment_url: link_data.comment_url,
-          commentary_url: link_data.commentary_url,
-          is_discussion_url: link_data.is_discussion_url
+          content: entry_data.body,
+          content_html: entry_data.body.presence,
+          published_at: entry_data.pub_date,
+          version: entry_data.tag,
+          comment_url: entry_data.link_data.comment_url,
+          commentary_url: entry_data.link_data.commentary_url,
+          is_discussion_url: entry_data.link_data.is_discussion_url
         )
       end
+
+      private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider) : CodebergReleaseData
+        tag = release["tag_name"]?.try(&.as_s) || ""
+        name = release["name"]?.try(&.as_s).presence || tag
+        body = release[provider.body_field]?.try(&.as_s) || ""
+        html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
+
+        CodebergReleaseData.new(
+          tag: tag,
+          name: name,
+          body: body,
+          html_url: html_url,
+          pub_date: parse_release_date(release),
+          link_data: LinkResolver.resolve_from_url(html_url)
+        )
+      end
+
+      private def self.parse_release_date(release : JSON::Any) : Time?
+        published_at = release["published_at"]? || release["created_at"]?
+        TimeParser.parse(published_at.try(&.as_s))
+      end
+
+      record CodebergReleaseData,
+        tag : String,
+        name : String,
+        body : String,
+        html_url : String,
+        pub_date : Time?,
+        link_data : LinkResolver::LinkData
     end
   end
 end

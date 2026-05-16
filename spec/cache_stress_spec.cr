@@ -12,7 +12,7 @@ describe "CacheStore stress" do
       spawn do
         200.times do |j|
           key = "key_#{j % 50}"
-          res = Fetcher::Result.success(entries: [] of Fetcher::Entry, site_link: "https://#{i}-#{j}.example")
+          res = Fetcher::Result.builder.entries([] of Fetcher::Entry).site_link("https://#{i}-#{j}.example").build
           cache.set(key, res, 5.minutes)
           cache.get(key)
           # occasionally check stats
