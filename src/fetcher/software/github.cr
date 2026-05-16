@@ -1,10 +1,14 @@
 require "json"
 require "log"
 require "../link_resolver"
+require "../time_parser"
+require "./release_helpers"
 
 module Fetcher
   module Software
     module GitHub
+      include ReleaseHelpers
+
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         github_headers = ::HTTP::Headers.new
         github_headers["Accept"] = "application/vnd.github.v3+json"
@@ -15,9 +19,7 @@ module Fetcher
 
         ErrorHandler.handle_response(response, provider.api_url) do
           releases = parse_json(response.body, provider.api_url)
-          stable_releases = releases.reject do |release|
-            release["prerelease"]?.try(&.as_bool) || release["draft"]?.try(&.as_bool)
-          end
+          stable_releases = releases.reject { |release| prerelease?(release) }
 
           entries = stable_releases.first(limit).map do |release|
             parse_entry(release, provider)
@@ -63,10 +65,10 @@ module Fetcher
       end
 
       private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider) : GithubReleaseData
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
+        tag = extract_tag(release)
+        name = extract_name(release)
         body = release["body"]?.try(&.as_s) || release["description"]?.try(&.as_s) || ""
-        html_url = release["html_url"]?.try(&.as_s) || ""
+        html_url = extract_html_url(release)
 
         GithubReleaseData.new(
           tag: tag,
@@ -76,11 +78,6 @@ module Fetcher
           pub_date: parse_release_date(release),
           link_data: LinkResolver.resolve_from_url(html_url)
         )
-      end
-
-      private def self.parse_release_date(release : JSON::Any) : Time?
-        published_at = release["published_at"]? || release["released_at"]? || release["created_at"]?
-        TimeParser.parse(published_at.try(&.as_s))
       end
 
       record GithubReleaseData,

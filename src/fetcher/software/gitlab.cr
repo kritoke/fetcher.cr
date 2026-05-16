@@ -2,10 +2,14 @@ require "json"
 require "log"
 require "../link_resolver"
 require "../error_handler"
+require "../time_parser"
+require "./release_helpers"
 
 module Fetcher
   module Software
     module GitLab
+      include ReleaseHelpers
+
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         gitlab_headers = ::HTTP::Headers.new
@@ -51,8 +55,8 @@ module Fetcher
       end
 
       private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
+        tag = extract_tag(release)
+        name = extract_name(release)
         published_at = release["released_at"]? || release["created_at"]?
         body = release[provider.body_field]?.try(&.as_s) || ""
 
@@ -73,14 +77,6 @@ module Fetcher
           commentary_url: link_data.commentary_url,
           is_discussion_url: link_data.is_discussion_url
         )
-      end
-
-      private def self.extract_html_url(release : JSON::Any) : String
-        if links = release["links"]?
-          links["self"]?.try(&.as_s) || ""
-        else
-          release["url"]?.try(&.as_s) || release["html_url"]?.try(&.as_s) || ""
-        end
       end
     end
   end

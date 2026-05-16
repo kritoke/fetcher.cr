@@ -1,10 +1,14 @@
 require "json"
 require "../link_resolver"
 require "../error_handler"
+require "../time_parser"
+require "./release_helpers"
 
 module Fetcher
   module Software
     module Codeberg
+      include ReleaseHelpers
+
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         response = http_client.get(provider.api_url, build_codeberg_headers(config))
@@ -30,7 +34,7 @@ module Fetcher
         return result if result.is_a?(Result)
 
         releases = result.as(Array(JSON::Any))
-        stable_releases = releases.reject { |release| release["prerelease"]?.try(&.as_bool) || false }
+        stable_releases = releases.reject { |release| prerelease?(release) }
 
         entries = stable_releases.first(limit).map { |release| parse_entry(release, provider) }
         Result.builder
@@ -62,12 +66,9 @@ module Fetcher
         Result.error(Error.http(status, "HTTP #{status}", url))
       end
 
-      # Parse JSON response and handle error responses from Codeberg API
       private def self.parse_json_response(body : String, url : String) : Array(JSON::Any) | Result
-        # First check if it looks like an array
         stripped = body.lstrip
         unless stripped.starts_with?('[')
-          # Likely an error response - extract the error message if possible
           error_msg = extract_error_message(body)
           if error_msg
             error = Error.invalid_format("Codeberg API error: #{error_msg}", url)
@@ -86,14 +87,11 @@ module Fetcher
         end
       end
 
-      # Extract error message from Codeberg API error responses
       private def self.extract_error_message(body : String) : String?
         parsed = JSON.parse(body)
-        # Check if it's a JSON object (hash)
         obj = parsed.as_h?
         return unless obj
 
-        # Try common error message fields
         parsed["message"]?.try(&.as_s) ||
           parsed["error"]?.try(&.as_s) ||
           extract_first_error(parsed["errors"]) ||
@@ -102,7 +100,6 @@ module Fetcher
         nil
       end
 
-      # Helper to extract error from "errors" array field
       private def self.extract_first_error(errors_field : JSON::Any?) : String?
         return unless errors_field
         errors = errors_field.as_a?
@@ -128,10 +125,10 @@ module Fetcher
       end
 
       private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider) : CodebergReleaseData
-        tag = release["tag_name"]?.try(&.as_s) || ""
-        name = release["name"]?.try(&.as_s).presence || tag
+        tag = extract_tag(release)
+        name = extract_name(release)
         body = release[provider.body_field]?.try(&.as_s) || ""
-        html_url = release["html_url"]?.try(&.as_s) || release["url"]?.try(&.as_s) || ""
+        html_url = extract_html_url(release)
 
         CodebergReleaseData.new(
           tag: tag,
@@ -141,11 +138,6 @@ module Fetcher
           pub_date: parse_release_date(release),
           link_data: LinkResolver.resolve_from_url(html_url)
         )
-      end
-
-      private def self.parse_release_date(release : JSON::Any) : Time?
-        published_at = release["published_at"]? || release["created_at"]?
-        TimeParser.parse(published_at.try(&.as_s))
       end
 
       record CodebergReleaseData,

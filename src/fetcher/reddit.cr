@@ -314,23 +314,39 @@ module Fetcher
       post = child["data"]?
       return unless post
 
-      title = post["title"]?.try(&.as_s) || "Untitled"
-      post_url = post["url"]?.try(&.as_s) || ""
-      permalink = post["permalink"]?.try(&.as_s) || ""
-      created_utc = post["created_utc"]?.try(&.as_f) || 0.0
-      is_self = post["is_self"]?.try(&.as_bool) || false
-
-      discussion_url = "https://www.reddit.com#{permalink}"
-      external_url = is_self || post_url.empty? ? nil : post_url
-      pub_date = created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
+      discussion_url = build_discussion_url(extract_permalink(post))
+      effective_url = determine_effective_url(post, discussion_url)
 
       PostData.new(
-        title: title,
-        url: external_url || discussion_url,
+        title: extract_title(post),
+        url: effective_url,
         discussion_url: discussion_url,
-        pub_date: pub_date,
-        link_data: LinkResolver.resolve_from_url(external_url || discussion_url)
+        pub_date: extract_pub_date(post),
+        link_data: LinkResolver.resolve_from_url(effective_url)
       )
+    end
+
+    private def self.extract_title(post : JSON::Any) : String
+      post["title"]?.try(&.as_s) || "Untitled"
+    end
+
+    private def self.extract_permalink(post : JSON::Any) : String
+      post["permalink"]?.try(&.as_s) || ""
+    end
+
+    private def self.build_discussion_url(permalink : String) : String
+      "https://www.reddit.com#{permalink}"
+    end
+
+    private def self.determine_effective_url(post : JSON::Any, discussion_url : String) : String
+      is_self = post["is_self"]?.try(&.as_bool) || false
+      post_url = post["url"]?.try(&.as_s) || ""
+      is_self || post_url.empty? ? discussion_url : post_url
+    end
+
+    private def self.extract_pub_date(post : JSON::Any) : Time?
+      created_utc = post["created_utc"]?.try(&.as_f) || 0.0
+      created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
     end
 
     record PostData,
