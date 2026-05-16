@@ -7,8 +7,6 @@ require "./release_helpers"
 module Fetcher
   module Software
     module Codeberg
-      include ReleaseHelpers
-
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         response = http_client.get(provider.api_url, build_codeberg_headers(config))
@@ -34,7 +32,7 @@ module Fetcher
         return result if result.is_a?(Result)
 
         releases = result.as(Array(JSON::Any))
-        stable_releases = releases.reject { |release| prerelease?(release) }
+        stable_releases = releases.reject { |release| ReleaseHelpers.prerelease?(release) }
 
         entries = stable_releases.first(limit).map { |release| parse_entry(release, provider) }
         Result.builder
@@ -125,17 +123,17 @@ module Fetcher
       end
 
       private def self.extract_release_data(release : JSON::Any, provider : SoftwareProvider) : CodebergReleaseData
-        tag = extract_tag(release)
-        name = extract_name(release)
+        tag = ReleaseHelpers.extract_tag(release)
+        name = ReleaseHelpers.extract_name(release)
         body = release[provider.body_field]?.try(&.as_s) || ""
-        html_url = extract_html_url(release)
+        html_url = ReleaseHelpers.extract_html_url(release)
 
         CodebergReleaseData.new(
           tag: tag,
           name: name,
           body: body,
           html_url: html_url,
-          pub_date: parse_release_date(release),
+          pub_date: ReleaseHelpers.parse_release_date(release),
           link_data: LinkResolver.resolve_from_url(html_url)
         )
       end

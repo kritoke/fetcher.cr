@@ -30,6 +30,11 @@ module Fetcher
       RateLimiterRegistry.clear
     end
 
+    def self.clear_dns_cache : Nil
+      client = new
+      client.clear_dns_cache
+    end
+
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
       perform_request(:head, url, headers)
     end

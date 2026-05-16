@@ -8,8 +8,6 @@ require "./release_helpers"
 module Fetcher
   module Software
     module GitLab
-      include ReleaseHelpers
-
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         gitlab_headers = ::HTTP::Headers.new
@@ -55,13 +53,13 @@ module Fetcher
       end
 
       private def self.parse_entry(release : JSON::Any, provider : SoftwareProvider) : Entry
-        tag = extract_tag(release)
-        name = extract_name(release)
+        tag = ReleaseHelpers.extract_tag(release)
+        name = ReleaseHelpers.extract_name(release)
         published_at = release["released_at"]? || release["created_at"]?
         body = release[provider.body_field]?.try(&.as_s) || ""
 
         pub_date = TimeParser.parse(published_at.try(&.as_s))
-        html_url = extract_html_url(release)
+        html_url = ReleaseHelpers.extract_html_url(release)
 
         link_data = LinkResolver.resolve_from_url(html_url)
 
