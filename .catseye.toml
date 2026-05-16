@@ -1,0 +1,9 @@
+# Catseye project configuration for Fetcher
+# Suppresses false positive findings documented in planning/002-catseye-false-positives.md
+
+[claws]
+
+[claws.suppress]
+# SSRF findings are mitigated by CrestHttpClient.check_ssrf() validation layer
+# See: planning/002-catseye-false-positives.md "SSRF Flagged HTTP Requests"
+SSRF = ["**/fetcher/rss.cr", "**/fetcher/youtube.cr", "**/fetcher/software/**"]
