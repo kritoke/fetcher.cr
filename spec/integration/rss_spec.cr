@@ -496,5 +496,234 @@ describe "Integration Tests - RSS" do
         entries[0].comment_url.should eq("https://news.ycombinator.com/item?id=12345")
       end
     end
+
+    describe "streaming parser depth tracking regression" do
+      it "parses multiple items with self-closing enclosure elements" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test</title>
+              <item>
+                <title>First</title>
+                <link>https://example.com/1</link>
+                <enclosure url="https://example.com/pic.jpg" type="image/jpeg" length="123"/>
+              </item>
+              <item>
+                <title>Second</title>
+                <link>https://example.com/2</link>
+              </item>
+              <item>
+                <title>Third</title>
+                <link>https://example.com/3</link>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(3)
+        entries[0].title.should eq("First")
+        entries[0].attachments.size.should eq(1)
+        entries[0].attachments[0].mime_type.should eq("image/jpeg")
+        entries[1].title.should eq("Second")
+        entries[2].title.should eq("Third")
+      end
+
+      it "parses multiple items with HTML content containing self-closing tags" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+            <channel>
+              <title>Test</title>
+              <item>
+                <title>Article One</title>
+                <link>https://example.com/1</link>
+                <description>Hello &lt;br/&gt;World&lt;br/&gt;More text</description>
+              </item>
+              <item>
+                <title>Article Two</title>
+                <link>https://example.com/2</link>
+                <description>Second description</description>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(2)
+        entries[0].title.should eq("Article One")
+        entries[0].content.should contain("World")
+        entries[1].title.should eq("Article Two")
+        entries[1].content.should eq("Second description")
+      end
+
+      it "parses items with content:encoded containing CDATA with HTML" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+            <channel>
+              <title>Test</title>
+              <item>
+                <title>First</title>
+                <link>https://example.com/1</link>
+                <content:encoded><![CDATA[<p>Hello</p><br/><img src="test.jpg"/><p>World</p>]]></content:encoded>
+              </item>
+              <item>
+                <title>Second</title>
+                <link>https://example.com/2</link>
+                <content:encoded><![CDATA[<p>Second content</p>]]></content:encoded>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(2)
+        entries[0].content.should contain("World")
+        entries[1].content.should contain("Second content")
+      end
+
+      it "parses multiple items with mixed self-closing and text children" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test</title>
+              <item>
+                <title>One</title>
+                <link>https://example.com/1</link>
+                <enclosure url="https://example.com/a.mp3" type="audio/mpeg" length="456"/>
+                <category>Tech</category>
+                <enclosure url="https://example.com/a2.mp3" type="audio/mpeg" length="789"/>
+                <comments>https://example.com/1/comments</comments>
+              </item>
+              <item>
+                <title>Two</title>
+                <link>https://example.com/2</link>
+                <category>News</category>
+              </item>
+              <item>
+                <title>Three</title>
+                <link>https://example.com/3</link>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(3)
+        entries[0].title.should eq("One")
+        entries[0].attachments.size.should eq(2)
+        entries[0].categories.should contain("Tech")
+        entries[0].comment_url.should eq("https://example.com/1/comments")
+        entries[1].title.should eq("Two")
+        entries[1].categories.should contain("News")
+        entries[2].title.should eq("Three")
+      end
+
+      it "parses multiple Atom entries with self-closing link and category elements" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <feed xmlns="http://www.w3.org/2005/Atom">
+            <title>Test</title>
+            <entry>
+              <title>First Entry</title>
+              <link href="https://example.com/1"/>
+              <category term="Ruby"/>
+              <category term="Crystal"/>
+            </entry>
+            <entry>
+              <title>Second Entry</title>
+              <link href="https://example.com/2"/>
+              <category term="News"/>
+            </entry>
+            <entry>
+              <title>Third Entry</title>
+              <link href="https://example.com/3"/>
+            </entry>
+          </feed>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(3)
+        entries[0].title.should eq("First Entry")
+        entries[0].url.should eq("https://example.com/1")
+        entries[0].categories.should contain("Ruby")
+        entries[0].categories.should contain("Crystal")
+        entries[1].title.should eq("Second Entry")
+        entries[1].categories.should contain("News")
+        entries[2].title.should eq("Third Entry")
+      end
+
+      it "parses Atom entry with author containing text children" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <feed xmlns="http://www.w3.org/2005/Atom">
+            <title>Test</title>
+            <entry>
+              <title>First</title>
+              <link href="https://example.com/1"/>
+              <author>
+                <name>Jane Doe</name>
+                <uri>https://example.com/jane</uri>
+              </author>
+            </entry>
+            <entry>
+              <title>Second</title>
+              <link href="https://example.com/2"/>
+              <author>
+                <name>John Smith</name>
+              </author>
+            </entry>
+          </feed>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(2)
+        entries[0].author.should eq("Jane Doe")
+        entries[0].author_url.should eq("https://example.com/jane")
+        entries[1].author.should eq("John Smith")
+      end
+
+      it "handles empty elements without text content" do
+        xml = <<-XML
+          <?xml version="1.0"?>
+          <rss version="2.0">
+            <channel>
+              <title>Test</title>
+              <item>
+                <title></title>
+                <link>https://example.com/1</link>
+                <description></description>
+              </item>
+              <item>
+                <title>Real Title</title>
+                <link>https://example.com/2</link>
+              </item>
+            </channel>
+          </rss>
+          XML
+
+        reader = XML::Reader.new(xml)
+        parser = Fetcher::StreamingRSSParser.new
+        entries = parser.parse_entries(reader, 10)
+        entries.size.should eq(2)
+        entries[0].title.should eq("Untitled")
+        entries[1].title.should eq("Real Title")
+      end
+    end
   end
 end

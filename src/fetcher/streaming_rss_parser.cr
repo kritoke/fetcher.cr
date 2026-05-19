@@ -46,11 +46,10 @@ module Fetcher
       attachments = [] of Attachment
       comments_link = ""
 
-      depth = 0
+      item_depth = reader.depth
       while reader.read
         case reader.node_type
         when XML::Reader::Type::ELEMENT
-          depth += 1
           case reader.name
           when "title"                      then title = read_text_content(reader)
           when "link"                       then link = read_text_content(reader)
@@ -67,8 +66,7 @@ module Fetcher
           when "comments" then comments_link = read_text_content(reader)
           end
         when XML::Reader::Type::END_ELEMENT
-          depth -= 1
-          break if depth == 0 && reader.name == "item"
+          break if reader.depth == item_depth && reader.name == "item"
         end
       end
 
@@ -105,11 +103,10 @@ module Fetcher
       author_uri = ""
       categories = [] of String
 
-      depth = 0
+      entry_depth = reader.depth
       while reader.read
         case reader.node_type
         when XML::Reader::Type::ELEMENT
-          depth += 1
           case reader.name
           when "title"
             title = read_text_content(reader)
@@ -134,8 +131,7 @@ module Fetcher
             read_text_content(reader)
           end
         when XML::Reader::Type::END_ELEMENT
-          depth -= 1
-          break if depth == 0 && reader.name == "entry"
+          break if reader.depth == entry_depth && reader.name == "entry"
         end
       end
 

@@ -52,6 +52,7 @@ module Fetcher
       !blocked_ip?(current_ip)
     end
 
+
     def self.valid?(url : String?) : Bool
       return false if url.nil? || url.empty?
       return false if url.size > MAX_URL_LENGTH
@@ -68,6 +69,47 @@ module Fetcher
     def self.safe_url(url : String?) : String
       return "#" unless valid?(url)
       url
+    end
+
+    # Service wrapper for dependency injection.
+    # By default it delegates to the URLValidator module methods. Tests can
+    # pass a custom object that implements the same instance methods to
+    # CrestHttpClient for deterministic/mocked behavior.
+    class Service
+      def initialize
+      end
+
+      def valid?(url : String?) : Bool
+        URLValidator.valid?(url)
+      end
+
+      def resolve_and_validate(url : String) : Bool
+        URLValidator.resolve_and_validate(url)
+      end
+
+      def validate_connected_ip(host : String, connected_ip : Socket::IPAddress) : Bool
+        URLValidator.validate_connected_ip(host, connected_ip)
+      end
+
+      def extract_domain(url : String) : String
+        URLValidator.extract_domain(url)
+      end
+
+      def looks_like_ip?(host : String) : Bool
+        URLValidator.looks_like_ip?(host)
+      end
+
+      def validate_ip(host : String) : Bool
+        URLValidator.validate_ip(host)
+      end
+
+      def register_ip(host : String, ip : Socket::IPAddress) : Nil
+        URLValidator.register_ip(host, ip)
+      end
+    end
+
+    def self.default_service : Service
+      Service.new
     end
 
     SAFE_SCHEMES      = {"http", "https"}

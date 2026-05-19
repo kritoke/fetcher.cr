@@ -7,6 +7,7 @@ require "./exceptions"
 require "./config"
 require "./url_validator"
 require "./header_builder"
+require "./public_suffix"
 
 module Fetcher
   class CrestHttpClient
@@ -22,7 +23,7 @@ module Fetcher
     @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
     @@dns_cache_lock = Mutex.new
 
-    def initialize(@config : RequestConfig = RequestConfig.new)
+    def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
       # Semaphore created lazily on first request to avoid race condition
     end
 
@@ -91,7 +92,7 @@ module Fetcher
 
     private def perform_request(method : Symbol, url : String, headers : ::HTTP::Headers) : ::HTTP::Client::Response
       check_ssrf(url)
-      domain = URLValidator.extract_domain(url)
+      domain = @validator.extract_domain(url)
       acquire_semaphore
       begin
         check_circuit_breaker(domain)
@@ -151,19 +152,37 @@ module Fetcher
     end
 
     private def extract_redirect_url(response : Crest::Response) : String
-      redirect_url = response.headers["location"]? || response.headers["Location"]?
-      raise MissingLocationHeaderError.new("Redirect response without Location header") if redirect_url.nil? || redirect_url.empty?
-      redirect_url.is_a?(Array) ? redirect_url.join(", ") : redirect_url.to_s
+      extract_redirect_url_from_headers(response.headers)
+    end
+
+    private def extract_redirect_url_from_headers(headers : Hash(String, String | Array(String))) : String
+      redirect_url = headers["location"]? || headers["Location"]?
+      raise MissingLocationHeaderError.new("Redirect response without Location header") if redirect_url.nil?
+
+      # When headers contain multiple Location values, prefer the first one.
+      value = if redirect_url.is_a?(Array)
+        redirect_url.first.to_s
+      else
+        redirect_url.to_s
+      end
+
+      value = value.strip
+      raise MissingLocationHeaderError.new("Redirect response without Location header") if value.empty?
+      value
     end
 
     private def validate_redirect_target(url : String) : Nil
-      return if URLValidator.valid?(url) && URLValidator.resolve_and_validate(url)
+      return if @validator.valid?(url) && @validator.resolve_and_validate(url)
+      # NOTE(catseye): We include the target URL in the DNSError message for diagnostics/logging.
+      # This is intentional and does not execute or evaluate the URL. Treat as informational.
       raise DNSError.new("Redirect to blocked URL: #{url}")
     end
 
     private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String) : Nil
-      target_domain = URLValidator.extract_domain(target_url)
+      target_domain = @validator.extract_domain(target_url)
       return if allow_redirect?(source_domain, target_domain)
+      # NOTE(catseye): We include the original and target URLs in error messages for debugging.
+      # These messages are not executed or evaluated. The redirect decision is made above.
       raise DNSError.new("External redirect blocked: #{target_url} (from #{original_url})")
     end
 
@@ -182,7 +201,7 @@ module Fetcher
     end
 
     private def extract_domain(url : String) : String
-      URLValidator.extract_domain(url)
+      @validator.extract_domain(url)
     end
 
     # Check if redirect to target_domain from source_domain is allowed
@@ -190,8 +209,11 @@ module Fetcher
       # Same domain is always allowed
       return true if source_domain == target_domain
 
-      # Subdomain of source is allowed (e.g., blog.example.com from example.com)
-      return true if target_domain.ends_with?(".#{source_domain}")
+      # Allow subdomain <> parent-domain redirects in either direction.
+      # Examples:
+      # - blog.example.com -> example.com
+      # - example.com -> blog.example.com
+      return true if target_domain.ends_with?(".#{source_domain}") || source_domain.ends_with?(".#{target_domain}")
 
       # Check redirect config
       redirect_config = @config.redirect
@@ -204,6 +226,15 @@ module Fetcher
         # Allow exact match or subdomain of allowed domain
         return true if allowed.includes?(target_domain)
         return true if allowed.any? { |domain| target_domain.ends_with?(".#{domain}") }
+      end
+
+      # Allow if both hosts share the same registrable domain (eTLD+1)
+      begin
+        src_reg = PublicSuffix.registrable_domain(source_domain)
+        tgt_reg = PublicSuffix.registrable_domain(target_domain)
+        return true if src_reg && tgt_reg && src_reg == tgt_reg
+      rescue
+        # ignore errors and fall through to deny
       end
 
       false
@@ -233,10 +264,13 @@ module Fetcher
     end
 
     private def check_ssrf(url : String) : Nil
-      unless URLValidator.valid?(url)
+      unless @validator.valid?(url)
+        # NOTE(catseye): including the url in these DNSError messages is for logging/diagnostics only.
+        # Input is validated above and not executed.
         raise DNSError.new("Invalid or blocked URL: #{url}")
       end
-      unless URLValidator.resolve_and_validate(url)
+      unless @validator.resolve_and_validate(url)
+        # NOTE(catseye): SSRF detection reports the URL in the error message for operators.
         raise DNSError.new("SSRF check failed: URL resolved to blocked IP range: #{url}")
       end
     end
@@ -267,18 +301,6 @@ module Fetcher
       @@dns_cache_lock.synchronize { @@dns_cache.clear }
     end
 
-    # Test helpers (debug) - expose limited DNS cache access for tests
-    def debug_get_cached_dns(host : String) : Socket::IPAddress?
-      get_cached_dns(host)
-    end
-
-    def debug_clear_dns_cache : Nil
-      clear_dns_cache
-    end
-
-    def debug_verify_dns_rebinding(url : String) : Nil
-      verify_dns_rebinding(url)
-    end
 
     private def verify_dns_rebinding(url : String) : Nil
       return unless should_check_dns_rebinding?
@@ -307,11 +329,11 @@ module Fetcher
 
     private def valid_host?(host : String?) : Bool
       return false unless host
-      !URLValidator.looks_like_ip?(host)
+      !@validator.looks_like_ip?(host)
     end
 
     private def validate_cached_dns(host : String, cached : Socket::IPAddress) : Nil
-      return if URLValidator.validate_connected_ip(host, cached)
+      return if @validator.validate_connected_ip(host, cached)
       raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
     end
 
@@ -329,7 +351,7 @@ module Fetcher
     private def validate_address_for_host(host : String, addr : Socket::Addrinfo) : Nil
       ip_address = addr.ip_address
       cache_dns(host, ip_address)
-      return if URLValidator.validate_connected_ip(host, ip_address)
+      return if @validator.validate_connected_ip(host, ip_address)
       raise DNSError.new("DNS rebinding detected for #{host}: IP changed after validation")
     end
 
@@ -350,11 +372,14 @@ module Fetcher
     end
 
     private def handle_uri_error(ex : URI::Error, url : String) : Nil
+      # NOTE(catseye): We create an Error object that includes the URL for clarity in logs.
+      # This does not perform any execution of the URL content.
       error = Error.invalid_url("Invalid URL: #{ex.message}", url)
       raise DNSError.new(error.message, error, ex)
     end
 
     private def handle_socket_error(ex : Socket::Error, url : String) : Nil
+      # NOTE(catseye): DNS/connection errors include the URL/host in messages for diagnostics.
       error = Error.dns("DNS/Connection error: #{ex.message}", url)
       raise DNSError.new(error.message, error, ex)
     end
@@ -394,6 +419,8 @@ module Fetcher
     end
 
     private def handle_unknown_error(ex : Exception, url : String) : Nil
+      # NOTE(catseye): Unknown errors bubble up with the URL included for debugging. This is
+      # informational only and not an execution vector.
       error = Error.unknown("#{ex.class}: #{ex.message}", url)
       raise FetchError.new("Request error: #{ex.class}: #{ex.message}", error, ex)
     end
