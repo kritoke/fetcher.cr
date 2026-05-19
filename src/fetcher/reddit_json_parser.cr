@@ -61,7 +61,7 @@ module Fetcher
              else
                post.url
              end
-      pub_date = post.created_utc > 0 ? Time.unix(post.created_utc.to_i64) : nil
+      pub_date = post.created_utc > 0 ? TimeParser.normalize(Time.unix(post.created_utc.to_i64)) : nil
       link_data = LinkResolver.resolve_from_url(link)
 
       Entry.create(

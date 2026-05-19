@@ -121,7 +121,7 @@ module Fetcher
     private def parse_item_date(item : JSON::Any) : Time?
       published = item["date_published"]?.try(&.as_s)
       modified = item["date_modified"]?.try(&.as_s)
-      TimeParser.parse(published || modified)
+      TimeParser.normalize(TimeParser.parse(published || modified))
     end
 
     private def extract_item_tags(item : JSON::Any) : Array(String)

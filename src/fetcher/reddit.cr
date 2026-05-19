@@ -345,7 +345,7 @@ module Fetcher
 
     private def self.extract_pub_date(post : JSON::Any) : Time?
       created_utc = post["created_utc"]?.try(&.as_f) || 0.0
-      created_utc > 0 ? Time.unix(created_utc.to_i64) : nil
+      created_utc > 0 ? TimeParser.normalize(Time.unix(created_utc.to_i64)) : nil
     end
 
     record PostData,

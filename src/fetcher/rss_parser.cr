@@ -206,7 +206,7 @@ module Fetcher
       pub_date_str = children.find { |child| child.name == "pubDate" }.try(&.text) ||
                      children.find { |child| child.name == "dc:date" }.try(&.text) ||
                      children.find { |child| child.name == "date" }.try(&.text)
-      TimeParser.parse(pub_date_str)
+      TimeParser.normalize(TimeParser.parse(pub_date_str)) if pub_date_str
     end
 
     private def extract_rss_content(children : Array(XML::Node)) : String
@@ -341,7 +341,7 @@ module Fetcher
     private def extract_atom_pub_date(children : Array(XML::Node)) : Time?
       published_str = children.find { |child| child.name == "published" }.try(&.text) ||
                       children.find { |child| child.name == "updated" }.try(&.text)
-      TimeParser.parse(published_str)
+      TimeParser.normalize(TimeParser.parse(published_str)) if published_str
     end
 
     private def extract_atom_content(children : Array(XML::Node)) : String

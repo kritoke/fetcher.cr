@@ -58,7 +58,7 @@ module Fetcher
         published_at = release["released_at"]? || release["created_at"]?
         body = release[provider.body_field]?.try(&.as_s) || ""
 
-        pub_date = TimeParser.parse(published_at.try(&.as_s))
+        pub_date = TimeParser.normalize(TimeParser.parse(published_at.try(&.as_s)))
         html_url = ReleaseHelpers.extract_html_url(release)
 
         link_data = LinkResolver.resolve_from_url(html_url)

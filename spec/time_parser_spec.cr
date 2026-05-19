@@ -95,4 +95,30 @@ describe Fetcher::TimeParser do
       result.should_not be_nil
     end
   end
+
+  describe "normalize" do
+    it "returns nil for nil input" do
+      result = Fetcher::TimeParser.normalize(nil)
+      result.should be_nil
+    end
+
+    it "converts +00:00 timezone to UTC" do
+      rfc_date = "Wed, 15 Jan 2026 10:30:00 +0000"
+      parsed = Fetcher::TimeParser.parse(rfc_date)
+      parsed.should_not be_nil
+      normalized = Fetcher::TimeParser.normalize(parsed)
+      normalized.should_not be_nil
+      normalized.as(Time).location.should eq(Time::Location::UTC)
+    end
+
+    it "returns same time when already UTC" do
+      iso_date = "2026-01-15T10:30:00Z"
+      parsed = Fetcher::TimeParser.parse(iso_date)
+      parsed.should_not be_nil
+      normalized = Fetcher::TimeParser.normalize(parsed)
+      normalized.should_not be_nil
+      # Time should be equal to original (no-op for UTC)
+      normalized.as(Time).should eq(parsed)
+    end
+  end
 end

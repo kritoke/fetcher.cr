@@ -24,7 +24,7 @@ module Fetcher
         published_at = release["published_at"]? ||
                        release["released_at"]? ||
                        release["created_at"]
-        TimeParser.parse(published_at.try(&.as_s))
+        TimeParser.normalize(TimeParser.parse(published_at.try(&.as_s)))
       end
 
       # Check if a release is a prerelease/draft
