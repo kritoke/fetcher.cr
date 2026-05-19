@@ -37,9 +37,13 @@ module Fetcher
   # Redirect security configuration
   # allow_external: if false (default), redirects to external domains are blocked
   # allowed_domains: optional allowlist of specific domains for external redirects
+  # allow_permanent_external: if true (default), 301/308 permanent redirects to external
+  #   domains are allowed. These represent the resource URL moving permanently (e.g.
+  #   blog relocations from blogspot.com to custom domains).
   record RedirectConfig,
     allow_external : Bool = false,
-    allowed_domains : Array(String)? = nil
+    allowed_domains : Array(String)? = nil,
+    allow_permanent_external : Bool = true
 
   enum DriverDetectionMode
     Auto
@@ -154,7 +158,8 @@ module Fetcher
     def with_redirect_allowed_domains(domains : Array(String)) : RequestConfig
       new_redirect = RedirectConfig.new(
         allow_external: @redirect.allow_external,
-        allowed_domains: domains
+        allowed_domains: domains,
+        allow_permanent_external: @redirect.allow_permanent_external
       )
 
       RequestConfig.new(

@@ -20,8 +20,8 @@ module Fetcher
     end
 
     # Test helper to verify allow_redirect? behaviour for unit tests
-    def debug_allow_redirect?(source_domain : String, target_domain : String) : Bool
-      allow_redirect?(source_domain, target_domain)
+    def debug_allow_redirect?(source_domain : String, target_domain : String, status_code : Int32 = 302) : Bool
+      allow_redirect?(source_domain, target_domain, status_code)
     end
 
     # Test helper to exercise check_ssrf() without needing a full request

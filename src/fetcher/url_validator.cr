@@ -14,6 +14,7 @@ module Fetcher
     LINK_LOCAL_IPV6 = "fe80::/10"
 
     # DNS rebinding mitigation: track recently validated hostnames and their IPs
+    DNS_RESOLVE_PORT = 80
     record ValidatedEntry,
       ip : Socket::IPAddress,
       timestamp : Time
@@ -145,7 +146,7 @@ module Fetcher
       return true unless looks_like_ip?(host)
 
       begin
-        addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+        addr_info = Socket::Addrinfo.resolve(host, DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
 
         addr_info.each do |addr|
           next unless addr.family == Socket::Family::INET || addr.family == Socket::Family::INET6
@@ -218,7 +219,7 @@ module Fetcher
       # IPv4, IPv6, and mapped IPv4 addresses. Fallback to simple heuristics
       # only if parsing fails.
       begin
-        Socket::IPAddress.new(host, 80)
+        Socket::IPAddress.new(host, DNS_RESOLVE_PORT)
         true
       rescue ex
         # Fallback: if there's a colon it's likely IPv6-ish; if it starts with
@@ -246,7 +247,7 @@ module Fetcher
     end
 
     private def self.validate_ip(host : String) : Bool
-      ip_address = Socket::IPAddress.new(host, 80)
+      ip_address = Socket::IPAddress.new(host, DNS_RESOLVE_PORT)
       !blocked_ip?(ip_address)
     rescue Socket::Error
       false
@@ -315,7 +316,7 @@ module Fetcher
         # Extract the IPv4 portion
         ipv4_str = address.downcase.sub("::ffff:", "")
         begin
-          ipv4 = Socket::IPAddress.new(ipv4_str, 80)
+          ipv4 = Socket::IPAddress.new(ipv4_str, DNS_RESOLVE_PORT)
           ipv4.private? || ipv4.loopback? || link_local?(ipv4)
         rescue ex
           Log.debug { "ipv6_mapped_ipv4? nested failed: #{ex.message}" }

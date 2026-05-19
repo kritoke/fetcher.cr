@@ -139,7 +139,7 @@ module Fetcher
       target_domain = extract_domain(resolved_url)
 
       validate_redirect_target(resolved_url)
-      validate_redirect_domain(original_url, domain, resolved_url)
+      validate_redirect_domain(original_url, domain, resolved_url, response.status_code)
       transition_domain(domain, target_domain) if domain != target_domain
       return convert_response(response) if (remaining_redirects || @config.max_redirects) <= 1
 
@@ -178,9 +178,9 @@ module Fetcher
       raise DNSError.new("Redirect to blocked URL: #{url}")
     end
 
-    private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String) : Nil
+    private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String, status_code : Int32 = 302) : Nil
       target_domain = @validator.extract_domain(target_url)
-      return if allow_redirect?(source_domain, target_domain)
+      return if allow_redirect?(source_domain, target_domain, status_code)
       # NOTE(catseye): We include the original and target URLs in error messages for debugging.
       # These messages are not executed or evaluated. The redirect decision is made above.
       raise DNSError.new("External redirect blocked: #{target_url} (from #{original_url})")
@@ -205,7 +205,7 @@ module Fetcher
     end
 
     # Check if redirect to target_domain from source_domain is allowed
-    private def allow_redirect?(source_domain : String, target_domain : String) : Bool
+    private def allow_redirect?(source_domain : String, target_domain : String, status_code : Int32 = 302) : Bool
       # Same domain is always allowed
       return true if source_domain == target_domain
 
@@ -220,6 +220,12 @@ module Fetcher
 
       # If allow_external is true, external redirects are allowed
       return true if redirect_config.allow_external
+
+      # Permanent redirects (301/308) represent the resource URL moving permanently.
+      # For feed fetching, these should be trusted — e.g. blogspot.com -> custom domain.
+      if redirect_config.allow_permanent_external && (status_code == 301 || status_code == 308)
+        return true
+      end
 
       # If allowed_domains is set, check if target is in the allowlist
       if allowed = redirect_config.allowed_domains
@@ -338,7 +344,7 @@ module Fetcher
     end
 
     private def resolve_and_validate_new_dns(host : String) : Nil
-      addr_info = Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+      addr_info = Socket::Addrinfo.resolve(host, URLValidator::DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
       addr_info.each do |addr|
         validate_address_for_host(host, addr) if valid_address?(addr)
       end

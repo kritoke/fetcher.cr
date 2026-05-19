@@ -96,5 +96,58 @@ describe Fetcher::CrestHttpClient do
       client.debug_allow_redirect?("example.com", "trusted.com").should be_true
       client.debug_allow_redirect?("example.com", "untrusted.com").should be_false
     end
+
+    # Permanent external redirects (301/308)
+    describe "allow_permanent_external" do
+      it "allows 301 permanent redirect to external domain by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        # blogspot -> custom domain is a 301
+        client.debug_allow_redirect?("googleaiblog.blogspot.com", "blog.research.google", status_code: 301).should be_true
+      end
+
+      it "allows 308 permanent redirect to external domain by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "other.com", status_code: 308).should be_true
+      end
+
+      it "blocks 302 temporary redirect to external domain by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "external.com", status_code: 302).should be_false
+      end
+
+      it "blocks 307 temporary redirect to external domain by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "external.com", status_code: 307).should be_false
+      end
+
+      it "blocks 303 see-other redirect to external domain by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "external.com", status_code: 303).should be_false
+      end
+
+      it "blocks permanent external redirect when allow_permanent_external is false" do
+        cfg = Fetcher::RequestConfig.new(redirect: Fetcher::RedirectConfig.new(allow_permanent_external: false))
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "external.com", status_code: 301).should be_false
+      end
+
+      it "same-domain redirect still works regardless of status code" do
+        cfg = Fetcher::RequestConfig.new(redirect: Fetcher::RedirectConfig.new(allow_permanent_external: false))
+        client = Fetcher::CrestHttpClient.new(cfg)
+        client.debug_allow_redirect?("example.com", "example.com", status_code: 302).should be_true
+      end
+
+      it "blogspot to custom domain via 301 works by default" do
+        cfg = Fetcher::RequestConfig.new
+        client = Fetcher::CrestHttpClient.new(cfg)
+        # Real-world case: googleaiblog.blogspot.com -> blog.research.google
+        client.debug_allow_redirect?("googleaiblog.blogspot.com", "blog.research.google", status_code: 301).should be_true
+      end
+    end
   end
 end
