@@ -12,9 +12,11 @@ module Fetcher
     end
   end
 
+  DEFAULT_RETRIABLE = ->(ex : Exception) { ex.is_a?(RetriableError) || transient_error?(ex) }
+
   def self.with_retry(
     config : RequestConfig,
-    is_retriable : Exception -> Bool = ->(ex : Exception) { ex.is_a?(RetriableError) || transient_error?(ex) },
+    is_retriable : Exception -> Bool = DEFAULT_RETRIABLE,
     &operation : -> Result
   ) : Result
     attempt = 0

@@ -149,21 +149,21 @@ module Fetcher
     end
 
     private def self.resolve_handle_to_channel_id(handle : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"slug" => handle})
+      try_rss_with_params(url, {"slug" => handle}, config || RequestConfig.new)
     end
 
     private def self.resolve_custom_url_to_channel_id(name : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"name" => name})
+      try_rss_with_params(url, {"name" => name}, config || RequestConfig.new)
     end
 
     private def self.resolve_user_to_channel_id(username : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"user" => username})
+      try_rss_with_params(url, {"user" => username}, config || RequestConfig.new)
     end
 
-    private def self.try_rss_with_params(original_url : String, params : Hash(String, String)) : String?
+    private def self.try_rss_with_params(original_url : String, params : Hash(String, String), config : RequestConfig = RequestConfig.new) : String?
       rss_url = "#{YOUTUBE_RSS_BASE}#{params.map { |k, v| "#{k}=#{URI.encode_path(v)}" }.join("&")}"
 
-      http_client = Fetcher::CrestHttpClient.new(RequestConfig.new)
+      http_client = Fetcher::CrestHttpClient.new(config)
       response = http_client.get(rss_url, Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new))
 
       return unless response.status_code == 200

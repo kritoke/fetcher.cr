@@ -73,11 +73,6 @@ module Fetcher
       sem
     end
 
-    private def create_semaphore : Channel(Nil)?
-      # Backwards compatibility — delegates to internal implementation
-      ensure_semaphore
-    end
-
     private def acquire_semaphore : Nil
       sem = ensure_semaphore
       return unless sem
@@ -362,10 +357,6 @@ module Fetcher
     end
 
     private def handle_error(ex : Exception, url : String)
-      map_request_error(ex, url)
-    end
-
-    private def map_request_error(ex : Exception, url : String)
       case ex
       when MissingLocationHeaderError then raise ex
       when URI::Error                 then handle_uri_error(ex, url)

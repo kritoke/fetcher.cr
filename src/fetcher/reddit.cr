@@ -103,9 +103,8 @@ module Fetcher
 
       error = result.error
       should_try_rss = error && (error.status_code == 403 || transient_error?(error.kind))
-      if should_try_rss
-        # ameba:disable Lint/NotNil
-        ::Log.for("fetcher.reddit").warn { "Reddit API returned #{error.not_nil!.status_code || "transient error"} for /r/#{subreddit} - trying RSS fallback" }
+      if should_try_rss && (err = error)
+        ::Log.for("fetcher.reddit").warn { "Reddit API returned #{err.status_code || "transient error"} for /r/#{subreddit} - trying RSS fallback" }
         rss_result = fetch_rss(subreddit, sort, limit, headers, config)
         return {result: rss_result, source: :rss} if rss_result.success?
       end
@@ -289,9 +288,9 @@ module Fetcher
     end
 
     private def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
-      data = parsed.as_a? ? parsed[0]["data"]? : parsed["data"]?
-      children = data.try(&.["children"]?)
-      children.as_a? if children
+      # Reddit returns either a single listing object or an array with a listing wrapper
+      listing = parsed.as_a?.try &.[]?(0).try &.["data"]? || parsed["data"]?
+      listing.try(&.["children"]?).try(&.as_a?)
     rescue ex : KeyError | TypeCastError | IndexError
       ::Log.for("fetcher.reddit").warn { "Unexpected JSON structure in Reddit response: #{ex.message}" }
       nil
