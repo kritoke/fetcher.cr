@@ -183,17 +183,5 @@ module Fetcher
     def self.max_size=(value : Int32)
       store.max_size = value
     end
-
-    def self.generate_key(subreddit : String, sort : String, limit : Int32) : String
-      Reddit.generate_cache_key(subreddit, sort, limit)
-    end
-
-    def self.ttl_for_sort(sort : String) : Time::Span
-      Reddit.ttl_for_sort(sort)
-    end
-
-    def self.clear_subreddit(subreddit : String) : Nil
-      Reddit.clear_cache(subreddit)
-    end
   end
 end

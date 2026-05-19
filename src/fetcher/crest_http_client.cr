@@ -393,26 +393,21 @@ module Fetcher
 
     private def handle_request_failed(ex : Crest::RequestFailed, url : String) : Nil
       status = ex.response.status_code
-      case status
-      when 400..499 then handle_client_error(status, ex.message, url)
-      when 500..599 then handle_server_error(status, ex.message, url)
-      else               handle_http_error(status, ex.message, url)
-      end
-    end
+      message = "HTTP #{status}: #{ex.message}"
 
-    private def handle_client_error(status : Int32, message : String, url : String) : Nil
-      error = Error.http(status, "HTTP #{status}: #{message}", url)
-      raise HTTPClientError.new(error.message, status, error, nil)
-    end
+      error = case status
+              when 400..499 then Error.http(status, message, url)
+              when 500..599 then Error.server_error(status, message, url)
+              else               Error.http(status, message, url)
+              end
 
-    private def handle_server_error(status : Int32, message : String, url : String) : Nil
-      error = Error.server_error(status, "HTTP #{status}: #{message}", url)
-      raise HTTPServerError.new(error.message, status, error, nil)
-    end
+      wrapper = case status
+                when 400..499 then HTTPClientError.new(error.message, status, error, nil)
+                when 500..599 then HTTPServerError.new(error.message, status, error, nil)
+                else               HTTPError.new(error.message, status, error, nil)
+                end
 
-    private def handle_http_error(status : Int32, message : String, url : String) : Nil
-      error = Error.http(status, "HTTP #{status}: #{message}", url)
-      raise HTTPError.new(error.message, status, error, nil)
+      raise wrapper
     end
 
     private def handle_unknown_error(ex : Exception, url : String) : Nil

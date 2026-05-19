@@ -30,6 +30,8 @@ module Fetcher
       getter api_url : String
       getter atom_url : String
       getter atom_fallback_urls : Array(String)
+      # JSON field name for the release body/description text.
+      # GitHub/Codeberg: "body", GitLab: "description"
       getter body_field : String
 
       def initialize(

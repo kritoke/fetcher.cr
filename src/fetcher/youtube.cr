@@ -17,12 +17,8 @@ module Fetcher
     YOUTUBE_RESOLVE_CACHE_TTL = 1.hour
 
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
-      channel_id = extract_channel(url)
-
-      unless channel_id
-        channel_id = resolve_channel_id(url, config)
-        return Fetcher.error_result(ErrorKind::InvalidURL, "Not a valid YouTube channel URL. Could not resolve channel ID for #{url}") unless channel_id
-      end
+      channel_id = find_channel_id(url, config)
+      return Fetcher.error_result(ErrorKind::InvalidURL, "Not a valid YouTube channel URL. Could not resolve channel ID for #{url}") unless channel_id
 
       cache_key = "youtube:#{channel_id}:#{limit}"
 
@@ -96,68 +92,24 @@ module Fetcher
       ErrorHandler.handle_network_error(ex, rss_url)
     end
 
-    private def self.extract_channel(url : String) : String?
-      return extract_channel_id(url) if url.includes?("/channel/")
-      return extract_handle_channel(url) if url.includes?("/@")
-      return extract_custom_channel(url) if url.includes?("/c/")
-      return extract_user_channel(url) if url.includes?("/user/")
-      nil
-    end
-
-    private def self.extract_channel_id(url : String) : String?
-      match = url.match(%r{youtube\.com/channel/([^/?]+)}i)
-      return unless match
-      id = match[1]
-      id.starts_with?("UC") && id.matches?(/^UC[A-Za-z0-9_-]+$/) ? id : nil
-    end
-
-    private def self.extract_handle_channel(url : String) : String?
-      match = url.match(%r{youtube\.com/@([^/?]+)}i)
-      return unless match
-      resolve_handle_to_channel_id(match[1], url)
-    end
-
-    private def self.extract_custom_channel(url : String) : String?
-      match = url.match(%r{youtube\.com/c/([^/?]+)}i)
-      return unless match
-      resolve_custom_url_to_channel_id(match[1], url)
-    end
-
-    private def self.extract_user_channel(url : String) : String?
-      match = url.match(%r{youtube\.com/user/([^/?]+)}i)
-      return unless match
-      resolve_user_to_channel_id(match[1], url)
-    end
-
-    private def self.resolve_channel_id(url : String, config : RequestConfig) : String?
-      if url.includes?("/@")
-        match = url.match(%r{youtube\.com/@([^/?]+)}i)
-        return resolve_handle_to_channel_id(match[1], url, config) if match
+    private def self.find_channel_id(url : String, config : RequestConfig) : String?
+      # Direct channel ID (no network request needed)
+      if match = url.match(%r{youtube\.com/channel/(UC[A-Za-z0-9_-]+)}i)
+        return match[1]
       end
 
-      if url.includes?("/c/")
-        match = url.match(%r{youtube\.com/c/([^/?]+)}i)
-        return resolve_custom_url_to_channel_id(match[1], url, config) if match
-      end
-
-      if url.includes?("/user/")
-        match = url.match(%r{youtube\.com/user/([^/?]+)}i)
-        return resolve_user_to_channel_id(match[1], url, config) if match
+      # Handle/custom/user URLs require RSS resolution
+      {"slug" => %r{youtube\.com/@([^/?]+)}i,
+       "name" => %r{youtube\.com/c/([^/?]+)}i,
+       "user" => %r{youtube\.com/user/([^/?]+)}i,
+      }.each do |param_key, pattern|
+        if match = url.match(pattern)
+          channel_id = try_rss_with_params(url, {param_key => match[1]}, config)
+          return channel_id if channel_id
+        end
       end
 
       nil
-    end
-
-    private def self.resolve_handle_to_channel_id(handle : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"slug" => handle}, config || RequestConfig.new)
-    end
-
-    private def self.resolve_custom_url_to_channel_id(name : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"name" => name}, config || RequestConfig.new)
-    end
-
-    private def self.resolve_user_to_channel_id(username : String, url : String, config : RequestConfig? = nil) : String?
-      try_rss_with_params(url, {"user" => username}, config || RequestConfig.new)
     end
 
     private def self.try_rss_with_params(original_url : String, params : Hash(String, String), config : RequestConfig = RequestConfig.new) : String?

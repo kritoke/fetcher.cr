@@ -250,17 +250,17 @@ describe "Fetcher::Cache" do
       Fetcher::Cache.max_size.should eq(50)
     end
 
-    it "Cache.generate_key delegates to Reddit" do
-      key = Fetcher::Cache.generate_key("crystal", "hot", 25)
+    it "Reddit.generate_cache_key produces expected key" do
+      key = Fetcher::Reddit.generate_cache_key("crystal", "hot", 25)
       key.should eq("reddit:crystal:hot:25")
     end
 
-    it "Cache.ttl_for_sort delegates to Reddit" do
-      Fetcher::Cache.ttl_for_sort("hot").should eq(2.minutes)
+    it "Reddit.ttl_for_sort returns correct TTL" do
+      Fetcher::Reddit.ttl_for_sort("hot").should eq(2.minutes)
     end
 
-    it "Cache.clear_subreddit delegates to Reddit.clear_cache" do
-      Fetcher::Cache.clear_subreddit("crystal")
+    it "Reddit.clear_cache clears by prefix" do
+      Fetcher::Reddit.clear_cache("crystal")
     end
   end
 end

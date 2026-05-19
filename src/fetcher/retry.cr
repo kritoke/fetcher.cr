@@ -57,7 +57,7 @@ module Fetcher
     end
 
     case ex
-    when DNSError, TimeoutError, IO::TimeoutError
+    when DNSError, TimeoutError, IO::TimeoutError, Socket::Error
       return true
     when HTTPClientError
       # 4xx client errors (403, 404, etc.) are not transient — do not retry
@@ -67,7 +67,6 @@ module Fetcher
       (500..599).includes?(sc)
     end
 
-    msg = ex.message.to_s.downcase
-    msg.includes?("timeout") || msg.includes?("connection") || msg.includes?("dns")
+    false
   end
 end
