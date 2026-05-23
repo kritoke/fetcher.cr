@@ -152,7 +152,9 @@ module Fetcher
     end
 
     private def extract_rss_favicon(xml : XML::Node) : String?
-      xml.xpath_node("//*[local-name()='channel']/*[local-name()='image']/*[local-name()='url']").try(&.text)
+      # Don't extract RSS <image><url> as favicon - it's the channel logo, not a favicon.
+      # This is typically 60x60 or larger and not appropriate for use as a favicon.
+      nil
     end
 
     private def resolve_rss_site_link(channel : XML::Node) : String

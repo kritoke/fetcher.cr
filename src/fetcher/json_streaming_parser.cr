@@ -62,11 +62,17 @@ module Fetcher
       @pull.read_object do |key|
         case key
         when "data"
-          detect_reddit_parser
-        when "version"
-          if @pull.read_string.includes?("jsonfeed")
-            @parser = JSONFeedStreamingParser.new(@limit)
+          if detect_reddit_parser
             break
+          end
+        when "version"
+          begin
+            if @pull.read_string.includes?("jsonfeed")
+              @parser = JSONFeedStreamingParser.new(@limit)
+              break
+            end
+          rescue JSON::ParseException
+            # Not a string value (e.g., array), skip and continue
           end
         else
           @pull.skip
@@ -76,15 +82,16 @@ module Fetcher
       ::Log.for("fetcher.streaming").warn { "Failed to determine JSON feed type: #{ex.class} - #{ex.message}" }
     end
 
-    private def detect_reddit_parser
+    private def detect_reddit_parser : Bool
       @pull.read_object do |data_key|
         if data_key == "children"
           @parser = RedditJSONParser.new(@limit)
-          break
+          return true
         else
           @pull.skip
         end
       end
+      false
     end
   end
 end
