@@ -45,3 +45,4 @@ openspec/
 planning/
 .catseye/
 
+.catseye.toml
