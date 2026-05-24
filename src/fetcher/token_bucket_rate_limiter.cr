@@ -5,10 +5,17 @@ require "./exceptions"
 
 module Fetcher
   class TokenBucketRateLimiter
+    # Backoff intervals for retry on fiber crashes (in milliseconds)
+    CRASH_BACKOFF_INTERVALS = [100, 500, 1000, 5000]
+    DEFAULT_CRASH_BACKOFF   = 5000
+
+    # Milliseconds per second for time conversions
+    MS_PER_SECOND = 1000.0
+
     @last_refill : Float64
     @max_waiters : Int32
     @pending_wakeup : Fiber?
-    @wakeup_cancelled : Bool
+    @wakeup_generation : UInt64 = 0
 
     record TryAcquireMsg, tokens_requested : Float64, reply : Channel(Bool)
     record AcquireMsg, tokens_requested : Float64, reply : Channel(QueueFullError?)
@@ -21,7 +28,7 @@ module Fetcher
       @last_refill = now_seconds
       @waiters = [] of Tuple(Float64, Channel(QueueFullError?))
       @wake_scheduled = false
-      @wakeup_cancelled = false
+      @wakeup_generation = 0_u64
 
       spawn { run_owner_fiber }
     end
@@ -34,7 +41,11 @@ module Fetcher
           loop { handle_message(schedule_wakeup) }
         rescue ex
           consecutive_crashes += 1
-          backoff_ms = [100, 500, 1000, 5000].fetch(consecutive_crashes - 1, 5000)
+          # Prevent overflow - cap at max backoff index
+          if consecutive_crashes >= CRASH_BACKOFF_INTERVALS.size
+            consecutive_crashes = CRASH_BACKOFF_INTERVALS.size - 1
+          end
+          backoff_ms = CRASH_BACKOFF_INTERVALS.fetch(consecutive_crashes - 1, DEFAULT_CRASH_BACKOFF)
           ::Log.for("fetcher").error { "TokenBucket owner fiber crashed (##{consecutive_crashes}): #{ex.class} - #{ex.message} (retry in #{backoff_ms}ms)" }
           ::sleep(backoff_ms.milliseconds)
         end
@@ -82,7 +93,6 @@ module Fetcher
         if @waiters.empty?
           cancel_pending_wakeup
         else
-          @wakeup_cancelled = false
           schedule_wakeup.call
         end
       end
@@ -96,13 +106,12 @@ module Fetcher
       return unless tokens_needed > 0
       wait_time = tokens_needed / @refill_rate
       @wake_scheduled = true
-      @wakeup_cancelled = false
+      current_generation = @wakeup_generation
       fiber = spawn do
         ::sleep(wait_time.seconds)
-        @cmd.send(TickMsg.new) unless @wakeup_cancelled
-      rescue ex
-        ::Log.for("fetcher.token_bucket").error { "Wakeup fiber crashed: #{ex.class} - #{ex.message}" }
-        @wakeup_cancelled = true
+        # Only send tick if we're still the current generation
+        @cmd.send(TickMsg.new) if @wakeup_generation == current_generation
+      ensure
         @wake_scheduled = false
       end
       @pending_wakeup = fiber
@@ -110,7 +119,7 @@ module Fetcher
 
     private def cancel_pending_wakeup
       @pending_wakeup = nil
-      @wakeup_cancelled = true
+      @wakeup_generation += 1  # Invalidate any pending wakeups
       @wake_scheduled = false
     end
 
@@ -147,7 +156,7 @@ module Fetcher
     end
 
     private def now_seconds : Float64
-      Time.monotonic.total_milliseconds / 1000.0
+      Time.monotonic.total_milliseconds / MS_PER_SECOND
     end
   end
 end

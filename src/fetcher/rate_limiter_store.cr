@@ -28,6 +28,11 @@ module Fetcher
           return entry.limiter
         end
 
+        # Enforce size limit before creating new entry to prevent unbounded growth
+        if @entries.size >= @max_entries
+          enforce_limit
+        end
+
         limiter = TokenBucketRateLimiter.new(
           config.rate_limit.capacity,
           config.rate_limit.refill_rate,
@@ -48,6 +53,20 @@ module Fetcher
     def cleanup : Nil
       @lock.synchronize do
         BoundedRegistry.cleanup(@entries)
+      end
+    end
+
+    # Enforce size limit by removing oldest entries when at capacity
+    private def enforce_limit : Nil
+      # Convert to array for sorting (Hash doesn't have sort_by)
+      sorted = @entries.to_a.sort_by { |_, entry| entry.last_accessed }
+      # Remove buffer of 100 entries to avoid hitting limit repeatedly
+      excess_count = [@entries.size - @max_entries + 100, sorted.size].min
+      excess_count.times do
+        if entry = sorted.shift?
+          oldest_key, _ = entry
+          @entries.delete(oldest_key)
+        end
       end
     end
   end

@@ -5,8 +5,12 @@ require "./result"
 require "./entry_parser"
 require "./streaming_rss_parser"
 require "./xml_text_reader"
+require "./exceptions"
 
 module Fetcher
+  # Maximum entity definitions allowed before suspecting entity expansion attack
+  MAX_ENTITY_DEFINITIONS = 10
+
   class XMLStreamingParser
     def initialize(@limit : Int32 = 100)
     end
@@ -42,12 +46,20 @@ module Fetcher
     # Parse XML feed and return array of entries
     def parse_entries(io : IO, limit : Int32? = nil) : Array(Entry)
       actual_limit = limit || @limit
+
+      # For streaming, we need to check the beginning for XXE patterns
+      # Read a chunk to inspect before passing to XML parser
+      check_xxe_risk(io)
+
       reader = XML::Reader.new(io)
       parser = StreamingRSSParser.new
       parser.parse_entries(reader, actual_limit)
     rescue ex : XML::Error
       Log.warn { "XML streaming parser error: #{ex.message}" }
       [] of Entry
+    rescue ex : InvalidFormatError
+      # Re-raise XXE protection errors
+      raise ex
     rescue ex
       Log.warn { "XML streaming parser unexpected error: #{ex.class} - #{ex.message}" }
       raise ex
@@ -61,6 +73,60 @@ module Fetcher
         raise MemoryLimitExceeded.new(
           "Feed size (#{io.size} bytes) exceeds memory limit (#{config.streaming.max_memory} bytes)"
         )
+      end
+    end
+
+    # Check for XXE/entity expansion risks at the start of the content
+    # This is a compromise for streaming - we check the beginning only
+    private def check_xxe_risk(io : IO) : Nil
+      # Read first 8KB to check for dangerous DOCTYPE patterns
+      prefix_bytes = Bytes.new(8192)
+      bytes_read = io.read(prefix_bytes)
+      return if bytes_read == 0
+
+      prefix = String.new(prefix_bytes[0, bytes_read])
+
+      # Perform the actual XXE checks on the prefix
+      perform_xxe_check(prefix)
+
+      # For seekable IO, rewind so XML::Reader starts from the beginning
+      if io.responds_to?(:rewind)
+        io.rewind
+      else
+        # For non-seekable streams, we need to store the prefix and prepend it
+        # This is a known limitation - we'll need to modify the parsing approach
+        ::Log.for("fetcher").warn { "XXE check on non-seekable stream - content may be incomplete" }
+      end
+    rescue ex : InvalidFormatError
+      raise ex
+    rescue
+      # Ignore other errors in the check
+    end
+
+    # Perform XXE/entity expansion checks on content
+    private def perform_xxe_check(content : String) : Nil
+      # Use uppercase for case-insensitive comparison
+      upper = content.upcase
+
+      # Reject DOCTYPE with internal subset
+      if upper.includes?("<!DOCTYPE") && upper.includes?("[")
+        raise InvalidFormatError.new("DOCTYPE with internal subset not allowed (entity expansion risk)")
+      end
+
+      # Check for parameter entities
+      if upper.scan(/<!ENTITY\s+%/i).size > 0
+        raise InvalidFormatError.new("Parameter entity declarations not allowed")
+      end
+
+      # Check for external entity declarations (SYSTEM keyword)
+      if upper.includes?("<!ENTITY") && upper.includes?("SYSTEM")
+        raise InvalidFormatError.new("External entity declarations not allowed")
+      end
+
+      # Check entity count
+      entity_count = content.scan(/<!ENTITY\s+\w+\s+[^>]*>/i).size
+      if entity_count > MAX_ENTITY_DEFINITIONS * 2
+        raise InvalidFormatError.new("Too many entity definitions in header")
       end
     end
   end

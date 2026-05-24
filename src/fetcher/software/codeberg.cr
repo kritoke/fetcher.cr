@@ -7,6 +7,8 @@ require "./release_helpers"
 module Fetcher
   module Software
     module Codeberg
+      # Maximum characters to show from response body in error messages
+      MAX_ERROR_BODY_PREVIEW = 50
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         response = http_client.get(provider.api_url, build_codeberg_headers(config))
@@ -72,7 +74,7 @@ module Fetcher
             error = Error.invalid_format("Codeberg API error: #{error_msg}", url)
             return Result.error(error)
           else
-            error = Error.invalid_format("Expected JSON array, got #{stripped[0..Math.min(50, stripped.size - 1)]?}", url)
+            error = Error.invalid_format("Expected JSON array, got #{stripped[0..Math.min(MAX_ERROR_BODY_PREVIEW, stripped.size - 1)]?}", url)
             return Result.error(error)
           end
         end

@@ -13,9 +13,16 @@ module Fetcher
       ip : Socket::IPAddress,
       last_accessed : Time
 
+    getter max_entries : Int32
+
     def initialize(@max_entries : Int32 = 50_000, @ttl : Time::Span = 5.seconds)
       @map = {} of String => Entry
       @mutex = Mutex.new
+
+      # NOTE: The short TTL (5 seconds default) creates a trade-off between:
+      # - Security: Short TTL reduces window for DNS rebinding attacks
+      # - Performance: Short TTL means more frequent re-validation
+      # For high-security environments, consider a longer TTL combined with IP allowlisting.
     end
 
     # Register a host -> ip mapping with current timestamp.

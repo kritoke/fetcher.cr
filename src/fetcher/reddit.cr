@@ -10,12 +10,17 @@ require "./link_resolver"
 require "./header_builder"
 require "./config"
 require "./reddit_oauth"
+require "./url_validator"
 
 module Fetcher
   module Reddit
     USER_AGENT          = "fetcher.cr/0.9.7 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
+
+    # Diagnostics and response formatting constants
+    HTTP_STATUS_WIDTH   = 80
+    MAX_BODY_SNIPPET    = 512
 
     class RedditFetchError < Exception
       getter original_cause : Exception?
@@ -80,7 +85,7 @@ module Fetcher
       host = uri.host
       addresses = if host && !host.empty?
                     begin
-                      Socket::Addrinfo.resolve(host, "80", type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
+                      Socket::Addrinfo.resolve(host, URLValidator::DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
                         .map(&.ip_address.to_s)
                     rescue ex
                       ["resolve_failed: #{ex.message}"]
@@ -212,7 +217,7 @@ module Fetcher
 
       body_snippet = begin
         if response.body && response.body.is_a?(String)
-          response.body[0, 512].gsub(/\s+/, " ").strip
+          response.body[0, MAX_BODY_SNIPPET].gsub(/\s+/, " ").strip
         end
       rescue
         nil

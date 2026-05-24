@@ -201,43 +201,50 @@ module Fetcher
 
     # Check if redirect to target_domain from source_domain is allowed
     private def allow_redirect?(source_domain : String, target_domain : String, status_code : Int32 = 302) : Bool
-      # Same domain is always allowed
-      return true if source_domain == target_domain
+      return true if same_domain_redirect?(source_domain, target_domain)
+      return true if subdomain_redirect?(source_domain, target_domain)
+      return true if external_redirect_allowed?(target_domain, status_code)
+      return true if allowed_domain_redirect?(source_domain, target_domain)
+      return true if same_registrable_domain?(source_domain, target_domain)
+      false
+    end
 
-      # Allow subdomain <> parent-domain redirects in either direction.
-      # Examples:
-      # - blog.example.com -> example.com
-      # - example.com -> blog.example.com
-      return true if target_domain.ends_with?(".#{source_domain}") || source_domain.ends_with?(".#{target_domain}")
+    # Same domain is always allowed
+    private def same_domain_redirect?(source : String, target : String) : Bool
+      source == target
+    end
 
-      # Check redirect config
+    # Allow subdomain <> parent-domain redirects in either direction.
+    private def subdomain_redirect?(source : String, target : String) : Bool
+      target.ends_with?(".#{source}") || source.ends_with?(".#{target}")
+    end
+
+    # Check if external redirects are allowed based on config
+    private def external_redirect_allowed?(target : String, status_code : Int32) : Bool
       redirect_config = @config.redirect
-
-      # If allow_external is true, external redirects are allowed
       return true if redirect_config.allow_external
+      return true if redirect_config.allow_permanent_external && permanent_redirect?(status_code)
+      false
+    end
 
-      # Permanent redirects (301/308) represent the resource URL moving permanently.
-      # For feed fetching, these should be trusted — e.g. blogspot.com -> custom domain.
-      if redirect_config.allow_permanent_external && (status_code == 301 || status_code == 308)
-        return true
-      end
+    # Permanent redirects (301/308) are trusted for feed fetching
+    private def permanent_redirect?(status_code : Int32) : Bool
+      status_code == 301 || status_code == 308
+    end
 
-      # If allowed_domains is set, check if target is in the allowlist
-      if allowed = redirect_config.allowed_domains
-        # Allow exact match or subdomain of allowed domain
-        return true if allowed.includes?(target_domain)
-        return true if allowed.any? { |domain| target_domain.ends_with?(".#{domain}") }
-      end
+    # Check if target is in the allowed_domains list
+    private def allowed_domain_redirect?(source : String, target : String) : Bool
+      return false unless allowed = @config.redirect.allowed_domains
+      allowed.includes?(target) || allowed.any? { |domain| target.ends_with?(".#{domain}") }
+    end
 
-      # Allow if both hosts share the same registrable domain (eTLD+1)
-      begin
-        src_reg = PublicSuffix.registrable_domain(source_domain)
-        tgt_reg = PublicSuffix.registrable_domain(target_domain)
-        return true if src_reg && tgt_reg && src_reg == tgt_reg
-      rescue
-        # ignore errors and fall through to deny
-      end
-
+    # Allow if both hosts share the same registrable domain (eTLD+1)
+    private def same_registrable_domain?(source : String, target : String) : Bool
+      src_reg = PublicSuffix.registrable_domain(source)
+      tgt_reg = PublicSuffix.registrable_domain(target)
+      return false unless src_reg && tgt_reg
+      src_reg == tgt_reg
+    rescue
       false
     end
 

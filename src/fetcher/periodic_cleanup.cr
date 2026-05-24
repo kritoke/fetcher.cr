@@ -37,10 +37,11 @@ module Fetcher
     private def self.restart_fiber : Nil
       # Signal existing fiber to stop by setting flag
       @@cleanup_stopped = true
-
       @@cleanup_running = true
-      @@cleanup_stopped = false # Reset flag before spawning new fiber
+
       @@global_cleanup_fiber = spawn do
+        # Reset flag at the START of new fiber's execution to avoid race
+        @@cleanup_stopped = false
         loop do
           # Check stop flag on each iteration
           if @@cleanup_stopped

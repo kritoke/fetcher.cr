@@ -13,6 +13,26 @@ module Fetcher
     LINK_LOCAL_IPV4 = "169.254.0.0/16"
     LINK_LOCAL_IPV6 = "fe80::/10"
 
+    # IPv4 first octet ranges (for private/reserved IP detection)
+    IPV4_LINK_LOCAL_FIRST_OCTET  = 169
+    IPV4_CGNAT_FIRST_OCTET      = 100
+    IPV4_CGNAT_SECOND_OCTET_MIN = 64
+    IPV4_CGNAT_SECOND_OCTET_MAX = 127
+    IPV4_BENCHMARK_FIRST_OCTET  = 198
+    IPV4_BENCHMARK_SECOND_OCTET_1 = 18
+    IPV4_BENCHMARK_SECOND_OCTET_2 = 19
+    IPV4_MULTICAST_FIRST_OCTET  = 224
+    IPV4_MULTICAST_RANGE_SIZE   = 16   # 224-239
+    IPV4_RESERVED_FIRST_OCTET   = 240
+
+    # IPv4 link-local second octet (169.254.x.x)
+    IPV4_LINK_LOCAL_SECOND_OCTET = 254
+
+    # IPv6 link-local scope ID range (fe80::/10) - second nibble valid range 8-f
+    IPV6_LINK_LOCAL_SCOPE_MIN     = 8
+    IPV6_LINK_LOCAL_SCOPE_MAX     = 15
+    IPV6_LINK_LOCAL_SCOPE_RANGE   = 7  # MAX - MIN
+
     # DNS rebinding mitigation: track recently validated hostnames and their IPs
     DNS_RESOLVE_PORT = 80
     record ValidatedEntry,
@@ -30,9 +50,9 @@ module Fetcher
     end
 
     # Legacy compatibility: max_validated_entries method-style accessor for
-    # the limit on tracked hostname/IP associations. The default limit is 50,000.
+    # the limit on tracked hostname/IP associations. Delegates to the store's actual limit.
     def self.max_validated_entries : Int32
-      50_000
+      validated_store.max_entries
     end
 
     def self.clear_validated : Nil
@@ -258,7 +278,8 @@ module Fetcher
         ipv6_unique?(ip_address) || ipv6_site?(ip_address) ||
         ipv6_mapped_ipv4?(ip_address) || cgnat?(ip_address) ||
         benchmark?(ip_address) || multicast?(ip_address) ||
-        reserved?(ip_address) || current_network?(ip_address)
+        reserved?(ip_address) || current_network?(ip_address) ||
+        documentation?(ip_address)
     end
 
     private def self.ipv6_site?(ip_address : Socket::IPAddress) : Bool
@@ -282,14 +303,14 @@ module Fetcher
           second_char = downcase[2]?
           return false unless second_char
           second_nibble = second_char.to_i?(16)
-          return false unless second_nibble && second_nibble >= 8 && second_nibble <= 15
+          return false unless second_nibble && second_nibble >= IPV6_LINK_LOCAL_SCOPE_MIN && second_nibble <= IPV6_LINK_LOCAL_SCOPE_MAX
           true
         else
           false
         end
       else
         return false unless parts = ipv4_octets(ip_address)
-        parts.size == 4 && parts[0] == 169 && parts[1] == 254
+        parts.size == 4 && parts[0] == IPV4_LINK_LOCAL_FIRST_OCTET && parts[1] == IPV4_LINK_LOCAL_SECOND_OCTET
       end
     end
 
@@ -342,31 +363,47 @@ module Fetcher
     # Carrier-Grade NAT (100.64.0.0/10) - RFC 6598
     private def self.cgnat?(ip_address : Socket::IPAddress) : Bool
       return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] == 100 && parts[1] >= 64 && parts[1] <= 127
+      parts.size == 4 && parts[0] == IPV4_CGNAT_FIRST_OCTET && parts[1] >= IPV4_CGNAT_SECOND_OCTET_MIN && parts[1] <= IPV4_CGNAT_SECOND_OCTET_MAX
     end
 
     # Network Benchmark Testing (198.18.0.0/15) - RFC 2544
     private def self.benchmark?(ip_address : Socket::IPAddress) : Bool
       return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] == 198 && (parts[1] == 18 || parts[1] == 19)
+      parts.size == 4 && parts[0] == IPV4_BENCHMARK_FIRST_OCTET && (parts[1] == IPV4_BENCHMARK_SECOND_OCTET_1 || parts[1] == IPV4_BENCHMARK_SECOND_OCTET_2)
     end
 
     # Multicast (224.0.0.0/4)
     private def self.multicast?(ip_address : Socket::IPAddress) : Bool
       return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] >= 224 && parts[0] <= 239
+      parts.size == 4 && parts[0] >= IPV4_MULTICAST_FIRST_OCTET && parts[0] <= IPV4_MULTICAST_FIRST_OCTET + IPV4_MULTICAST_RANGE_SIZE
     end
 
     # Reserved / Future Use (240.0.0.0/4)
     private def self.reserved?(ip_address : Socket::IPAddress) : Bool
       return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] >= 240
+      parts.size == 4 && parts[0] >= IPV4_RESERVED_FIRST_OCTET
     end
 
     # Current Network (0.0.0.0/8)
     private def self.current_network?(ip_address : Socket::IPAddress) : Bool
       return false unless parts = ipv4_octets(ip_address)
       parts.size == 4 && parts[0] == 0
+    end
+
+    # RFC 5737 documentation address blocks (TEST-NET-* used in documentation)
+    # 192.0.2.0/24 - TEST-NET-1
+    # 198.51.100.0/24 - TEST-NET-2
+    # 203.0.113.0/24 - TEST-NET-3
+    private def self.documentation?(ip_address : Socket::IPAddress) : Bool
+      return false unless parts = ipv4_octets(ip_address)
+      return false unless parts.size == 4
+
+      case parts[0]
+      when 192 then parts[1] == 0 && parts[2] == 2           # TEST-NET-1
+      when 198 then parts[1] == 51 && parts[2] == 100        # TEST-NET-2
+      when 203 then parts[1] == 0 && parts[2] == 113          # TEST-NET-3
+      else false
+      end
     end
   end
 end

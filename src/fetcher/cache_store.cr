@@ -47,6 +47,10 @@ module Fetcher
       dispatch_message(msg)
     end
 
+    # Named handlers for testability
+    # NOTE: The case statement dispatches to named handler methods. While it has
+    # 10 branches, this is intentional — message types are stable, and each branch
+    # is a simple delegation. See openspec/008 for analysis.
     private def dispatch_message(msg)
       case msg
       when GetMsg           then handle_get(msg)
@@ -61,8 +65,6 @@ module Fetcher
       when CleanupMsg       then handle_cleanup
       end
     end
-
-    # Named handlers for testability
     private def handle_enabled_set(value : Bool) : Nil
       @enabled = value
     end
@@ -121,10 +123,13 @@ module Fetcher
       @eviction_set.add(key)
     end
 
-    private def add_entry(key : String, value : Result, ttl : Time::Span)
+    private def add_entry(key : String, value : Result, ttl : Time::Span) : Nil
       @entries[key] = CacheEntry.new(value, Time.utc, ttl)
-      @eviction_order << key
-      @eviction_set.add(key)
+      # Guard against duplicate additions to preserve LRU order
+      unless @eviction_set.includes?(key)
+        @eviction_order << key
+        @eviction_set.add(key)
+      end
     end
 
     private def handle_clear

@@ -3,38 +3,41 @@ require "set"
 module Fetcher
   module PublicSuffix
 
-    @@loaded : Bool = false
+    @@rules_loaded : Bool = false
+    @@rules_lock = Mutex.new
     @@exact : Set(String) = Set(String).new
     @@wildcard : Set(String) = Set(String).new
     @@exception : Set(String) = Set(String).new
 
     def self.load_rules : Nil
-      return if @@loaded
-      @@exact.clear
-      @@wildcard.clear
-      @@exception.clear
+      @@rules_lock.synchronize do
+        return if @@rules_loaded
+        @@exact.clear
+        @@wildcard.clear
+        @@exception.clear
 
-      path = File.join(File.dirname(__FILE__), "public_suffix_list.dat")
-      begin
-        text = File.read(path)
-      rescue ex
-        # Fallback minimal rules if file is missing
-        text = "// Minimal fallback public suffix rules\ncom\norg\nnet\nio\nco.uk\nuk\nco\nblogspot.com\n"
-      end
-
-      text.each_line do |line|
-        line = line.strip
-        next if line.empty? || line.starts_with?("//")
-        if line.starts_with?("!")
-          @@exception.add(line[1..-1])
-        elsif line.starts_with?("*.")
-          @@wildcard.add(line[2..-1])
-        else
-          @@exact.add(line)
+        path = File.join(File.dirname(__FILE__), "public_suffix_list.dat")
+        begin
+          text = File.read(path)
+        rescue ex
+          # Fallback minimal rules if file is missing
+          text = "// Minimal fallback public suffix rules\ncom\norg\nnet\nio\nco.uk\nuk\nco\nblogspot.com\n"
         end
-      end
 
-      @@loaded = true
+        text.each_line do |line|
+          line = line.strip
+          next if line.empty? || line.starts_with?("//")
+          if line.starts_with?("!")
+            @@exception.add(line[1..-1])
+          elsif line.starts_with?("*.")
+            @@wildcard.add(line[2..-1])
+          else
+            @@exact.add(line)
+          end
+        end
+
+        @@rules_loaded = true
+      end
     end
 
     def self.get_public_suffix(domain : String) : String

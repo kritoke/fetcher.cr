@@ -114,7 +114,7 @@ module Fetcher
     end
 
     def delay_for_attempt(attempt : Int32) : Time::Span
-      capped_attempt = Math.min(attempt, 30)
+      capped_attempt = Math.min(attempt, Config::RETRY_MAX_ATTEMPT_CAP)
       delay = retry.base_delay * (retry.exponential_base ** capped_attempt)
       Math.min(delay, retry.max_delay)
     end

@@ -19,6 +19,9 @@ module Fetcher
     DEFAULT_RETRY_MAX_DELAY        = 30.seconds
     DEFAULT_RETRY_EXPONENTIAL_BASE = 2.0
 
+    # Maximum retry attempts before capping (prevents exponential backoff overflow)
+    RETRY_MAX_ATTEMPT_CAP = 30
+
     DEFAULT_MAX_CONCURRENT = 16
 
     REDDIT_MAX_POSTS_PER_REQUEST = 25
