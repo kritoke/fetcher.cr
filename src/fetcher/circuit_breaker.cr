@@ -41,6 +41,7 @@ module Fetcher
         in State::Open
           if recovery_timeout_elapsed?
             @state = State::HalfOpen
+            @last_failure_time = Time.utc  # Reset for correct timeout calculation
             true
           else
             false

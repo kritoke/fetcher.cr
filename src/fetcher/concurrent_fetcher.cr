@@ -28,21 +28,32 @@ module Fetcher
       pending_count = Atomic(Int32).new(0)
 
       urls.each_with_index do |url, index|
-        if pending_count.get >= max_pending
-          results.send({index, QueueFullError.new("Too many pending requests")})
-        else
-          pending_count.add(1)
-          spawn do
-            begin
-              semaphore.receive
-              result = Fetcher.pull(url, headers, limit, config)
-              results.send({index, result})
-            rescue ex
-              results.send({index, ex})
-            ensure
-              semaphore.send(nil)
-              pending_count.sub(1)
-            end
+        # Use CAS loop to atomically check-and-increment pending_count
+        # This prevents the TOCTOU race condition
+        acquired = false
+        while !acquired
+          current = pending_count.get
+          if current >= max_pending
+            results.send({index, QueueFullError.new("Too many pending requests")})
+            acquired = true # Exit loop, don't spawn
+          elsif pending_count.compare_and_set(current, current + 1)
+            acquired = true # CAS succeeded, we acquired the slot
+          end
+          # If CAS failed, loop retries
+        end
+
+        next unless pending_count.get <= max_pending
+
+        spawn do
+          begin
+            semaphore.receive
+            result = Fetcher.pull(url, headers, limit, config)
+            results.send({index, result})
+          rescue ex
+            results.send({index, ex})
+          ensure
+            semaphore.send(nil)
+            pending_count.sub(1)
           end
         end
       end

@@ -347,8 +347,15 @@ module Fetcher
 
     private def resolve_and_validate_new_dns(host : String) : Nil
       addr_info = Socket::Addrinfo.resolve(host, URLValidator::DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-      addr_info.each do |addr|
-        validate_address_for_host(host, addr) if valid_address?(addr)
+      valid_addrs = addr_info.select { |addr| valid_address?(addr) }
+      
+      # If no valid addresses found, raise error
+      if valid_addrs.empty?
+        raise DNSError.new("DNS resolution for #{host} returned no valid IP addresses")
+      end
+      
+      valid_addrs.each do |addr|
+        validate_address_for_host(host, addr)
       end
     end
 
