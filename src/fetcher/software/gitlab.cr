@@ -64,7 +64,7 @@ module Fetcher
         link_data = LinkResolver.resolve_from_url(html_url)
 
         Entry.create(
-          title: "#{provider.repo} #{name}",
+          title: "#{provider.repo_name} #{name}",
           url: html_url,
           source_type: provider.source_type,
           content: body,

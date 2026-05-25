@@ -20,7 +20,7 @@ describe Fetcher::Software do
       json = JSON.parse(%({"tag_name": "v1.0.0", "name": "Test", "html_url": "https://test.com"}))
       result = Fetcher::Software.parse_software_entry(json, TestHelpers.make_software_provider)
       result.should be_a(Fetcher::Entry)
-      result.title.should eq("test/repo Test")
+      result.title.should eq("repo Test")
     end
 
     it "handles JSON with null values - may throw (documented behavior)" do
@@ -68,7 +68,7 @@ describe Fetcher::Software do
       long_string = "x" * 10000
       json = JSON.parse(%({"tag_name": "v1.0.0", "name": "#{long_string}", "html_url": "https://test.com"}))
       result = Fetcher::Software.parse_software_entry(json, TestHelpers.make_software_provider)
-      result.title.size.should eq(10000 + "test/repo ".size)
+      result.title.size.should eq(10000 + "repo ".size)
     end
 
     it "handles JSON with extra unexpected fields" do

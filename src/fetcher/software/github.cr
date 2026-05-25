@@ -49,7 +49,7 @@ module Fetcher
         entry_data = extract_release_data(release, provider)
 
         Entry.create(
-          title: "#{provider.repo} #{entry_data.name}",
+          title: "#{provider.repo_name} #{entry_data.name}",
           url: entry_data.html_url,
           source_type: provider.source_type,
           content: entry_data.body,

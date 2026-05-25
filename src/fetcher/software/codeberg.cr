@@ -9,6 +9,7 @@ module Fetcher
     module Codeberg
       # Maximum characters to show from response body in error messages
       MAX_ERROR_BODY_PREVIEW = 50
+
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
         http_client = Fetcher::CrestHttpClient.new(config)
         response = http_client.get(provider.api_url, build_codeberg_headers(config))
@@ -111,7 +112,7 @@ module Fetcher
         entry_data = extract_release_data(release, provider)
 
         Entry.create(
-          title: "#{provider.repo} #{entry_data.name}",
+          title: "#{provider.repo_name} #{entry_data.name}",
           url: entry_data.html_url,
           source_type: provider.source_type,
           content: entry_data.body,
