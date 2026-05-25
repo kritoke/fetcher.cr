@@ -204,7 +204,7 @@ module Fetcher
       links = channel.xpath_nodes("./*[local-name()='link']")
       site_link_node = links.find do |node|
         node["rel"]? != "self" && (node.text.presence || node["href"]?)
-      end || links.first?
+      end
 
       return "#" unless site_link_node
       link = site_link_node["href"]? || site_link_node.text
