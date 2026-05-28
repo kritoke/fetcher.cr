@@ -213,15 +213,16 @@ module Fetcher
 
     private def parse_rss_item(node : XML::Node) : Entry
       children = node.children.select(&.element?)
+      child_map = build_child_map(children)
 
-      title = Entry.sanitize_title(extract_rss_title(children))
-      link = extract_rss_link(children)
-      pub_date = extract_rss_pub_date(children)
-      content = extract_rss_content(children)
-      author = extract_rss_author(children)
-      categories = extract_rss_categories(children)
-      attachments = extract_rss_attachments(children)
-      comments_link = extract_rss_comments_link(children)
+      title = Entry.sanitize_title(extract_from_map(child_map, "title").try(&.text))
+      link = HTMLUtils.sanitize_link(extract_from_map(child_map, "link").try(&.text))
+      pub_date = extract_rss_pub_date(child_map)
+      content = extract_rss_content(child_map)
+      author = extract_from_map(child_map, "creator").try(&.text).try(&.strip).presence
+      categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat.text.try(&.strip).presence }
+      attachments = extract_rss_attachments(child_map)
+      comments_link = extract_from_map(child_map, "comments").try(&.text).try(&.strip).presence
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -239,49 +240,42 @@ module Fetcher
       )
     end
 
-    private def extract_rss_title(children : Array(XML::Node)) : String?
-      children.find { |child| child.name == "title" }.try(&.text).try(&.strip)
+    # Build a Hash from tag name to child nodes for O(1) lookup
+    private def build_child_map(children : Array(XML::Node)) : Hash(String, Array(XML::Node))
+      map = {} of String => Array(XML::Node)
+      children.each do |child|
+        name = child.name
+        (map[name] ||= [] of XML::Node) << child
+      end
+      map
     end
 
-    private def extract_rss_link(children : Array(XML::Node)) : String?
-      HTMLUtils.sanitize_link(children.find { |child| child.name == "link" }.try(&.text))
+    # Get first matching child from map (returns nil if not found)
+    private def extract_from_map(map : Hash(String, Array(XML::Node)), tag : String) : XML::Node?
+      map[tag]?.try(&.first?)
     end
 
-    private def extract_rss_pub_date(children : Array(XML::Node)) : Time?
-      pub_date_str = children.find { |child| child.name == "pubDate" }.try(&.text) ||
-                     children.find { |child| child.name == "dc:date" }.try(&.text) ||
-                     children.find { |child| child.name == "date" }.try(&.text)
+    private def extract_rss_pub_date(child_map : Hash(String, Array(XML::Node))) : Time?
+      pub_date_str = extract_from_map(child_map, "pubDate").try(&.text) ||
+                    extract_from_map(child_map, "dc:date").try(&.text) ||
+                    extract_from_map(child_map, "date").try(&.text)
       TimeParser.normalize(TimeParser.parse(pub_date_str)) if pub_date_str
     end
 
-    private def extract_rss_content(children : Array(XML::Node)) : String
-      content_encoded = children.find { |child| child.name == "encoded" }.try(&.text)
-      description = children.find { |child| child.name == "description" }.try(&.text)
+    private def extract_rss_content(child_map : Hash(String, Array(XML::Node))) : String
+      content_encoded = extract_from_map(child_map, "encoded").try(&.text)
+      description = extract_from_map(child_map, "description").try(&.text)
       content_encoded || description || ""
     end
 
-    private def extract_rss_author(children : Array(XML::Node)) : String?
-      children.find { |child| child.name == "creator" }.try(&.text).try(&.strip).presence
-    end
-
-    private def extract_rss_categories(children : Array(XML::Node)) : Array(String)
-      children.select { |child| child.name == "category" }.compact_map do |cat|
-        cat.text.try(&.strip).presence
-      end
-    end
-
-    private def extract_rss_attachments(children : Array(XML::Node)) : Array(Attachment)
-      children.select { |child| child.name == "enclosure" }.compact_map do |enc|
+    private def extract_rss_attachments(child_map : Hash(String, Array(XML::Node))) : Array(Attachment)
+      (child_map["enclosure"]? || [] of XML::Node).compact_map do |enc|
         url = enc["url"]?
         type = enc["type"]?
         length = enc["length"]?.try(&.to_i64?)
         next unless url && type
         Attachment.new(url: url, mime_type: type, size_in_bytes: length)
       end
-    end
-
-    private def extract_rss_comments_link(children : Array(XML::Node)) : String?
-      children.find { |child| child.name == "comments" }.try(&.text).try(&.strip).presence
     end
 
     private def parse_atom(xml : XML::Node, limit : Int32) : Array(Entry)
@@ -348,14 +342,15 @@ module Fetcher
 
     private def parse_atom_entry(node : XML::Node) : Entry
       children = node.children.select(&.element?)
+      child_map = build_child_map(children)
 
-      title = Entry.sanitize_title(children.find { |child| child.name == "title" }.try(&.text))
-      link = extract_atom_link(children)
-      pub_date = extract_atom_pub_date(children)
-      content = extract_atom_content(children)
-      author = extract_atom_author(children)
-      author_url = extract_atom_author_url(children)
-      categories = extract_atom_categories(children)
+      title = Entry.sanitize_title(extract_from_map(child_map, "title").try(&.text))
+      link = extract_atom_link(child_map)
+      pub_date = extract_atom_pub_date(child_map)
+      content = extract_atom_content(child_map)
+      author = extract_atom_author(child_map)
+      author_url = extract_atom_author_url(child_map)
+      categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat["term"]?.try(&.strip).presence }
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -373,37 +368,44 @@ module Fetcher
       )
     end
 
-    private def extract_atom_link(children : Array(XML::Node)) : String
-      alt_link = children.find { |child| child.name == "link" && child["rel"]? == "alternate" && (child["type"]?.nil? || child["type"].starts_with?("text/html")) }
+    private def extract_atom_link(child_map : Hash(String, Array(XML::Node))) : String
+      links = child_map["link"]? || [] of XML::Node
+      alt_link = links.find { |l| l["rel"]? == "alternate" && (l["type"]?.nil? || l["type"].starts_with?("text/html")) }
       link_node = alt_link ||
-                  children.find { |child| child.name == "link" && child["rel"]? == "alternate" } ||
-                  children.find { |child| child.name == "link" && child["href"]? } ||
-                  children.find { |child| child.name == "link" }
+                  links.find { |l| l["rel"]? == "alternate" } ||
+                  links.find { |l| l["href"]? } ||
+                  links.first?
       link_node.try(&.["href"]?).try(&.strip).presence ||
         link_node.try(&.text).try(&.strip).presence || "#"
     end
 
-    private def extract_atom_pub_date(children : Array(XML::Node)) : Time?
-      published_str = children.find { |child| child.name == "published" }.try(&.text) ||
-                      children.find { |child| child.name == "updated" }.try(&.text)
+    private def extract_atom_pub_date(child_map : Hash(String, Array(XML::Node))) : Time?
+      published_str = extract_from_map(child_map, "published").try(&.text) ||
+                      extract_from_map(child_map, "updated").try(&.text)
       TimeParser.normalize(TimeParser.parse(published_str)) if published_str
     end
 
-    private def extract_atom_content(children : Array(XML::Node)) : String
-      content_node = children.find { |child| child.name == "content" }
-      summary_node = children.find { |child| child.name == "summary" }
+    private def extract_atom_content(child_map : Hash(String, Array(XML::Node))) : String
+      content_node = extract_from_map(child_map, "content")
+      summary_node = extract_from_map(child_map, "summary")
 
       content_node.try(&.text) || summary_node.try(&.text) || ""
     end
 
-    private def extract_atom_author(children : Array(XML::Node)) : String?
-      author_node = children.find { |child| child.name == "author" }
-      author_node.try(&.children.find { |child| child.name == "name" }).try(&.text).try(&.strip).presence
+    private def extract_atom_author(child_map : Hash(String, Array(XML::Node))) : String?
+      author_nodes = child_map["author"]?
+      return unless author_nodes
+      author_node = author_nodes.first?
+      return unless author_node
+      author_node.children.find { |c| c.name == "name" }.try(&.text).try(&.strip).presence
     end
 
-    private def extract_atom_author_url(children : Array(XML::Node)) : String?
-      author_node = children.find { |child| child.name == "author" }
-      author_node.try(&.children.find { |child| child.name == "uri" }).try(&.text).try(&.strip).presence
+    private def extract_atom_author_url(child_map : Hash(String, Array(XML::Node))) : String?
+      author_nodes = child_map["author"]?
+      return unless author_nodes
+      author_node = author_nodes.first?
+      return unless author_node
+      author_node.children.find { |c| c.name == "uri" }.try(&.text).try(&.strip).presence
     end
 
     private def extract_atom_categories(children : Array(XML::Node)) : Array(String)

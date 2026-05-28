@@ -4,6 +4,11 @@ require "./url_validator"
 module Fetcher
   # Factory for creating validated Entry instances
   class EntryFactory
+    # Cache sanitizers at class level to avoid repeated allocation.
+    # Creating Sanitize::Policy::HTMLSanitizer.common on every call is expensive.
+    @@_sanitizer = Sanitize::Policy::HTMLSanitizer.common
+    @@_content_sanitizer = Sanitize::Policy::HTMLSanitizer.common
+
     def self.create(
       title : String,
       url : String,
@@ -69,13 +74,10 @@ module Fetcher
 
     private def self.sanitize(content : String) : String
       return "" if content.empty?
-      begin
-        sanitizer = Sanitize::Policy::HTMLSanitizer.common
-        sanitizer.process(content).to_s
-      rescue ex
-        ::Log.for("fetcher").warn { "HTML sanitization failed: #{ex.message}" }
-        ""
-      end
+      @@_sanitizer.process(content).to_s
+    rescue ex
+      ::Log.for("fetcher").warn { "HTML sanitization failed: #{ex.message}" }
+      ""
     end
   end
 end

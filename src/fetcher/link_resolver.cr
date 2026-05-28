@@ -5,6 +5,11 @@ module Fetcher
       commentary_url : String? = nil,
       is_discussion_url : Bool = false
 
+    # Pre-compiled patterns for URL matching (performance optimization)
+    # Using single regex instead of multiple string scans reduces O(n) to O(1)
+    DISCUSSION_PATTERN = /\/comments\/|\/item\?id=|\/s\/|\/discuss/
+    REDDIT_DISCUSSION_PATTERN = /reddit\.com\/r\/|old\.reddit\.com\/r\//i
+
     def self.resolve(node : XML::Node, main_url : String) : LinkData
       comment_url : String? = nil
       commentary_url : String? = nil
@@ -48,15 +53,13 @@ module Fetcher
       )
     end
 
-    DISCUSSION_PATHS           = {"/comments/", "/item?id=", "/s/", "/discuss"}
-    REDDIT_DISCUSSION_PATTERNS = {"reddit.com/r/", "old.reddit.com/r/"}
-
     private def self.discussion_url?(url : String) : Bool
       return false if url.empty? || url == "#"
 
       lower = url.downcase
-      return true if REDDIT_DISCUSSION_PATTERNS.any? { |pattern| lower.includes?(pattern) }
-      DISCUSSION_PATHS.any? { |path| lower.includes?(path) }
+      return true if REDDIT_DISCUSSION_PATTERN.matches?(lower)
+      return true if DISCUSSION_PATTERN.matches?(lower)
+      false
     end
   end
 end

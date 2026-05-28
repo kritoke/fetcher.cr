@@ -12,6 +12,10 @@ module Fetcher
     # not accepting clearly incorrect future dates.
     FUTURE_BOUND = Time.utc + 24.hours
 
+    # Pre-compiled regexes to avoid repeated compilation in hot path
+    FALLBACK_DATE_PATTERN = /\d{4}-\d{2}-\d{2}$/
+    FALLBACK_DATETIME_PATTERN = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
+
     # Normalize a Time to UTC. This ensures:
     # - Consistent location for comparisons (UTC vs +00:00 are equal after normalization)
     # - Future times from feeds (clock skew, bad data) are clamped to a sensible upper bound
@@ -51,12 +55,12 @@ module Fetcher
 
     private def self.parse_fallback(stripped : String) : Time?
       # Handle YYYY-MM-DD format
-      if stripped.matches?(/^\d{4}-\d{2}-\d{2}$/)
+      if stripped.matches?(FALLBACK_DATE_PATTERN)
         return Time.parse(stripped, "%Y-%m-%d", Time::Location::UTC)
       end
 
       # Handle YYYY-MM-DDTHH:MM:SS format without timezone
-      if stripped.matches?(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/)
+      if stripped.matches?(FALLBACK_DATETIME_PATTERN)
         return Time.parse(stripped, "%Y-%m-%dT%H:%M:%S", Time::Location::UTC)
       end
 
