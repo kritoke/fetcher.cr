@@ -46,3 +46,7 @@ planning/
 .catseye/
 
 .catseye.toml
+# Local Pi runtime state
+.atl/
+.pi/
+

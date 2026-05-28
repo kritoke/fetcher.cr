@@ -309,6 +309,16 @@ module Fetcher
       @@dns_cache_lock.synchronize { @@dns_cache.clear }
     end
 
+    # Proactively sweep all expired entries from the DNS cache.
+    # Call this periodically (e.g., every few minutes) to prevent memory growth
+    # from stale entries that haven't been accessed since expiration.
+    def self.clear_expired_dns : Nil
+      @@dns_cache_lock.synchronize do
+        now = Time.utc
+        @@dns_cache.reject! { |_, entry| entry[:expires] <= now }
+      end
+    end
+
 
     private def verify_dns_rebinding(url : String) : Nil
       return unless should_check_dns_rebinding?

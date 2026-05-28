@@ -60,6 +60,18 @@ module Fetcher
       end
     end
 
+    # Proactively sweep all expired entries from the store.
+    # Call this periodically (e.g., every few minutes) to prevent memory growth
+    # from stale entries that haven't been accessed since expiration.
+    def clear_expired : Nil
+      @lock.synchronize do
+        now = Time.utc
+        @entries.reject! do |_, entry|
+          entry.last_accessed + entry.ttl < now
+        end
+      end
+    end
+
     # Enforce size limit by removing oldest entries when at capacity
     private def enforce_limit : Nil
       # Convert to array for sorting (Hash doesn't have sort_by)

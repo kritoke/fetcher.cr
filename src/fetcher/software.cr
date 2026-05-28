@@ -147,6 +147,9 @@ module Fetcher
     end
 
     private def self.extract_repo(url : String, domain : String) : String?
+      # Safety: reject URLs that are too long to prevent potential ReDoS
+      return nil if url.bytesize > 500
+
       pattern = "#{domain}/([^/]+/[^/]+)/?"
       match = url.match(Regex.new(pattern))
       match ? match[1] : nil
