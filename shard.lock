@@ -10,7 +10,7 @@ shards:
 
   crest:
     git: https://github.com/mamantoha/crest.git
-    version: 1.7.0
+    version: 1.8.0
 
   http-client-digest_auth:
     git: https://github.com/mamantoha/http-client-digest_auth.git
