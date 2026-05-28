@@ -29,17 +29,17 @@ describe Fetcher do
 
   describe ".transient_error?" do
     it "detects timeout errors" do
-      ex = Exception.new("Connection timeout")
+      ex = Fetcher::TimeoutError.new("Connection timeout")
       Fetcher.transient_error?(ex).should be_true
     end
 
     it "detects connection errors" do
-      ex = Exception.new("Failed to establish connection")
+      ex = Fetcher::DNSError.new("Failed to establish connection")
       Fetcher.transient_error?(ex).should be_true
     end
 
     it "detects DNS errors" do
-      ex = Exception.new("DNS resolution failed")
+      ex = Fetcher::DNSError.new("DNS resolution failed")
       Fetcher.transient_error?(ex).should be_true
     end
 

@@ -13,9 +13,18 @@ module Fetcher
 
     DEFAULT_TTL = 5.minutes
 
+    @cleanup_proc : Proc(Nil)?
+    @cleanup_registered : Bool
+
     def initialize(@max_entries : Int32 = 10_000)
       @entries = {} of String => Entry
       @lock = Mutex.new
+      @cleanup_proc = nil
+      @cleanup_registered = false
+    end
+
+    private def cleanup_proc : Proc(Nil)
+      @cleanup_proc ||= Proc(Nil).new { cleanup }
     end
 
     def get(domain : String, config) : CircuitBreaker
@@ -37,9 +46,19 @@ module Fetcher
         )
         entry = Entry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
         @entries[domain] = entry
-        PeriodicCleanup.register_cleanup { cleanup }
+
+        # Register cleanup exactly once per store instance, not per domain.
+        # The cleanup proc is cached in @cleanup_proc and reused for all domains.
+        register_store_cleanup
         breaker
       end
+    end
+
+    # Register this store's cleanup proc exactly once.
+    private def register_store_cleanup : Nil
+      return if @cleanup_registered
+      @cleanup_registered = true
+      PeriodicCleanup.register_cleanup { cleanup_proc.call }
     end
 
     def clear : Nil

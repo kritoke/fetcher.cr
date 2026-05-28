@@ -17,6 +17,9 @@ module Fetcher
     record MaxSizeGetMsg, reply : Channel(Int32)
     record CleanupMsg
 
+    @cleanup_proc : Proc(Nil)?
+    @cleanup_registered : Bool
+
     def initialize(max_size : Int32 = 1000, enabled : Bool = true)
       @cmd = Channel(GetMsg | SetMsg | ClearMsg | ClearByPrefixMsg | StatsMsg | EnabledSetMsg | EnabledGetMsg | MaxSizeSetMsg | MaxSizeGetMsg | CleanupMsg).new
       @entries = {} of String => CacheEntry
@@ -25,10 +28,23 @@ module Fetcher
       @stats = CacheStats.new
       @max_size = max_size
       @enabled = enabled
+      @cleanup_proc = nil
+      @cleanup_registered = false
 
       spawn { run_owner_fiber }
 
-      PeriodicCleanup.register_cleanup { cleanup }
+      register_cleanup_once
+    end
+
+    private def cleanup_proc : Proc(Nil)
+      @cleanup_proc ||= Proc(Nil).new { cleanup }
+    end
+
+    # Register this store's cleanup proc exactly once.
+    private def register_cleanup_once : Nil
+      return if @cleanup_registered
+      @cleanup_registered = true
+      PeriodicCleanup.register_cleanup { cleanup_proc.call }
     end
 
     private def run_owner_fiber
