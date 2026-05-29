@@ -15,7 +15,7 @@ module Fetcher
 
     getter max_entries : Int32
 
-    def initialize(@max_entries : Int32 = 50_000, @ttl : Time::Span = 5.seconds)
+    def initialize(@max_entries : Int32 = 10_000, @ttl : Time::Span = 5.seconds)
       @map = {} of String => Entry
       @mutex = Mutex.new
       @drain_threshold = (@max_entries * 0.8).to_i32

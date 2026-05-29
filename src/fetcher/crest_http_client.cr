@@ -20,8 +20,22 @@ module Fetcher
     @request_semaphore : Channel(Nil)?
     @semaphore_lock : Mutex = Mutex.new
 
+    # DNS cache with lazy initialization for cleanup registration
     @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
     @@dns_cache_lock = Mutex.new
+    @@dns_cleanup_registered = false
+    @@dns_cleanup_proc : Proc(Nil)?
+
+    private def self.dns_cleanup_proc : Proc(Nil)
+      @@dns_cleanup_proc ||= Proc(Nil).new { clear_expired_dns }
+    end
+
+    # Register DNS cache cleanup exactly once when first DNS entry is cached
+    def self.ensure_dns_cleanup_registered : Nil
+      return if @@dns_cleanup_registered
+      @@dns_cleanup_registered = true
+      PeriodicCleanup.register_cleanup { dns_cleanup_proc.call }
+    end
 
     def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
       # Semaphore created lazily on first request to avoid race condition
@@ -301,6 +315,8 @@ module Fetcher
       return unless @config.dns.cache_enabled
       ttl = @config.dns.cache_ttl
       @@dns_cache_lock.synchronize do
+        # Register DNS cleanup when first entry is added
+        CrestHttpClient.ensure_dns_cleanup_registered
         @@dns_cache[host] = {addr: addr, expires: Time.utc + ttl}
       end
     end
