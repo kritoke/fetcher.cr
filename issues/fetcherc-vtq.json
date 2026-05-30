@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T18:56:01Z",
+  "description": "Each RequestConfig lazily creates its own Cache instance, which:\n- Spawns a CacheStore owner fiber\n- Registers a cleanup proc with PeriodicCleanup\n\nIf many RequestConfig instances are created (one per request), fibers accumulate. No close/dispose method exists.\n\nFix: Add close/dispose method to RequestConfig that sends stop to CacheStore fiber and unregisters cleanup. Document config reuse.",
+  "id": "fetcherc-vtq",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "RequestConfig Cache instances spawn permanent fibers never cleaned up",
+  "type": "task",
+  "updated_at": "2026-05-30T18:56:01Z"
+}
