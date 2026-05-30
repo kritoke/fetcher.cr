@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:22Z",
+  "description": "RSSParser#check_entity_expansion_risk and XMLStreamingParser#perform_xxe_check implement nearly identical checks.\n\nInconsistency: DOM version checks MAX_ENTITY_DEFINITIONS, streaming checks 2x that value.\n\nFix: Extract shared EntityExpansionGuard module with single implementation and configurable threshold.",
+  "id": "fetcherc-vba",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Duplicated XXE/entity expansion check logic in RSSParser and XMLStreamingParser",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:22Z"
+}
