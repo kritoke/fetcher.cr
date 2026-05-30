@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T19:47:33Z",
   "created": "2026-05-30T19:39:22Z",
   "description": "FUTURE_BOUND = Time.utc + 24.hours is evaluated at class load time, making the normalize() future-clamp a no-op.\n\nBroken code at time_parser.cr:13,26:\n- FUTURE_BOUND is evaluated once at startup\n- After hours/days, FUTURE_BOUND is far in the past\n- normalize() never clamps future dates\n- Either compute inside normalize() per-call, or remove the dead guard",
   "id": "fetcherc-bj5",
   "labels": [],
   "priority": 0,
-  "status": "open",
+  "status": "closed",
   "title": "TimeParser FUTURE_BOUND constant evaluated once - future date clamping broken",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:22Z"
+  "updated_at": "2026-05-30T19:47:33Z"
 }
