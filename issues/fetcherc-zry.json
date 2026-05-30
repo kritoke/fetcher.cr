@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T20:16:24Z",
   "created": "2026-05-30T19:39:22Z",
   "description": "Regex.new(\"#{domain}/([^/]+/[^/]+)/?\") creates new regex pattern on every call. Regex.new with string interpolation is not cached.\n\nFix: Pre-compile regex patterns at module level as constants.",
   "id": "fetcherc-zry",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Software.extract_repo uses Regex.new per call - should be pre-compiled",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:22Z"
+  "updated_at": "2026-05-30T20:16:24Z"
 }
