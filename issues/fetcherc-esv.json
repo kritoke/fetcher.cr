@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T19:49:01Z",
   "created": "2026-05-30T19:39:28Z",
   "description": "restart_fiber sets @@cleanup_stopped = true then spawns new fiber. Old fiber reads @@cleanup_stopped without synchronization.\n\nRace: Multiple fibers could run simultaneously, or new fiber could immediately exit if race triggers.\n\nFix: Use Channel or Mutex-protected flag for fiber lifecycle coordination.",
   "id": "fetcherc-esv",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "PeriodicCleanup TOCTOU race on fiber restart",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:28Z"
+  "updated_at": "2026-05-30T19:49:01Z"
 }
