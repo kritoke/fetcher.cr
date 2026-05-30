@@ -56,7 +56,7 @@ module Fetcher
       begin
         parser = RSSParser.new
         xml = parser.parse_xml_document(body)
-        entries = parser.parse_entries(xml, limit)
+        entries = parser.parse_entries(xml, limit, config.content.strip_entry_content)
         metadata = parser.parse_feed_metadata(xml)
 
         if entries.empty?

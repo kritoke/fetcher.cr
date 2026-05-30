@@ -21,8 +21,10 @@ module Fetcher
     @semaphore_lock : Mutex = Mutex.new
 
     # DNS cache with lazy initialization for cleanup registration
+    # Size-capped with LRU eviction to prevent unbounded growth
     @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
     @@dns_cache_lock = Mutex.new
+    @@dns_max_entries : Int32 = 10_000
     @@dns_cleanup_registered = false
     @@dns_cleanup_proc : Proc(Nil)?
 
@@ -35,6 +37,15 @@ module Fetcher
       return if @@dns_cleanup_registered
       @@dns_cleanup_registered = true
       PeriodicCleanup.register_cleanup { dns_cleanup_proc.call }
+    end
+
+    # Configure max DNS cache entries. Call once during app init.
+    def self.dns_max_entries=(value : Int32) : Nil
+      @@dns_max_entries = value
+    end
+
+    def self.dns_max_entries : Int32
+      @@dns_max_entries
     end
 
     def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
@@ -317,7 +328,23 @@ module Fetcher
       @@dns_cache_lock.synchronize do
         # Register DNS cleanup when first entry is added
         CrestHttpClient.ensure_dns_cleanup_registered
+        # Enforce size limit before adding to prevent unbounded growth
+        CrestHttpClient.enforce_dns_limit
         @@dns_cache[host] = {addr: addr, expires: Time.utc + ttl}
+      end
+    end
+
+    # Enforce size limit by removing oldest entries when at capacity
+    def self.enforce_dns_limit : Nil
+      return unless @@dns_cache.size >= @@dns_max_entries
+      # Sort by expires (oldest first) and remove 10% to avoid repeated evictions
+      excess = (@@dns_cache.size * 0.1).to_i32.clamp(1, @@dns_cache.size)
+      sorted = @@dns_cache.to_a.sort_by { |_, entry| entry[:expires] }
+      excess.times do
+        if entry = sorted.shift?
+          host, _ = entry
+          @@dns_cache.delete(host)
+        end
       end
     end
 

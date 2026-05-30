@@ -48,18 +48,18 @@ module Fetcher
   class RSSParser < EntryParser
     include XMLHelper
 
-    def parse_entries(data : String, limit : Int32) : Array(Entry)
+    def parse_entries(data : String, limit : Int32, strip_content : Bool = false) : Array(Entry)
       xml = parse_xml(data)
-      parse_entries(xml, limit)
+      parse_entries(xml, limit, strip_content)
     end
 
-    def parse_entries(xml : XML::Document, limit : Int32) : Array(Entry)
+    def parse_entries(xml : XML::Document, limit : Int32, strip_content : Bool = false) : Array(Entry)
       return [] of Entry unless xml.root
 
-      rss_entries = parse_rss(xml, limit)
+      rss_entries = parse_rss(xml, limit, strip_content)
       return rss_entries unless rss_entries.empty?
 
-      atom_entries = parse_atom(xml, limit)
+      atom_entries = parse_atom(xml, limit, strip_content)
       return atom_entries unless atom_entries.empty?
 
       [] of Entry
@@ -151,7 +151,7 @@ module Fetcher
       count
     end
 
-    private def parse_rss(xml : XML::Node, limit : Int32) : Array(Entry)
+    private def parse_rss(xml : XML::Node, limit : Int32, strip_content : Bool) : Array(Entry)
       entries = [] of Entry
 
       is_rdf = xml.root.try(&.name) == "RDF"
@@ -160,7 +160,7 @@ module Fetcher
       if channel
         item_nodes = is_rdf ? xml.xpath_nodes("//*[local-name()='item']") : channel.xpath_nodes("./*[local-name()='item']")
         item_nodes.each do |node|
-          entries << parse_rss_item(node)
+          entries << parse_rss_item(node, strip_content)
           break if entries.size >= limit
         end
       end
@@ -211,14 +211,14 @@ module Fetcher
       link.strip.presence || "#"
     end
 
-    private def parse_rss_item(node : XML::Node) : Entry
+    private def parse_rss_item(node : XML::Node, strip_content : Bool) : Entry
       children = node.children.select(&.element?)
       child_map = build_child_map(children)
 
       title = Entry.sanitize_title(extract_from_map(child_map, "title").try(&.text))
       link = HTMLUtils.sanitize_link(extract_from_map(child_map, "link").try(&.text))
       pub_date = extract_rss_pub_date(child_map)
-      content = extract_rss_content(child_map)
+      content = strip_content ? "" : extract_rss_content(child_map)
       author = extract_from_map(child_map, "creator").try(&.text).try(&.strip).presence
       categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat.text.try(&.strip).presence }
       attachments = extract_rss_attachments(child_map)
@@ -278,14 +278,14 @@ module Fetcher
       end
     end
 
-    private def parse_atom(xml : XML::Node, limit : Int32) : Array(Entry)
+    private def parse_atom(xml : XML::Node, limit : Int32, strip_content : Bool) : Array(Entry)
       entries = [] of Entry
 
       feed_node = xml.xpath_node("//*[local-name()='feed']")
       return [] of Entry unless feed_node
 
       feed_node.xpath_nodes("./*[local-name()='entry']").each do |node|
-        entries << parse_atom_entry(node)
+        entries << parse_atom_entry(node, strip_content)
         break if entries.size >= limit
       end
 
@@ -340,14 +340,14 @@ module Fetcher
         feed_node.xpath_node("./*[local-name()='logo']").try(&.text)
     end
 
-    private def parse_atom_entry(node : XML::Node) : Entry
+    private def parse_atom_entry(node : XML::Node, strip_content : Bool) : Entry
       children = node.children.select(&.element?)
       child_map = build_child_map(children)
 
       title = Entry.sanitize_title(extract_from_map(child_map, "title").try(&.text))
       link = extract_atom_link(child_map)
       pub_date = extract_atom_pub_date(child_map)
-      content = extract_atom_content(child_map)
+      content = strip_content ? "" : extract_atom_content(child_map)
       author = extract_atom_author(child_map)
       author_url = extract_atom_author_url(child_map)
       categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat["term"]?.try(&.strip).presence }
