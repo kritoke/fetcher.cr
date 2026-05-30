@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:32Z",
+  "description": "resolve_item_url(item, id) takes id but never uses it. When url_candidate is invalid, returns '#' instead of falling back to id.\n\nFix: Use id as fallback: URLValidator.valid?(url_candidate) ? url_candidate : (URLValidator.valid?(id) ? id : '#')",
+  "id": "fetcherc-m1y",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "JSONFeedParser resolve_item_url ignores id parameter",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:32Z"
+}
