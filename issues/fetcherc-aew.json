@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:31Z",
+  "description": "@@_sanitizer and @@_content_sanitizer are cached at class level, but sanitize_content_html() does:\n\n  sanitizer = Sanitize::Policy::HTMLSanitizer.common  # creates NEW instance each time!\n\nThis defeats the caching purpose. Should use @@_content_sanitizer instead.",
+  "id": "fetcherc-aew",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "EntryFactory sanitize_content_html creates new sanitizer on every call",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:31Z"
+}
