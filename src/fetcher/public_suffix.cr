@@ -46,19 +46,20 @@ module Fetcher
       labels = domain.split('.')
       matches = [] of String
 
-      (0...labels.size).each do |i|
-        tail = labels[i..-1].join('.')
-        if @@exception.includes?(tail)
-          matches << "!#{tail}"
+      # Build suffix incrementally to avoid O(n^2) string allocation
+      suffix_parts = [] of String
+      (labels.size - 1).step(to: 0, by: -1) do |start|
+        suffix = labels[start..-1].join('.')
+        suffix_parts.unshift(suffix)
+
+        if @@exception.includes?(suffix)
+          matches << "!#{suffix}"
         end
-        if @@exact.includes?(tail)
-          matches << tail
+        if @@exact.includes?(suffix)
+          matches << suffix
         end
-        if i + 1 < labels.size
-          wildcard_tail = labels[(i + 1)..-1].join('.')
-          if @@wildcard.includes?(wildcard_tail)
-            matches << "*.#{wildcard_tail}"
-          end
+        if start > 0 && @@wildcard.includes?(labels[start + 1..-1].join('.'))
+          matches << "*.#{labels[start + 1..-1].join('.')}"
         end
       end
 
