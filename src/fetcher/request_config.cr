@@ -34,6 +34,12 @@ module Fetcher
     max_size : Int32 = 1000,
     default_ttl : Time::Span = Cache::DEFAULT_TTL
 
+  # Content extraction configuration
+  # strip_entry_content: if true, entry HTML content is not extracted/parsed.
+  #   Saves memory when only metadata (title, url, published_at) is needed.
+  record ContentConfig,
+    strip_entry_content : Bool = false
+
   # Redirect security configuration
   # allow_external: if false (default), redirects to external domains are blocked
   # allowed_domains: optional allowlist of specific domains for external redirects
@@ -66,6 +72,7 @@ module Fetcher
     getter streaming : StreamingConfig
     getter cache_config : CacheConfig
     getter dns : DnsConfig
+    getter content : ContentConfig
     getter redirect : RedirectConfig
     getter max_redirects : Int32
     getter? follow_redirects : Bool
@@ -96,6 +103,7 @@ module Fetcher
       @streaming : StreamingConfig = StreamingConfig.new,
       @cache_config : CacheConfig = CacheConfig.new,
       @dns : DnsConfig = DnsConfig.new,
+      @content : ContentConfig = ContentConfig.new,
       @redirect : RedirectConfig = RedirectConfig.new,
       @max_redirects : Int32 = 5,
       @follow_redirects : Bool = true,
@@ -137,6 +145,7 @@ module Fetcher
         streaming: @streaming,
         cache_config: @cache_config,
         dns: @dns,
+        content: @content,
         redirect: @redirect,
         max_redirects: @max_redirects,
         follow_redirects: @follow_redirects,
@@ -170,6 +179,7 @@ module Fetcher
         streaming: @streaming,
         cache_config: @cache_config,
         dns: @dns,
+        content: @content,
         redirect: new_redirect,
         max_redirects: @max_redirects,
         follow_redirects: @follow_redirects,
@@ -185,6 +195,12 @@ module Fetcher
         reddit_username: @reddit_username,
         reddit_password: @reddit_password
       )
+    end
+
+    # Close resources held by this config, including the Cache owner fiber.
+    # Call this when the config is no longer needed to prevent fiber leaks.
+    def close : Nil
+      @cache_instance.try(&.close)
     end
   end
 end

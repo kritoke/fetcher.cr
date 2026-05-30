@@ -16,9 +16,11 @@ module Fetcher
     record MaxSizeSetMsg, value : Int32
     record MaxSizeGetMsg, reply : Channel(Int32)
     record CleanupMsg
+    record StopMsg
 
     @cleanup_proc : Proc(Nil)?
     @cleanup_registered : Bool
+    @stopped : Bool = false
 
     def initialize(max_size : Int32 = 1000, enabled : Bool = true)
       @cmd = Channel(GetMsg | SetMsg | ClearMsg | ClearByPrefixMsg | StatsMsg | EnabledSetMsg | EnabledGetMsg | MaxSizeSetMsg | MaxSizeGetMsg | CleanupMsg).new
@@ -49,13 +51,37 @@ module Fetcher
 
     private def run_owner_fiber
       loop do
+        # Exit if stopped
+        break if @stopped
+
         begin
-          loop { handle_message }
+          loop do
+            # Check stopped flag between messages
+            break if @stopped
+            msg = @cmd.receive
+            dispatch_message(msg)
+            # Exit if stopped
+            break if @stopped
+          end
         rescue ex
           ::Log.for("fetcher").error { "CacheStore owner fiber crashed: #{ex.class} - #{ex.message} (restarting)" }
           ::sleep(10.milliseconds)
         end
       end
+    rescue ex
+      ::Log.for("fetcher").error { "CacheStore owner fiber terminated: #{ex.class} - #{ex.message}" }
+    end
+
+    # Gracefully stop the owner fiber and unregister cleanup.
+    # Call this when RequestConfig is no longer needed.
+    def close : Nil
+      @cmd.send(StopMsg.new)
+      unregister_cleanup
+    end
+
+    private def unregister_cleanup : Nil
+      return unless @cleanup_registered && @cleanup_proc
+      PeriodicCleanup.unregister_cleanup { @cleanup_proc.try(&.call) }
     end
 
     private def handle_message
@@ -79,7 +105,12 @@ module Fetcher
       when MaxSizeSetMsg    then handle_max_size_set(msg.value)
       when MaxSizeGetMsg    then handle_max_size_get(msg.reply)
       when CleanupMsg       then handle_cleanup
+      when StopMsg          then handle_stop
       end
+    end
+
+    private def handle_stop : Nil
+      @stopped = true
     end
     private def handle_enabled_set(value : Bool) : Nil
       @enabled = value

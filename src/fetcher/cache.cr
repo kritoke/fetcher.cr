@@ -159,6 +159,12 @@ module Fetcher
       @store.max_size = value
     end
 
+    # Close the underlying CacheStore, stopping its owner fiber.
+    # Call this when the cache instance is no longer needed.
+    def close : Nil
+      @store.close
+    end
+
     {% for method, ret in {
                             "get"             => "Result?",
                             "clear"           => "Void",
