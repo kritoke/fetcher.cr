@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T19:51:57Z",
   "created": "2026-05-30T19:39:22Z",
   "description": "check_xxe_risk reads only 8192 bytes. A crafted XML could place DOCTYPE/entity after the 8KB boundary to bypass detection.\n\nNote: parse_xml uses NONET which provides some protection, but streaming parser path is vulnerable.\n\nFix: Either parse full stream with safe config, or increase inspection window and document limitation.",
   "id": "fetcherc-jzl",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "XXE check only inspects first 8KB - bypass possible with payload after boundary",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:22Z"
+  "updated_at": "2026-05-30T19:51:57Z"
 }
