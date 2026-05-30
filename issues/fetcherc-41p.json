@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:22Z",
+  "description": "handle_message wraps @cmd.receive + dispatch_message but is never called. run_owner_fiber calls dispatch_message directly.\n\nFix: Remove the unused method.",
+  "id": "fetcherc-41p",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "CacheStore handle_message method defined but never called",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:22Z"
+}
