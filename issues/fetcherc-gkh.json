@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T18:35:40Z",
+  "description": "Entry.content holds the entire HTML/text content of feed items (20-200KB per entry).\n\nImpact: 100+ entries x 50KB = 5-10MB spike per feed. 50 concurrent feeds = 250-500MB peak allocation.\n\nRoot cause: Entry.record includes `content : String = \"\"` and EntryFactory.sanitize(content) creates additional String allocations.\n\nSuggested fixes:\n1. Add `strip_content : Bool = false` parameter to Entry.create and parsers\n2. Add `include_content : Bool = true` config flag to RequestConfig\n3. Use lazy content with Proc(String)\n\nStatus: Needs investigation and implementation.",
+  "id": "fetcherc-gkh",
+  "labels": [],
+  "priority": 0,
+  "status": "open",
+  "title": "Entry.content holds full HTML strings causing memory spikes",
+  "type": "task",
+  "updated_at": "2026-05-30T18:35:40Z"
+}
