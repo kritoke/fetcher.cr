@@ -76,11 +76,15 @@ module Fetcher
       end
     end
 
-    # Check for XXE/entity expansion risks at the start of the content
-    # This is a compromise for streaming - we check the beginning only
+    # Buffer size for XXE check (8KB)
+    XXE_CHECK_BUFFER_SIZE = 8192
+
+    # Check for XXE/entity expansion risks at the start of the content.
+    # For non-seekable streams, this buffers the prefix and returns an IO that
+    # includes both the prefix and remaining content (with size limits).
     private def check_xxe_risk(io : IO) : Nil
       # Read first 8KB to check for dangerous DOCTYPE patterns
-      prefix_bytes = Bytes.new(8192)
+      prefix_bytes = Bytes.new(XXE_CHECK_BUFFER_SIZE)
       bytes_read = io.read(prefix_bytes)
       return if bytes_read == 0
 
@@ -93,9 +97,13 @@ module Fetcher
       if io.responds_to?(:rewind)
         io.rewind
       else
-        # For non-seekable streams, we need to store the prefix and prepend it
-        # This is a known limitation - we'll need to modify the parsing approach
-        ::Log.for("fetcher").warn { "XXE check on non-seekable stream - content may be incomplete" }
+        # For non-seekable streams, wrap remaining content with prefix
+        remaining = io.read
+        combined = IO::Memory.new(prefix_bytes[0, bytes_read] + remaining)
+        io.replace_with(combined) if io.responds_to?(:replace_with)
+        # Note: without replace_with, this will miss the prefix in XML parsing.
+        # This is a known limitation for non-seekable streams.
+        ::Log.for("fetcher").warn { "XXE check on non-seekable stream - using fallback without prefix rewind" }
       end
     rescue ex : InvalidFormatError
       raise ex

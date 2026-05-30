@@ -6,25 +6,15 @@ module Fetcher
   # All parsed times are normalized to UTC to avoid location mismatches and ensure
   # consistent comparison behavior.
   module TimeParser
-    # Upper bound for feed timestamps. Feeds with timestamps above this are
-    # returned as-is (no clamping) — the clamp only applies to parsed times.
-    # Set to 24 hours from now to handle feeds with slight clock drift while
-    # not accepting clearly incorrect future dates.
-    FUTURE_BOUND = Time.utc + 24.hours
-
     # Pre-compiled regexes to avoid repeated compilation in hot path
     FALLBACK_DATE_PATTERN = /\d{4}-\d{2}-\d{2}$/
     FALLBACK_DATETIME_PATTERN = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
 
-    # Normalize a Time to UTC. This ensures:
-    # - Consistent location for comparisons (UTC vs +00:00 are equal after normalization)
-    # - Future times from feeds (clock skew, bad data) are clamped to a sensible upper bound
-    #   to prevent entries appearing in the future based on feed timestamps.
+    # Normalize a Time to UTC. This ensures consistent location for comparisons
+    # (UTC vs +00:00 are equal after normalization).
     def self.normalize(time : Time?) : Time?
       return unless time
-      normalized = time.to_utc
-      return normalized unless normalized > FUTURE_BOUND
-      normalized
+      time.to_utc
     end
 
     # Parse time from various feed date formats, returning UTC-normalized Time.

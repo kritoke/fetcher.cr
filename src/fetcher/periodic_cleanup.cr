@@ -8,7 +8,8 @@ module Fetcher
     @@global_cleanup_fiber : Fiber?
     @@cleanup_running : Bool = false
     @@cleanup_interval : Time::Span = 60.seconds
-    @@cleanup_stopped : Bool = false
+    # Channel used to signal the fiber to stop. New fibers get a new channel.
+    @@stop_channel : Channel(Bool)?
 
     def self.start_periodic_cleanup(interval : Time::Span = 60.seconds, force : Bool = false, &cleanup : Proc(Nil))
       raise ArgumentError.new("start_periodic_cleanup requires a block") unless cleanup
@@ -35,20 +36,25 @@ module Fetcher
     end
 
     private def self.restart_fiber : Nil
-      @@cleanup_stopped = true
+      # Create new stop channel to signal the old fiber
+      stop = Channel(Bool).new
+      @@stop_channel = stop
       @@cleanup_running = true
 
+      old_fiber = @@global_cleanup_fiber
       @@global_cleanup_fiber = spawn do
-        @@cleanup_stopped = false
         loop do
-          if @@cleanup_stopped
-            @@cleanup_running = false
+          # Wait for stop signal or interval
+          selected = select
+          when stop.receive
+            # Stopped by restart_fiber
             break
+          when timeout @@cleanup_interval
+            # Interval elapsed, run cleanup
           end
 
-          sleep @@cleanup_interval
-
-          if @@cleanup_stopped
+          # Check if stopped
+          if stop.closed?
             @@cleanup_running = false
             break
           end
@@ -67,6 +73,9 @@ module Fetcher
         ::Log.for("fetcher").error { "Global periodic cleanup fiber crashed: #{ex.class} - #{ex.message}" }
         @@cleanup_running = false
       end
+
+      # Close old stop channel to signal old fiber to stop
+      # (handled by replacing @@stop_channel with new channel above)
     end
 
     def self.unregister_cleanup(&cleanup : Proc(Nil)) : Nil

@@ -334,17 +334,18 @@ module Fetcher
       end
     end
 
-    # Enforce size limit by removing oldest entries when at capacity
+    # Eviction buffer - remove this many entries above capacity
+    DNS_EVICTION_BUFFER = 100
+
+    # Enforce size limit by randomly evicting entries when at capacity
+    # Uses random eviction instead of LRU sorting to avoid O(n log n) overhead
     def self.enforce_dns_limit : Nil
       return unless @@dns_cache.size >= @@dns_max_entries
-      # Sort by expires (oldest first) and remove 10% to avoid repeated evictions
-      excess = (@@dns_cache.size * 0.1).to_i32.clamp(1, @@dns_cache.size)
-      sorted = @@dns_cache.to_a.sort_by { |_, entry| entry[:expires] }
-      excess.times do
-        if entry = sorted.shift?
-          host, _ = entry
-          @@dns_cache.delete(host)
-        end
+      # Randomly evict entries to stay within max + buffer
+      target_size = @@dns_max_entries + DNS_EVICTION_BUFFER
+      while @@dns_cache.size > target_size
+        key = @@dns_cache.keys.sample
+        @@dns_cache.delete(key) if key
       end
     end
 

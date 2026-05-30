@@ -60,30 +60,39 @@ module Fetcher
       end
 
       # Collect results with timeout to prevent hanging everlasting
-      deadline = Time.monotonic + timeout
+      deadline = Time.utc + timeout
       received = 0
-      timed_out = false
+      timeout_channel = Channel(Bool).new
 
-      while received < urls.size && !timed_out
-        message = results.receive?
-        if message.nil?
-          # Channel closed or timeout
-          break
-        end
+      # Spawn timeout notifier
+      spawn do
+        sleep timeout
+        timeout_channel.send(true)
+      end
 
-        index, outcome = message
-        result_array[index] = case outcome
-                              when Result
-                                outcome
-                              when Exception
-                                Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class}: #{outcome.message}")
-                              end
-        received += 1
+      loop do
+        break if received >= urls.size
 
-        # Check timeout
-        if Time.monotonic > deadline
+        # Use select to check for results or timeout
+        selected = select
+        when result = results.receive?
+          if result
+            index, outcome = result
+            result_array[index] = case outcome
+                                  when Result
+                                    outcome
+                                  when Exception
+                                    Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class}: #{outcome.message}")
+                                  end
+            received += 1
+          else
+            # Channel closed - no more results
+            break
+          end
+        when timeout_channel.receive
+          # Timeout fired
           ::Log.for("fetcher").warn { "Concurrent fetch timed out after #{timeout}, returning #{received}/#{urls.size} results" }
-          timed_out = true
+          break
         end
       end
 

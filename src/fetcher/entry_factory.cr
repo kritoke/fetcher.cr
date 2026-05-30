@@ -63,8 +63,7 @@ module Fetcher
     private def self.sanitize_content_html(html : String?) : String?
       return if html.nil? || html.empty?
       begin
-        sanitizer = Sanitize::Policy::HTMLSanitizer.common
-        result = sanitizer.process(html).to_s
+        result = @@_content_sanitizer.process(html).to_s
         result.presence
       rescue ex
         ::Log.for("fetcher").warn { "HTML sanitization of content_html failed: #{ex.message}" }
