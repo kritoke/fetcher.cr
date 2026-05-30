@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T18:35:40Z",
+  "description": "Each store creates a Proc(Nil) that captures self and registers with PeriodicCleanup.\n\nIf a store instance is abandoned, the proc in @@registered_cleanups still holds a reference.\n\nStatus: Theoretical issue - stores are typically singletons. Acceptable tradeoff for typical usage.",
+  "id": "fetcherc-db4",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "PeriodicCleanup Proc retain cycles prevent GC of abandoned stores",
+  "type": "task",
+  "updated_at": "2026-05-30T18:35:40Z"
+}
