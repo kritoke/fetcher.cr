@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T19:51:56Z",
   "created": "2026-05-30T19:39:22Z",
   "description": "enforce_dns_limit() converts entire @@dns_cache to array and sorts by expiry on every insert when full.\n\nWith 10,000 entries this is O(n log n) under a mutex lock, blocking all DNS operations.\n\nFix: Use a min-heap or ordered Deque to track expiry order efficiently, or use random eviction instead of LRU for DNS cache.",
   "id": "fetcherc-g0l",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "DNS cache eviction does O(n log n) sort on every insert under mutex",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:22Z"
+  "updated_at": "2026-05-30T19:51:56Z"
 }
