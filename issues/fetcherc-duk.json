@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:14Z",
+  "description": "pull_multiple timeout check happens only after receiving from results channel.\n\nProblem: If all concurrent fetches hang, results.receive? blocks indefinitely. Timeout never triggers.\n\nFix: Use select with timeout channel to enforce deadline on each receive, not just between results.",
+  "id": "fetcherc-duk",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "ConcurrentFetcher timeout is racy - hangs if all workers block",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:14Z"
+}
