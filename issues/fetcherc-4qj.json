@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:28Z",
+  "description": "First call to get_public_suffix reads public_suffix.dat inside a mutex, blocking all threads during file I/O.\n\nImpact: First URL validation is slow if file not pre-loaded.\n\nFix: Load eagerly at startup or use lazy non-blocking initialization.",
+  "id": "fetcherc-4qj",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "PublicSuffix.load_rules reads file synchronously blocking all threads",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:28Z"
+}
