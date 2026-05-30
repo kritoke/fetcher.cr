@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T19:39:34Z",
+  "description": "begin/rescue catches all exceptions and returns false. If Entry record has mutable last_accessed, errors are silently swallowed.\n\nIf record is immutable (compile-time error), this is dead code. Either remove rescue or verify mutability.",
+  "id": "fetcherc-ywi",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "BoundedRegistry.mark_access swallows all exceptions - potential silent corruption",
+  "type": "task",
+  "updated_at": "2026-05-30T19:39:34Z"
+}
