@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T22:43:58Z",
   "created": "2026-05-30T18:35:40Z",
   "description": "RSSParser.parse_xml builds the full DOM in memory for each feed. For large feeds with enclosures or CDATA, the DOM can be several MB.\n\nStatus: Known limitation. Streaming parsers (XMLStreamingParser, StreamingRSSParser) exist as alternative.",
   "id": "fetcherc-wak",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "XML Document retention during feed parsing",
   "type": "task",
-  "updated_at": "2026-05-30T18:35:40Z"
+  "updated_at": "2026-05-30T22:43:58Z"
 }
