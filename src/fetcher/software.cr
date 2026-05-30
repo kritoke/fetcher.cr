@@ -146,12 +146,21 @@ module Fetcher
       false
     end
 
+    # Pre-compiled patterns for repo extraction (using %r for cleaner regex)
+    GITHUB_REPO_PATTERN = %r{https://(?:www\.)?github\.com/([^/]+/[^/]+)/?}
+    CODEBERG_REPO_PATTERN = %r{https://(?:www\.)?codeberg\.org/([^/]+/[^/]+)/?}
+
     private def self.extract_repo(url : String, domain : String) : String?
       # Safety: reject URLs that are too long to prevent potential ReDoS
       return nil if url.bytesize > 500
 
-      pattern = "#{domain}/([^/]+/[^/]+)/?"
-      match = url.match(Regex.new(pattern))
+      pattern = case domain
+                when "github.com" then GITHUB_REPO_PATTERN
+                when "codeberg.org" then CODEBERG_REPO_PATTERN
+                else
+                  Regex.new("#{Regex.escape(domain)}/([^/]+/[^/]+)/?")
+                end
+      match = url.match(pattern)
       match ? match[1] : nil
     end
 
