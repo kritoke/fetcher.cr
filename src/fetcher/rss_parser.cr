@@ -7,6 +7,7 @@ require "./author"
 require "./attachment"
 require "./safe_feed_processor"
 require "./link_resolver"
+require "./entity_expansion_guard"
 
 module Fetcher
   # Helper module for XML node operations to reduce message chains
@@ -116,39 +117,11 @@ module Fetcher
     # Detect patterns that could cause exponential entity expansion (billion laughs / XML bomb)
     # Reject DOCTYPE with internal subset entirely, as well-formed feeds don't need them.
     private def check_entity_expansion_risk(content : String) : Nil
-      # Use uppercase for case-insensitive comparison
-      upper = content.upcase
-
-      # Reject DOCTYPE with internal subset - common vector for entity expansion attacks
-      if upper.includes?("<!DOCTYPE") && upper.includes?("[")
-        raise InvalidFormatError.new("DOCTYPE with internal subset not allowed (entity expansion risk)")
-      end
-
-      # Check for parameter entities which are also dangerous
-      if upper.scan(/<!ENTITY\s+%/i).size > 0
-        raise InvalidFormatError.new("Parameter entity declarations not allowed")
-      end
-
-      # Check for external entity declarations (SYSTEM keyword)
-      if upper.includes?("<!ENTITY") && upper.includes?("SYSTEM")
-        raise InvalidFormatError.new("External entity declarations not allowed")
-      end
-
-      # Check entity definition count
-      entity_count = count_entity_definitions(content)
-      if entity_count > MAX_ENTITY_DEFINITIONS
-        raise InvalidFormatError.new("Too many entity definitions (#{entity_count})")
-      end
-    rescue ex : InvalidFormatError
-      raise ex  # Re-raise our own errors
-    rescue
-      # Ignore unexpected errors during the check (e.g., regex failures)
+      EntityExpansionGuard.check(content, MAX_ENTITY_DEFINITIONS)
     end
 
     private def count_entity_definitions(content : String) : Int32
-      count = 0
-      content.scan(/<!ENTITY\s+\w+\s+[^>]*>/i) { count += 1 }
-      count
+      EntityExpansionGuard.count_entity_definitions(content)
     end
 
     private def parse_rss(xml : XML::Node, limit : Int32, strip_content : Bool) : Array(Entry)

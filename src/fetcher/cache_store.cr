@@ -84,11 +84,6 @@ module Fetcher
       PeriodicCleanup.unregister_cleanup { @cleanup_proc.try(&.call) }
     end
 
-    private def handle_message
-      msg = @cmd.receive
-      dispatch_message(msg)
-    end
-
     # Named handlers for testability
     # NOTE: The case statement dispatches to named handler methods. While it has
     # 10 branches, this is intentional — message types are stable, and each branch

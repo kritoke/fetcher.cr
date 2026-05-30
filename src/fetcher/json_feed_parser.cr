@@ -98,8 +98,8 @@ module Fetcher
 
     private def resolve_item_url(item : JSON::Any, id : String) : String
       url_candidate = item["url"]?.try(&.as_s)
-      return "#" unless url_candidate
-      URLValidator.valid?(url_candidate) ? url_candidate : "#"
+      return URLValidator.valid?(id) ? id : "#" unless url_candidate
+      URLValidator.valid?(url_candidate) ? url_candidate : (URLValidator.valid?(id) ? id : "#")
     end
 
     private def extract_item_content(item : JSON::Any) : String

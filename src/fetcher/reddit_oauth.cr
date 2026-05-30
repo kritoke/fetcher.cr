@@ -18,9 +18,9 @@ module Fetcher
       # Absolute timestamp when the token expires
       expires_at : Time
 
-    @@cached_token : CachedToken? = nil
+    # Token storage keyed by client_id to support multi-tenant usage
+    @@token_cache = {} of String => CachedToken
     @@mutex = Mutex.new
-    @@acquired_at : Time? = nil
 
     def self.get_token(config : RequestConfig) : String?
       client_id = config.reddit_client_id
@@ -34,9 +34,9 @@ module Fetcher
       end
 
       @@mutex.synchronize do
-        if (cached = @@cached_token) && !token_expired?(cached)
+        if (cached = @@token_cache[client_id]?) && !token_expired?(cached)
           remaining = (cached.expires_at - Time.utc).to_i
-          Log.debug { "Using cached Reddit OAuth token (expires in #{remaining}s)" }
+          Log.debug { "Using cached Reddit OAuth token for #{client_id} (expires in #{remaining}s)" }
           return cached.access_token
         end
 
@@ -45,8 +45,16 @@ module Fetcher
     end
 
     def self.clear_token : Nil
+      clear_token(nil)
+    end
+
+    def self.clear_token(client_id : String?) : Nil
       @@mutex.synchronize do
-        @@cached_token = nil
+        if client_id
+          @@token_cache.delete(client_id)
+        else
+          @@token_cache.clear
+        end
       end
     end
 
@@ -98,12 +106,12 @@ module Fetcher
       access_token = parsed["access_token"].as_s
       expires_in = parsed["expires_in"]?.try(&.as_i) || 3600
 
-      @@cached_token = CachedToken.new(
+      @@token_cache[client_id] = CachedToken.new(
         access_token: access_token,
         expires_at: Time.utc + expires_in.seconds
       )
 
-      Log.info { "Reddit OAuth token acquired, expires in #{expires_in}s" }
+      Log.info { "Reddit OAuth token acquired for #{client_id}, expires in #{expires_in}s" }
       access_token
     rescue ex : JSON::ParseException
       Log.error { "Failed to parse Reddit OAuth response: #{ex.message}" }

@@ -6,6 +6,7 @@ require "./entry_parser"
 require "./streaming_rss_parser"
 require "./xml_text_reader"
 require "./exceptions"
+require "./entity_expansion_guard"
 
 module Fetcher
   # Maximum entity definitions allowed before suspecting entity expansion attack
@@ -113,29 +114,8 @@ module Fetcher
 
     # Perform XXE/entity expansion checks on content
     private def perform_xxe_check(content : String) : Nil
-      # Use uppercase for case-insensitive comparison
-      upper = content.upcase
-
-      # Reject DOCTYPE with internal subset
-      if upper.includes?("<!DOCTYPE") && upper.includes?("[")
-        raise InvalidFormatError.new("DOCTYPE with internal subset not allowed (entity expansion risk)")
-      end
-
-      # Check for parameter entities
-      if upper.scan(/<!ENTITY\s+%/i).size > 0
-        raise InvalidFormatError.new("Parameter entity declarations not allowed")
-      end
-
-      # Check for external entity declarations (SYSTEM keyword)
-      if upper.includes?("<!ENTITY") && upper.includes?("SYSTEM")
-        raise InvalidFormatError.new("External entity declarations not allowed")
-      end
-
-      # Check entity count
-      entity_count = content.scan(/<!ENTITY\s+\w+\s+[^>]*>/i).size
-      if entity_count > MAX_ENTITY_DEFINITIONS * 2
-        raise InvalidFormatError.new("Too many entity definitions in header")
-      end
+      # Streaming parser uses 2x threshold to account for more lenient parsing
+      EntityExpansionGuard.check(content, MAX_ENTITY_DEFINITIONS * 2)
     end
   end
 

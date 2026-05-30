@@ -1,5 +1,6 @@
 require "log"
 require "time"
+require "./registry_helpers"
 
 module Fetcher
   module BoundedRegistry
@@ -14,16 +15,21 @@ module Fetcher
       end
     end
 
+    # Mark an entry as accessed by updating its last_accessed time.
+    # Returns true if the entry exists and was updated, false otherwise.
+    # Note: Works with entries that have mutable `last_accessed` property.
     def self.mark_access(entries : Hash(String, T), key : String) : Bool forall T
       if entry = entries[key]?
         begin
           entry.last_accessed = Time.utc
-          return true
+          true
         rescue ex
           Log.debug { "BoundedRegistry mark_access failed: #{ex.message}" }
+          false
         end
+      else
+        false
       end
-      false
     end
   end
 end
