@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T20:12:34Z",
   "created": "2026-05-30T19:39:22Z",
   "description": "@@cached_token, @@acquired_at are class variables shared globally. If two RequestConfig instances have different Reddit credentials, they share/mix tokens.\n\nFix: Store tokens per client_id (Hash keyed by client_id).",
   "id": "fetcherc-g71",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "RedditOAuth token shared globally - breaks multi-tenant usage",
   "type": "task",
-  "updated_at": "2026-05-30T19:39:22Z"
+  "updated_at": "2026-05-30T20:12:34Z"
 }
