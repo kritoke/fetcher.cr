@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T19:10:32Z",
   "created": "2026-05-30T18:55:59Z",
   "description": "DNS cache has no max-size cap unlike RateLimiterStore/CircuitBreakerStore.\n\nRisk: Burst of unique domains in 60s window (before cleanup cycle) causes unbounded memory growth.\n\nFix: Add max_entries cap to @@dns_cache with eviction in cache_dns(), mirroring RateLimiterStore pattern.",
   "id": "fetcherc-xx4",
   "labels": [],
   "priority": 1,
-  "status": "open",
+  "status": "closed",
   "title": "CrestHttpClient DNS cache unbounded growth between cleanup cycles",
   "type": "task",
-  "updated_at": "2026-05-30T18:55:59Z"
+  "updated_at": "2026-05-30T19:10:32Z"
 }
