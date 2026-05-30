@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T20:12:41Z",
   "created": "2026-05-30T18:56:01Z",
   "description": "restart_fiber sets @@cleanup_stopped = true and spawns new fiber without joining old one.\n\nOld fiber may still be sleeping for up to cleanup_interval seconds. Multiple overlapping fibers can exist under rapid re-registration.\n\nFix: Await or cancel old fiber before spawning new one, or use generation counter to invalidate immediately.",
   "id": "fetcherc-shb",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "PeriodicCleanup fiber restart race can spawn overlapping fibers",
   "type": "task",
-  "updated_at": "2026-05-30T18:56:01Z"
+  "updated_at": "2026-05-30T20:12:41Z"
 }
