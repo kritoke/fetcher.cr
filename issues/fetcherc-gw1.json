@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-05-30T18:35:40Z",
+  "description": "Waiter array grows with every acquire call when tokens are insufficient, bounded by @max_waiters (default 1000).\n\nStatus: Acceptable - bounded by max_waiters. Document as expected behavior.",
+  "id": "fetcherc-gw1",
+  "labels": [],
+  "priority": 4,
+  "status": "open",
+  "title": "TokenBucketRateLimiter waiter array growth under burst load",
+  "type": "task",
+  "updated_at": "2026-05-30T18:35:40Z"
+}
