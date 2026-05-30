@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T20:12:43Z",
   "created": "2026-05-30T18:35:40Z",
   "description": "Each Entry record allocates fresh Array(String) and Array(Attachment) instances even when empty (~16 bytes x 2 x n entries).\n\nImpact: ~320KB for 10,000 entries with no categories/attachments.\n\nStatus: Nice to have, not critical.",
   "id": "fetcherc-kpt",
   "labels": [],
   "priority": 4,
-  "status": "open",
+  "status": "closed",
   "title": "Entry.categories and attachments allocate empty arrays per entry",
   "type": "task",
-  "updated_at": "2026-05-30T18:35:40Z"
+  "updated_at": "2026-05-30T20:12:43Z"
 }
