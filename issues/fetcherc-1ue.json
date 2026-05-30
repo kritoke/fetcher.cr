@@ -2,13 +2,14 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-05-30T20:12:43Z",
   "created": "2026-05-30T18:55:59Z",
   "description": "@@acquired_at is declared but never assigned or read. Should track token age for proactive refresh but logic is missing.\n\nLow leak risk (single token), but dead state suggests incomplete implementation.\n\nFix: Remove @@acquired_at or implement its intended purpose.",
   "id": "fetcherc-1ue",
   "labels": [],
   "priority": 3,
-  "status": "open",
+  "status": "closed",
   "title": "RedditOAuth @@acquired_at field never used - incomplete token age tracking",
   "type": "task",
-  "updated_at": "2026-05-30T18:55:59Z"
+  "updated_at": "2026-05-30T20:12:43Z"
 }
