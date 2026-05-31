@@ -11,7 +11,7 @@ module Fetcher
         return if response.status_code == 404
         return unless (200..299).includes?(response.status_code)
 
-        entries = parse_atom_entries(response.body, provider.source_type, limit)
+        entries = parse_atom_entries(response.body, provider.source_type, limit, provider.repo_name)
         return if entries.empty?
 
         Result.builder
@@ -30,14 +30,15 @@ module Fetcher
         nil
       end
 
-      def self.parse_atom_entries(body : String, source_type : SourceType, limit : Int32) : Array(Entry)
+      def self.parse_atom_entries(body : String, source_type : SourceType, limit : Int32, repo_name : String? = nil) : Array(Entry)
         parser = RSSParser.new
         entries = parser.parse_entries(body, limit)
         entries.map do |entry|
           version = entry.version || extract_version(entry.title)
           link_data = LinkResolver.resolve_from_url(entry.url)
+          title = normalize_atom_title(entry.title, repo_name)
           Entry.create(
-            title: entry.title,
+            title: title,
             url: entry.url,
             source_type: source_type,
             content: entry.content,
@@ -59,6 +60,20 @@ module Fetcher
 
       private def self.headers_for(url : String) : ::HTTP::Headers
         Fetcher::CrestHttpClient.build_headers(::HTTP::Headers.new)
+      end
+
+      # Normalize Atom feed titles to match API-style format: "repo_name version"
+      # Atom feeds often have bare version titles like "0.5.0" while the API returns "luce 0.5.0"
+      private def self.normalize_atom_title(title : String, repo_name : String?) : String
+        return title unless repo_name
+        # If the title is already prefixed with the repo name, keep as-is
+        return title if title.downcase.starts_with?(repo_name.downcase)
+        # If the title looks like a bare version, prefix with repo name
+        if title.matches?(/^v?\d+/)
+          "#{repo_name} #{title}"
+        else
+          title
+        end
       end
 
       private def self.extract_version(title : String) : String?

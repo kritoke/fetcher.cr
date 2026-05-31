@@ -8,34 +8,59 @@ module Fetcher
   module Software
     module GitHub
       def self.pull_releases(provider : SoftwareProvider, headers : ::HTTP::Headers, limit : Int32, config : RequestConfig) : Result
-        github_headers = ::HTTP::Headers.new
-        github_headers["Accept"] = "application/vnd.github.v3+json"
-        merged = Fetcher::CrestHttpClient.build_headers(github_headers)
-
         http_client = Fetcher::CrestHttpClient.new(config)
-        response = http_client.get(provider.api_url, merged)
 
-        ErrorHandler.handle_response(response, provider.api_url) do
-          releases = parse_json(response.body, provider.api_url)
-          stable_releases = releases.reject { |release| ReleaseHelpers.prerelease?(release) }
+        # Try REST API first
+        result = try_api(provider, limit, http_client)
+        return result if result && result.success? && !result.entries.empty?
 
-          entries = stable_releases.first(limit).map do |release|
-            parse_entry(release, provider)
-          end
+        # API failed, rate-limited (403), or returned empty — fall back to Atom feed
+        atom_result = Software.try_atom_fallback(provider, limit, http_client, Fetcher::CrestHttpClient.build_headers(headers))
+        return atom_result if atom_result && atom_result.success?
 
-          Result.builder
-            .entries(entries)
-            .etag(response.headers["ETag"]?)
-            .last_modified(response.headers["Last-Modified"]?)
-            .site_link("#{provider.base_url}/#{provider.repo}")
-            .favicon("#{provider.base_url}/favicon.ico")
-            .build
-        end
-      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error
+        # Return the original API result (even if it was an error)
+        result || Fetcher.error_result(ErrorKind::HTTPError, "GitHub fetch error: No releases found", 404)
+      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError
         ErrorHandler.handle_network_error(ex, provider.api_url)
       rescue ex
         Log.warn { "Unexpected error in GitHub fetch: #{ex.class} - #{ex.message}" }
         ErrorHandler.handle_network_error(ex, provider.api_url)
+      end
+
+      private def self.try_api(provider : SoftwareProvider, limit : Int32, http_client : CrestHttpClient) : Result?
+        github_headers = ::HTTP::Headers.new
+        github_headers["Accept"] = "application/vnd.github.v3+json"
+        merged = Fetcher::CrestHttpClient.build_headers(github_headers)
+
+        response = http_client.get(provider.api_url, merged)
+
+        return nil if response.status_code == 404
+        return nil unless (200..299).includes?(response.status_code)
+
+        releases = parse_json(response.body, provider.api_url)
+        stable_releases = releases.reject { |release| ReleaseHelpers.prerelease?(release) }
+
+        entries = stable_releases.first(limit).map do |release|
+          parse_entry(release, provider)
+        end
+
+        Result.builder
+          .entries(entries)
+          .etag(response.headers["ETag"]?)
+          .last_modified(response.headers["Last-Modified"]?)
+          .site_link("#{provider.base_url}/#{provider.repo}")
+          .favicon("#{provider.base_url}/favicon.ico")
+          .build
+      rescue ex : JSON::ParseException
+        Log.debug { "GitHub API JSON parse failed, trying fallback: #{provider.api_url}" }
+        nil
+      rescue ex : OpenSSL::SSL::Error
+        raise DNSError.new("GitHub SSL error: #{ex.message}")
+      rescue ex : FetchError
+        raise ex
+      rescue ex
+        Log.warn { "GitHub API request failed, trying fallback: #{ex.class} - #{ex.message}" }
+        nil
       end
 
       private def self.parse_json(body : String, url : String) : Array(JSON::Any)
