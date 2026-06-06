@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T23:31:35Z",
+  "description": "After the refactor, add a spec asserting the public API surface still exists and behaves as expected: Fetcher::CrestHttpClient.new(cfg, validator), #head/#get, .build_headers, .with_cache, .clear_rate_limiters, .clear_dns_cache (class+instance), .clear_expired_dns, .dns_max_entries / dns_max_entries=, ::REDIRECT_STATUS_CODES, ::DNS_EVICTION_BUFFER. This guards against accidental breakage of the library contract.",
+  "id": "fetcherc-m9r.6",
+  "labels": [],
+  "parent": "fetcherc-m9r",
+  "priority": 2,
+  "status": "open",
+  "title": "Add public-API regression test for CrestHttpClient",
+  "type": "task",
+  "updated_at": "2026-06-06T23:31:35Z"
+}
