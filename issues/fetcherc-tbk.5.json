@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Bug found while reviewing src/fetcher/crest_http_client.cr:\n\n  - ensure_dns_cleanup_registered sets @@dns_cleanup_registered = true once\n    and never resets. There is no symmetric clear/teardown method.\n  - The registered Proc captures { dns_cleanup_proc.call }, which is\n    itself a Proc wrapping { clear_expired_dns }. PeriodicCleanup holds\n    the outer Proc forever, so calling clear_dns_cache or\n    @@dns_cache_registered = false does not remove the registration.\n  - Consequence: even if a future caller disables cache_enabled at\n    runtime, the periodic cleanup fiber still runs clear_expired_dns on\n    schedule, which still holds the @@dns_cache_lock. This is fine for\n    correctness but wasteful.\n\nRepro:\n\n  1. Call Fetcher::CrestHttpClient.get('http://example.com/') once (this\n     populates the cache and registers cleanup).\n  2. Construct a second client with dns: DnsConfig.new(cache_enabled: false).\n  3. Fetcher::PeriodicCleanup's registered cleanups still includes the\n     DNS proc.\n\nFix options:\n\n  A. Add a Fetcher::CrestHttpClient.unregister_dns_cleanup class method\n     and have DnsCache expose a teardown hook.\n  B. Add an at_exit hook that unregisters automatically.\n  C. Refactor: the DNS cache (per the extract ticket) should own its\n     lifecycle and call PeriodicCleanup.register_cleanup/unregister_cleanup\n     symmetrically.\n\nRecommend C, in coordination with the DnsCache extraction ticket. If the\nextraction is deferred, ship A as a follow-up.\n\nTest:\n\n  spec/dns_cache_spec.cr should gain an assertion that after\n  clear_dns_cache + a teardown call, PeriodicCleanup.registered_cleanups\n  no longer includes the DNS proc. Use the unregister introspection\n  added in #fetcherc-tbk child #1.",
+  "id": "fetcherc-tbk.5",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Fix DNS cache cleanup registration leak",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
