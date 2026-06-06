@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:25:08Z",
+  "description": "transition_domain runs after a redirect is resolved, but records_success on the target domain before the redirected request has been issued. This inflates circuit-breaker success counts on domains that haven't actually responded successfully. Either (a) move the record_success call to after perform_follow_redirect returns, or (b) rename the method to reflect what it actually does (circuit-preflight + bookkeeping on transition). Blocked by c1h.3 (redirect extraction).",
+  "id": "fetcherc-c1h.11",
+  "labels": [],
+  "parent": "fetcherc-c1h",
+  "priority": 2,
+  "status": "open",
+  "title": "Stop recording success on target before contact (transition_domain)",
+  "type": "task",
+  "updated_at": "2026-06-06T22:25:08Z"
+}
