@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:03:22Z",
+  "description": "## What\n\nValidate the whole refactor by running the project's test suite end-to-end.\n\n## How\n\n    nix develop --command just spec\n# or, depending on what `just spec` does:\n    nix develop --command crystal spec\n\n## Targets\n\n- All `spec/crest_http_client_*_spec.cr` files (the units most affected).\n- `spec/dns_cache_spec.cr` (the uncommitted require must keep working).\n- `spec/redirects_spec.cr`, `spec/redirects_psl_spec.cr`.\n- `spec/crest_http_client_rebinding_*_spec.cr`.\n- `spec/crest_http_client_error_handling_spec.cr`.\n- `spec/url_validator_ssrf_spec.cr` (uses `debug_check_ssrf` helper).\n\n## Done when\n\n- All specs pass with no edits beyond folding in the dns_cache_spec require.\n- The only commits on the branch are the refactor commits and any\n  trivial deletions/renames inside the refactor.",
+  "id": "fetcherc-c1h.8",
+  "labels": [],
+  "parent": "fetcherc-c1h",
+  "priority": 2,
+  "status": "open",
+  "title": "Run full spec suite after refactor",
+  "type": "task",
+  "updated_at": "2026-06-06T22:03:22Z"
+}
