@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Bug in src/fetcher/crest_http_client.cr handle_error (lines ~398-475):\n\n  Every handler wraps its inner error in DNSError, regardless of the\n  original cause. This makes the exception type useless for callers\n  that want to distinguish failure modes.\n\n  Current mapping:\n    URI::Error       -\u003e DNSError  (wrong: parse error, not DNS)\n    Socket::Error    -\u003e DNSError  (correct in spirit)\n    IO::TimeoutError -\u003e TimeoutError (correct)\n    OpenSSL::SSL::Error -\u003e DNSError (wrong: SSL, not DNS)\n    Crest::RequestFailed -\u003e HTTPClientError or HTTPServerError (correct)\n    other           -\u003e FetchError (correct)\n\n  The inner Error object does carry the right type (Error.invalid_url,\n  Error.dns), but the wrapper exception's *class* is DNSError, which\n  is what callers rescue on.\n\nRepro:\n\n  begin\n    client.get(\\\"http://not a valid url/\\\")\n  rescue ex : Fetcher::DNSError\n    # This catches even though the cause was a URI parse error.\n  end\n\n  Callers who want to retry on transient DNS failures will retry on\n  bad URL parse errors too.\n\nFix:\n\n  In each handler, raise the exception type that matches the *cause*:\n\n    handle_uri_error    -\u003e InvalidURLError\n    handle_socket_error -\u003e DNSError (keep)\n    handle_timeout_error -\u003e TimeoutError (keep)\n    handle_ssl_error    -\u003e SSLError (new) or DNSError with internal marker\n    handle_request_failed -\u003e HTTPError subclass (keep)\n    handle_unknown_error -\u003e FetchError (keep)\n\n  Or, more conservatively, keep DNSError but add a #cause_type getter\n  on FetchError that returns the inner Error's type, and document the\n  convention.\n\n  Recommend the first (correct exception types) since the existing\n  exceptions.cr already has InvalidURLError, TimeoutError, and the\n  HTTPError family.\n\nTest: spec/crest_http_client_error_handling_spec.cr (5KB) should gain\nassertions like `expect_raises(Fetcher::InvalidURLError)` for the URI\nparse case.",
+  "id": "fetcherc-tbk.7",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Stop using DNSError as the universal catch-all wrapper",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
