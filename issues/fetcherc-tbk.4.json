@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "After DNS cache and redirect policy are extracted, CrestHttpClient should\ncontain only:\n\n  - class state: @config, @validator, @request_semaphore, @semaphore_lock\n  - public API: head, get, build_headers, with_cache, clear_rate_limiters\n  - private: perform_request, ensure_semaphore, create_semaphore_internal,\n    acquire_semaphore, release_semaphore, build_tls_context,\n    ensure_ssl_bypass_acknowledged, convert_response\n  - DNS integration: a single call to DnsCache.check_rebinding(url) (or\n    DnsCache.instance.check_rebinding) replacing the existing\n    verify_dns_rebinding call.\n  - Redirect integration: a single call to RedirectPolicy#follow(...)\n    replacing the existing handle_redirects call.\n\nTarget line count: ~200 lines (down from 531).\n\nSpecific issues to fix in the shrunken client:\n\n  - perform_request currently has a top-level rescue chain that records\n    circuit-breaker failures for *any* error. After the split, the\n    DnsCache check happens before the circuit breaker check, so a DNS\n    error gets counted against the circuit breaker even though it was a\n    SSRF mitigation, not a server outage. Decide: should DNS rebinding\n    failures count for circuit breaking? Probably no, since the server\n    didn't fail.\n  - check_ssrf currently calls both @validator.valid?(url) and\n    @validator.resolve_and_validate(url). The latter does DNS resolution\n    and is a side effect, but if rebinding_check is on we'll do DNS\n    resolution again in verify_dns_rebinding. Combine into a single\n    pre-flight check that the new RedirectPolicy can also call.\n  - The class method clear_rate_limiters delegates to\n    RateLimiterRegistry.clear. It belongs in RateLimiterRegistry, not\n    here. Move or document.\n  - The class method build_headers delegates to HeaderBuilder.build.\n    Same - it belongs in HeaderBuilder, not here. Move.\n  - The class method with_cache is a generic HTTP helper, not specific\n    to this client. Consider whether it belongs on a separate\n    CacheHeaders helper module.\n\nTest impact:\n\n  spec/crest_http_client_spec.cr (987B) and spec/crest_http_client_di_spec.cr\n  (2KB) are the closest unit tests. After all extractions, the client should\n  be exercisable in \u003c50 lines of setup.",
+  "id": "fetcherc-tbk.4",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Shrink CrestHttpClient to request execution only",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
