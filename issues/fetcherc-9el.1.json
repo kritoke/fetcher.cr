@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:29:51Z",
+  "description": "Move class-level DNS cache state and methods out of CrestHttpClient into Fetcher::DnsCache. The cache has its own lifecycle, lock, eviction policy, and cleanup registration — none of which are HTTP concerns. Keeps the following as thin shims on CrestHttpClient to preserve public API:\n- .dns_max_entries / .dns_max_entries= (delegate)\n- .clear_dns_cache / #clear_dns_cache (delegate)\n- .clear_expired_dns (delegate)\n- .enforce_dns_limit (delegate)\n- .ensure_dns_cleanup_registered (delegate)\n\nAlso:\n- Move DNS_EVICTION_BUFFER to DnsCache\n- Move @@dns_cleanup_proc getter to DnsCache\n- Eliminate 'return unless @config.dns.cache_enabled' duplication by checking once in DnsCache.get/set\n- Make clear_dns_cache (class method) not construct a new client — call the underlying lock directly\n- Fold uncommitted spec/dns_cache_spec.cr (require support/crest_http_client_test_helpers) into this work",
+  "id": "fetcherc-9el.1",
+  "labels": [],
+  "parent": "fetcherc-9el",
+  "priority": 2,
+  "status": "open",
+  "title": "Extract DNS cache to dedicated DnsCache class",
+  "type": "task",
+  "updated_at": "2026-06-06T22:29:51Z"
+}
