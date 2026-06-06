@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Bug in src/fetcher/crest_http_client.cr transition_domain (called from\nhandle_redirects line ~187):\n\n  transition_domain(domain, target_domain) is invoked when the redirect\n  target is on a different domain. It calls:\n    - check_circuit_breaker(to_domain)\n    - record_success(to_domain)\n\n  But we have not yet contacted to_domain. The first redirect hop will\n  trigger acquire + crest_request, then record_success on the *source*\n  domain in the success path of perform_request. So:\n\n  1. The target domain's circuit breaker is checked (correct: we want\n     to know if it's open before we try).\n  2. The target domain's circuit breaker is recorded as a success\n     (wrong: we haven't made the request yet).\n\n  Effect: a flaky upstream that returns 5xx 90% of the time will be\n  recorded as healthy on every redirect into it, and the circuit\n  breaker will never trip.\n\n  The intent was probably: record_success on the *source* domain (since\n  the redirect itself means the source responded correctly). Fix:\n\n  - Either move record_success(source_domain) here, OR\n  - Remove transition_domain entirely and let the normal perform_request\n    success path record_success on source_domain (which is what already\n    happens).\n\nRepro (mock):\n\n  1. Configure a circuit breaker with failure_threshold=1.\n  2. Stub a server that 302s on /, then 500s on /target.\n  3. Set record_failure on a counter.\n  4. Observe: 302 to /target - counter is incremented (the buggy\n     record_success on the target fires once), then request to /target\n     fails, counter is incremented again. The target's circuit breaker\n     has now seen 1 success + 1 failure - it should have tripped on\n     failure_threshold=1.\n\nFix is one or two lines: change transition_domain to either take\nrecord_success(source_domain) or delete the call entirely and let\nperform_request's success path handle it.\n\nTest: extend spec/crest_http_client_redirect_spec.cr with a stub\nserver that records circuit-breaker success/failure calls and assert\nthe success counter for the target domain is zero.",
+  "id": "fetcherc-tbk.6",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Fix record_success called before target domain is contacted",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
