@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Bug in src/fetcher/crest_http_client.cr resolve_redirect_url (lines ~292-307):\n\n  ```crystal\n  rescue ex\n    if ex.is_a?(URI::Error)\n      raise ex\n    else\n      raise URI::Error.new(\\\"Invalid redirect URL: #{redirect_url}\\\")\n    end\n  end\n  ```\n\n  The outer `rescue ex` (no class qualifier) catches Exception. The\n  inner `if ex.is_a?(URI::Error)` re-raises it. The else branch raises\n  a fresh URI::Error.\n\n  In Crystal, `rescue` without a class catches StandardError, not\n  Exception. URI::Error is a StandardError subclass, so this works at\n  runtime, but the if/else is misleading: any non-URI::Error that\n  bubbles up (ArgumentError, etc.) gets converted to URI::Error,\n  losing the original type and message.\n\n  Also, the if-branch is reachable only if the URI::Error is raised\n  after the begin block - but `URI.parse` already raises URI::Error\n  directly, and the only other URI operation is `base.resolve(relative)`\n  which also raises URI::Error. The else branch is the only one that\n  ever runs in practice (when something like ArgumentError is raised\n  by String#starts_with? or by Address parsing, which doesn't happen\n  here).\n\n  Net effect: the code is *almost* equivalent to:\n\n  ```crystal\n  rescue ex : URI::Error\n    raise ex\n  rescue\n    raise URI::Error.new(\\\"Invalid redirect URL: #{redirect_url}\\\")\n  ```\n\n  ...which would be clearer.\n\nFix:\n\n  Replace with the cleaner form, or simply:\n\n  ```crystal\n  rescue ex : URI::Error\n    raise ex\n  rescue\n    raise URI::Error.new(\\\"Invalid redirect URL: #{redirect_url}\\\")\n  end\n  ```\n\n  If this gets folded into the RedirectPolicy extraction ticket, the\n  fix is part of the move. If the extraction is deferred, ship this\n  as a follow-up.\n\nTest: a redirect target like \\\"http://example.com/path with spaces\\\"\nshould raise URI::Error, not ArgumentError or some other intermediate\ntype. Add a regression test in spec/crest_http_client_redirect_spec.cr.",
+  "id": "fetcherc-tbk.8",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Fix resolve_redirect_url dead-branch in rescue",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
