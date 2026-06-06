@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-c1h.8"
+  ],
   "created": "2026-06-06T22:03:22Z",
   "description": "## What\n\nMove the `handle_error` case/handler block into its own file.\n\n## Source to move (from `src/fetcher/crest_http_client.cr`)\n\n- `handle_error(ex : Exception, url : String)`\n- `handle_uri_error(ex, url)`\n- `handle_socket_error(ex, url)`\n- `handle_timeout_error(ex, url)`\n- `handle_ssl_error(ex, url)`\n- `handle_request_failed(ex, url)`\n- `handle_unknown_error(ex, url)`\n\n## Why\n\n- Pure error-translation: turn one exception class into another with a uniform\n  shape. No HTTP state, no DNS, no config reads beyond what is already on\n  `RequestConfig`. Single responsibility.\n- A standalone `ErrorMapper` is the right place to add new mappings (e.g.\n  `IO::Error`, `Socket::ConnectError` subtypes) without touching the\n  orchestration class.\n- Currently the case/when chain is 20 lines with 6 handlers — non-trivial and\n  duplicated state (the `url` is passed through unchanged to every handler).\n\n## API target\n\n    class Fetcher::CrestHttpClient::ErrorMapper\n      def map(ex : Exception, url : String) : Nil\n      # raises the appropriate Fetcher::* error\n    end\n\nCaller becomes:\n    rescue ex\n      record_failure(domain) unless domain.empty?\n      ErrorMapper.new.map(ex, url)\n    end\n\n## Constraints\n\n- Must raise the same exception types with the same messages as today\n  (tests assert on `DNSError`, `TimeoutError`, `HTTPClientError`,\n  `HTTPServerError`, `HTTPError`, `FetchError`).\n- The `(catseye)` NOTE comments about including the URL move with the code.\n- HTTPClientError is the special case that doesn't re-raise from\n  `perform_request`'s `rescue ex : HTTPClientError` — keep that behavior.\n\n## Done when\n\n- New file exists; `crest_http_client.cr` calls `ErrorMapper.new.map(ex, url)`.\n- `crest_http_client_error_handling_spec.cr` passes unchanged.",
   "id": "fetcherc-c1h.4",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Extract ErrorMapper into src/fetcher/crest_http_client/error_mapper.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:22Z"
+  "updated_at": "2026-06-06T22:03:38Z"
 }
