@@ -2,6 +2,7 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [
+    "fetcherc-c1h.7",
     "fetcherc-c1h.8"
   ],
   "created": "2026-06-06T22:03:22Z",
@@ -13,5 +14,5 @@
   "status": "open",
   "title": "Extract ErrorMapper into src/fetcher/crest_http_client/error_mapper.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:38Z"
+  "updated_at": "2026-06-06T22:03:39Z"
 }
