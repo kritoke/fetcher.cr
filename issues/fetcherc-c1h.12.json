@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:25:08Z",
+  "description": "handle_uri_error, handle_socket_error, and handle_ssl_error all raise DNSError regardless of the underlying cause. This loses type information for callers that want to distinguish (e.g. URL parse failure vs. SSL handshake failure vs. connection failure). Define or use distinct error types (e.g. URLError, SSLError, ConnectionError) and let DNSError stay scoped to actual DNS resolution. Resolves naturally as part of c1h.4 (ErrorMapper extraction).",
+  "id": "fetcherc-c1h.12",
+  "labels": [],
+  "parent": "fetcherc-c1h",
+  "priority": 2,
+  "status": "open",
+  "title": "Stop using DNSError as the universal catch-all wrapper",
+  "type": "task",
+  "updated_at": "2026-06-06T22:25:08Z"
+}
