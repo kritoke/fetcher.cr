@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-c1h.7"
+  ],
   "created": "2026-06-06T22:03:22Z",
   "description": "## What\n\nPull the entire redirect policy + validation block out of `CrestHttpClient`\ninto a dedicated class.\n\n## Source to move (from `src/fetcher/crest_http_client.cr`)\n\nConstants:\n- `REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}`\n\nMethods (all currently private):\n- `allow_redirect?(source, target, status_code = 302)`\n- `same_domain_redirect?(source, target)`\n- `subdomain_redirect?(source, target)`\n- `external_redirect_allowed?(target, status_code)`\n- `permanent_redirect?(status_code)`\n- `allowed_domain_redirect?(source, target)`\n- `same_registrable_domain?(source, target)`\n- `validate_redirect_target(url)`\n- `validate_redirect_domain(original_url, source_domain, target_url, status_code = 302)`\n- `resolve_redirect_url(redirect_url, original_url)`\n- `should_follow_redirect?(response)`\n- `extract_redirect_url(response)`\n- `extract_redirect_url_from_headers(headers)`\n- `transition_domain(from_domain, to_domain)` — kept here, but name is wrong\n  (see cleanup ticket)\n\n## Why\n\n- All redirect-related rules are pure functions of `(config, source, target, status)`.\n- They have nothing to do with HTTP execution or DNS.\n- Co-locating them makes policy changes auditable in one file.\n- Unit tests can hit a `RedirectPolicy` directly without standing up the whole\n  HTTP client.\n\n## API target\n\n    class Fetcher::CrestHttpClient::RedirectPolicy\n      REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}\n\n      def initialize(@config : RequestConfig, @validator : URLValidator::Service)\n      def allow?(source : String, target : String, status_code : Int32 = 302) : Bool\n      def validate_target(url : String) : Nil\n      def validate_domain(original_url : String, source_domain : String,\n                          target_url : String, status_code : Int32 = 302) : Nil\n      def resolve(redirect_url : String, original_url : String) : String\n      def follow?(response : Crest::Response) : Bool\n      def extract_location(response : Crest::Response) : String\n    end\n\n## Constraints\n\n- `MissingLocationHeaderError` and `DNSError` raised here must be the same\n  classes callers currently catch.\n- `extract_redirect_url` used by the spec helper `debug_extract_redirect_url`\n  must still work — keep an instance wrapper on `CrestHttpClient` if needed.\n- No behavior change: same redirects allowed/blocked, same error messages\n  (the `(catseye)` NOTE comments about URL inclusion in messages move with\n  the code).\n\n## Done when\n\n- New file exists; `crest_http_client.cr` requires and delegates.\n- The 14-ish redirect methods above no longer live in CrestHttpClient.\n- `crest_http_client_redirect_spec.cr` and `redirects_psl_spec.cr` pass\n  unchanged.",
   "id": "fetcherc-c1h.3",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Extract RedirectPolicy into src/fetcher/crest_http_client/redirect_policy.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:22Z"
+  "updated_at": "2026-06-06T22:03:39Z"
 }
