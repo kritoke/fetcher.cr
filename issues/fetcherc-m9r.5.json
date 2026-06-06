@@ -4,14 +4,16 @@
   "blocks": [
     "fetcherc-m9r.6"
   ],
+  "closed_at": "2026-06-06T23:43:01Z",
+  "close_reason": "Duplicate of fetcherc-9el.4 (handle_request_failed de-duplication, already closed via merge).",
   "created": "2026-06-06T23:31:35Z",
   "description": "In handle_request_failed, both the error and wrapper case statements branch on the same status ranges (400..499, 500..599, else) with the same factory mapping. This is DRY violation: pick the class once, then construct both the Error and the wrapper. Refactor to a single case statement (or a small mapping table) returning the right (error_class, wrapper_class) pair.",
   "id": "fetcherc-m9r.5",
   "labels": [],
   "parent": "fetcherc-m9r",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "De-duplicate handle_request_failed case statement",
   "type": "task",
-  "updated_at": "2026-06-06T23:31:38Z"
+  "updated_at": "2026-06-06T23:43:01Z"
 }
