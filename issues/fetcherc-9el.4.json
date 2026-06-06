@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-9el"
+  ],
   "blocks": [],
   "created": "2026-06-06T22:29:51Z",
   "description": "handle_request_failed has two parallel case statements (one for Error, one for wrapper) over the same 400..499 / 500..599 ranges. Compute the status class once and derive both the error and the wrapper. Reduces 16 lines to ~6 and removes the risk of the two branches drifting apart.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "De-duplicate handle_request_failed case statement",
   "type": "task",
-  "updated_at": "2026-06-06T22:29:51Z"
+  "updated_at": "2026-06-06T22:29:56Z"
 }
