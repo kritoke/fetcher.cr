@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-c1h.2"
+  ],
   "blocks": [
     "fetcherc-c1h.8"
   ],
