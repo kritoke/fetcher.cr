@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T23:31:35Z",
+  "description": "Move REDIRECT_STATUS_CODES, allow_redirect?, same_domain_redirect?, subdomain_redirect?, external_redirect_allowed?, permanent_redirect?, allowed_domain_redirect?, same_registrable_domain?, validate_redirect_domain, resolve_redirect_url, extract_redirect_url_from_headers into a new src/fetcher/redirect_policy.cr module/class. Preserve public API: CrestHttpClient::REDIRECT_STATUS_CODES, debug_allow_redirect?, debug_extract_redirect_url.",
+  "id": "fetcherc-m9r.2",
+  "labels": [],
+  "parent": "fetcherc-m9r",
+  "priority": 2,
+  "status": "open",
+  "title": "Extract redirect policy into its own module",
+  "type": "task",
+  "updated_at": "2026-06-06T23:31:35Z"
+}
