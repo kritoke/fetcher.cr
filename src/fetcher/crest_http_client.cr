@@ -463,19 +463,16 @@ module Fetcher
       status = ex.response.status_code
       message = "HTTP #{status}: #{ex.message}"
 
-      error = case status
-              when 400..499 then Error.http(status, message, url)
-              when 500..599 then Error.server_error(status, message, url)
-              else               Error.http(status, message, url)
-              end
+      # Classify once and derive both the structured Error and the wrapper
+      # exception. Keeping the status range check in one place prevents the
+      # 4xx/5xx/other branches from drifting apart between the two paths.
+      error, wrapper_class = case status
+                             when 400..499 then {Error.http(status, message, url), HTTPClientError}
+                             when 500..599 then {Error.server_error(status, message, url), HTTPServerError}
+                             else               {Error.http(status, message, url), HTTPError}
+                             end
 
-      wrapper = case status
-                when 400..499 then HTTPClientError.new(error.message, status, error, nil)
-                when 500..599 then HTTPServerError.new(error.message, status, error, nil)
-                else               HTTPError.new(error.message, status, error, nil)
-                end
-
-      raise wrapper
+      raise wrapper_class.new(error.message, status, error, nil)
     end
 
     private def handle_unknown_error(ex : Exception, url : String) : Nil
