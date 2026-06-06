@@ -3,7 +3,8 @@
   "blocked_by": [],
   "blocks": [
     "fetcherc-9el.1",
-    "fetcherc-9el.2"
+    "fetcherc-9el.2",
+    "fetcherc-9el.3"
   ],
   "created": "2026-06-06T22:29:52Z",
   "description": "Add a small spec that asserts the public API surface we depend on callers (src/fetcher.cr, software/*, youtube, json_feed, rss, reddit) uses remains stable:\n- Fetcher::CrestHttpClient.new(config, validator)\n- .build_headers(::HTTP::Headers)\n- .with_cache(::HTTP::Headers, String?, String?)\n- .clear_rate_limiters\n- .clear_dns_cache\n- .dns_max_entries / .dns_max_entries=\n- #head, #get\n- #clear_dns_cache\n\nThis gives the refactor guard rails so call sites don't silently break.",
