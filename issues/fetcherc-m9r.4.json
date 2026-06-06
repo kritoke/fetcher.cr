@@ -2,14 +2,16 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-06T23:43:01Z",
+  "close_reason": "Duplicate of fetcherc-9el.6 which covers the same scope.",
   "created": "2026-06-06T23:31:35Z",
   "description": "CrestHttpClient.perform_request directly checks body.bytesize \u003e SafeFeedProcessor::MAX_FEED_SIZE and raises InvalidFormatError. This is a SafeFeedProcessor concern, not an HTTP client concern. The check belongs in SafeFeedProcessor (or a wrapper invoked after perform_request returns). Refactor so CrestHttpClient does not import MAX_FEED_SIZE.",
   "id": "fetcherc-m9r.4",
   "labels": [],
   "parent": "fetcherc-m9r",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Move SafeFeedProcessor size check out of CrestHttpClient",
   "type": "task",
-  "updated_at": "2026-06-06T23:31:35Z"
+  "updated_at": "2026-06-06T23:43:01Z"
 }
