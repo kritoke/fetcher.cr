@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "There is an uncommitted change to spec/dns_cache_spec.cr:\n\n  diff --git a/spec/dns_cache_spec.cr b/spec/dns_cache_spec.cr\n  @@ -1,4 +1,5 @@\n   require \\\"spec\\\"\n  +require \\\"./support/crest_http_client_test_helpers\\\"\n   require \\\"../src/fetcher\\\"\n\n  describe Fetcher::CrestHttpClient do\n    ...\n\nThe spec references a debug_* set of helpers on CrestHttpClient that\nexist in spec/support/crest_http_client_test_helpers.cr:\n\n  - debug_get_cached_dns\n  - debug_clear_dns_cache\n  - debug_verify_dns_rebinding\n  - debug_allow_redirect?\n  - debug_check_ssrf\n  - debug_validate_redirect_target\n  - debug_seed_dns_cache\n  - debug_extract_redirect_url\n\nThe spec itself does not actually use most of these - it only calls\ndebug_clear_dns_cache, debug_get_cached_dns, and debug_verify_dns_rebinding.\n\nThe require line should not land on its own. Fold it into the DnsCache\nextraction ticket, where the spec will be rewritten to test the new\nFetcher::DnsCache class directly, and the helper file will be split\nor replaced.\n\nAction:\n\n  1. Do NOT commit the require line on its own.\n  2. As part of fetcherc-tbk child #1 (DnsCache extraction):\n     - Move the DNS-specific debug_* helpers to\n       spec/support/dns_cache_test_helpers.cr.\n     - Rewrite spec/dns_cache_spec.cr to instantiate Fetcher::DnsCache\n       directly, not Fetcher::CrestHttpClient.\n     - Drop the redirect/SSRF debug_* helpers from the new file (they\n       belong to the RedirectPolicy extraction).\n  3. Verify spec runs green after the extraction lands.",
+  "id": "fetcherc-tbk.9",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Fold uncommitted dns_cache_spec.cr helper require into DnsCache extraction",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
