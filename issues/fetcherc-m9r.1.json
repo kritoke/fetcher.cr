@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T23:31:35Z",
+  "description": "Move @@dns_cache, @@dns_cache_lock, @@dns_max_entries, @@dns_cleanup_registered, @@dns_cleanup_proc, dns_cleanup_proc, ensure_dns_cleanup_registered, dns_max_entries / dns_max_entries=, enforce_dns_limit, clear_expired_dns, DNS_EVICTION_BUFFER, get_cached_dns, cache_dns into a new src/fetcher/dns_cache.cr class (e.g. Fetcher::DNSCache). Preserve public API: CrestHttpClient.clear_dns_cache (class+instance), CrestHttpClient.dns_max_entries / dns_max_entries=, CrestHttpClient.clear_expired_dns, CrestHttpClient::DNS_EVICTION_BUFFER, and instance debug_get_cached_dns / debug_clear_dns_cache / debug_seed_dns_cache test helpers.",
+  "id": "fetcherc-m9r.1",
+  "labels": [],
+  "parent": "fetcherc-m9r",
+  "priority": 2,
+  "status": "open",
+  "title": "Extract DNS cache into its own class",
+  "type": "task",
+  "updated_at": "2026-06-06T23:31:35Z"
+}
