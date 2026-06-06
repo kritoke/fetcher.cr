@@ -1,6 +1,7 @@
 {
   "assignee": "",
   "blocked_by": [
+    "fetcherc-c1h.10",
     "fetcherc-c1h.2",
     "fetcherc-c1h.3",
     "fetcherc-c1h.4",
@@ -18,5 +19,5 @@
   "status": "open",
   "title": "Run full spec suite after refactor",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:39Z"
+  "updated_at": "2026-06-06T22:25:08Z"
 }
