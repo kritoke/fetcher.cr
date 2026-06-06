@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T23:31:22Z",
+  "description": "src/fetcher/crest_http_client.cr is 531 lines and mixes DNS cache, SSRF/URL validation, redirect policy, error mapping, and HTTP request orchestration. Refactor for SRP and DRY while preserving public API.",
+  "id": "fetcherc-m9r",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Refactor CrestHttpClient for SRP and reliability",
+  "type": "epic",
+  "updated_at": "2026-06-06T23:31:22Z"
+}
