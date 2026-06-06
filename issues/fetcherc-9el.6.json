@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:29:52Z",
+  "description": "perform_request inlines a response-size check using SafeFeedProcessor::MAX_FEED_SIZE. This is a feed-parsing concern, not an HTTP-client concern. CrestHttpClient should be feed-agnostic. The size guard belongs near SafeFeedProcessor or in the orchestrating Fetcher class. Either:\n(a) Return the raw response and let fetcher.cr check size before invoking SafeFeedProcessor\n(b) Inject a post-response hook in perform_request\nPrefer (a) — moves the dependency out of crest_http_client.cr entirely.",
+  "id": "fetcherc-9el.6",
+  "labels": [],
+  "parent": "fetcherc-9el",
+  "priority": 4,
+  "status": "open",
+  "title": "Move SafeFeedProcessor size check out of CrestHttpClient",
+  "type": "task",
+  "updated_at": "2026-06-06T22:29:52Z"
+}
