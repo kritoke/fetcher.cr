@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-9el"
+  ],
   "blocks": [],
   "created": "2026-06-06T22:29:52Z",
   "description": "Several minor DRY / dead-code issues in crest_http_client.cr:\n- extract_domain(url) private method just delegates to @validator.extract_domain — call site in handle_redirects should call @validator directly\n- transition_domain is called conditionally on domain != target_domain, but record_success is then called unconditionally afterwards on the original domain in perform_request — the conditional in transition_domain adds no value\n- validate_redirect_domain: target_domain computed but only the source_domain is used in allow_redirect? — parameter is dead\n- handle_redirects returns convert_response(response) when remaining \u003c= 1, but it has already mutated circuit_breaker / recorded_success on the target domain, so a redirect to the final destination will record twice\n- handle_error's case has trailing alignment whitespace\n- Magic number 10_000 for @@dns_max_entries should be a named constant",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Remove dead/redundant code in redirect handling",
   "type": "task",
-  "updated_at": "2026-06-06T22:29:52Z"
+  "updated_at": "2026-06-06T22:29:56Z"
 }
