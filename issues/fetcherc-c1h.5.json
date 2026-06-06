@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-c1h.2"
+  ],
   "blocks": [
     "fetcherc-c1h.8"
   ],
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Extract RebindingChecker into src/fetcher/crest_http_client/rebinding_checker.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:38Z"
+  "updated_at": "2026-06-06T22:03:39Z"
 }

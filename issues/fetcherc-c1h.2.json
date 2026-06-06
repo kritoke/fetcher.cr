@@ -3,7 +3,9 @@
   "blocked_by": [
     "fetcherc-c1h.1"
   ],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-c1h.5"
+  ],
   "created": "2026-06-06T22:03:22Z",
   "description": "## What\n\nMove the DNS cache machinery out of `CrestHttpClient` into a dedicated class.\n\n## Source to move (from `src/fetcher/crest_http_client.cr`)\n\nClass-level state:\n- `@@dns_cache : Hash(String, {addr: Socket::IPAddress, expires: Time})`\n- `@@dns_cache_lock : Mutex`\n- `@@dns_max_entries : Int32`\n- `@@dns_cleanup_registered : Bool`\n- `@@dns_cleanup_proc : Proc(Nil)?`\n- `DNS_EVICTION_BUFFER = 100`\n\nMethods (class-level):\n- `dns_max_entries=`, `dns_max_entries`\n- `dns_cleanup_proc` (lazy init)\n- `ensure_dns_cleanup_registered`\n- `enforce_dns_limit`\n- `clear_expired_dns`\n- `clear_dns_cache` (currently `self.clear_dns_cache` does `new.clear_dns_cache`)\n\nInstance methods on CrestHttpClient (delegate):\n- `get_cached_dns(host)` → returns `Socket::IPAddress?`\n- `cache_dns(host, addr)`\n- `clear_dns_cache` (instance form used by the test helper)\n\n## Why\n\n- Class-level `@@` state mixed with per-instance state muddles ownership.\n- The cache is independently useful and testable.\n- Single responsibility: a `DNSCache` is a size-capped, TTL-bounded, mutex-guarded\n  LRU-ish store. That is one concern.\n\n## API target\n\n    class Fetcher::CrestHttpClient::DNSCache\n      def self.instance : DNSCache\n      def self.clear : Nil\n      def self.clear_expired : Nil\n      def self.dns_max_entries=(value : Int32)\n      def self.dns_max_entries : Int32\n      def self.configure_cleanup : Nil\n\n      def get(host : String) : Socket::IPAddress?\n      def put(host : String, addr : Socket::IPAddress) : Nil\n      def clear : Nil\n    end\n\nCrestHttpClient keeps:\n- `@dns_cache = DNSCache.instance` (or just calls class methods).\n- A thin instance facade so `get_cached_dns` / `cache_dns` keep working for the\n  test helpers reopened in `spec/support/crest_http_client_test_helpers.cr`.\n\n## Constraints\n\n- No public API break for callers of `CrestHttpClient`.\n- `clear_dns_cache` class method and instance method must keep working.\n- The reopen in the spec helper must keep working without changes.\n- `PeriodicCleanup.register_cleanup { ... }` registration must still happen\n  exactly once on first insert.\n\n## Done when\n\n- New file `src/fetcher/crest_http_client/dns_cache.cr` exists.\n- `crest_http_client.cr` requires it and delegates.\n- `cache_dns`, `get_cached_dns`, `clear_dns_cache`, `clear_expired_dns`,\n  `ensure_dns_cleanup_registered`, `enforce_dns_limit` no longer live in\n  CrestHttpClient.\n- `dns_cache_spec.cr` passes.",
   "id": "fetcherc-c1h.2",
@@ -13,5 +15,5 @@
   "status": "open",
   "title": "Extract DNSCache into src/fetcher/crest_http_client/dns_cache.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:38Z"
+  "updated_at": "2026-06-06T22:03:39Z"
 }
