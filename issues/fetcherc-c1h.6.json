@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:03:22Z",
+  "description": "## What\n\n`perform_request` and `perform_follow_redirect` both call `Crest::Request.execute`\nwith the same 7 kwargs. Extract a single `execute_crest(method, url, headers)`\nhelper inside `CrestHttpClient`.\n\n## Source (from `src/fetcher/crest_http_client.cr`)\n\nThe two near-identical blocks are at roughly:\n\n- Lines ~155–163 (in `perform_request`)\n- Lines ~225–233 (in `perform_follow_redirect`)\n\nBoth do:\n    Crest::Request.execute(\n      method,\n      url,\n      headers: headers,\n      max_redirects: 0,\n      handle_errors: false,\n      connect_timeout: @config.timeout.connect,\n      read_timeout: @config.timeout.read,\n      tls: build_tls_context\n    )\n\n## Why\n\n- Classic DRY violation. Any change to the call shape (e.g. adding\n  `write_timeout`, `user_agent`, default headers) has to be made in two places.\n  Already a reliability risk: the two are easy to drift.\n\n## How\n\nAdd a private helper:\n\n    private def execute_crest(method : Symbol, url : String,\n                              headers : ::HTTP::Headers | Hash(String, String)) : Crest::Response\n      Crest::Request.execute(\n        method, url,\n        headers: headers,\n        max_redirects: 0,\n        handle_errors: false,\n        connect_timeout: @config.timeout.connect,\n        read_timeout: @config.timeout.read,\n        tls: build_tls_context\n      )\n    end\n\nUse it from both call sites.\n\n## Constraints\n\n- Header type differences: `perform_request` passes `crest_headers : Hash(String, String)`\n  via `HeaderBuilder.build_for_crest`; `perform_follow_redirect` passes the same\n  hash through. The helper accepts a union or just `Hash(String, String)` since\n  that's what both callers actually pass.\n- No behavior change.\n\n## Done when\n\n- Single source of truth for the Crest call in `crest_http_client.cr`.\n- Specs pass.",
+  "id": "fetcherc-c1h.6",
+  "labels": [],
+  "parent": "fetcherc-c1h",
+  "priority": 2,
+  "status": "open",
+  "title": "DRY: collapse duplicated Crest::Request.execute call",
+  "type": "task",
+  "updated_at": "2026-06-06T22:03:22Z"
+}
