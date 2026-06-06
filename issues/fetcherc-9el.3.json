@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:29:51Z",
+  "description": "perform_request and perform_follow_redirect both call Crest::Request.execute with the same option list. Extract a private execute_crest_request(method, url, headers) helper to remove the duplication. Rename handle_redirects → follow_redirect_chain for clarity. The perform_request method currently mixes SSRF check, semaphore, circuit breaker, rate limiter, DNS rebinding, request, redirect handling, size check, and circuit breaker recording — too many responsibilities. Extract a small set of helpers without changing public behavior.",
+  "id": "fetcherc-9el.3",
+  "labels": [],
+  "parent": "fetcherc-9el",
+  "priority": 3,
+  "status": "open",
+  "title": "Extract redirect chain and Crest execution into private methods",
+  "type": "task",
+  "updated_at": "2026-06-06T22:29:51Z"
+}
