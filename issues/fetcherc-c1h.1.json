@@ -4,14 +4,15 @@
   "blocks": [
     "fetcherc-c1h.2"
   ],
+  "closed_at": "2026-06-06T22:35:59Z",
   "created": "2026-06-06T22:03:22Z",
   "description": "## What\n\n`spec/dns_cache_spec.cr` has one uncommitted line:\n\n    require \"./support/crest_http_client_test_helpers\"\n\nThe file `spec/support/crest_http_client_test_helpers.cr` exists and defines\n`debug_*` helpers via class reopening. Without the require, the spec file would\nnot compile (the helpers are referenced).\n\n## Why\n\nThe user said: \"fold it into the new work.\" This means: do not commit it\nstandalone on main; land it as part of the refactor series.\n\n## How\n\nInclude the spec change in the first refactor commit (DNSCache extraction or\nthe DRY fix). Verify the spec still references valid helpers afterwards.\n\n## Done when\n\n- `git log` shows the require line committed alongside the first refactor.\n- `dns_cache_spec.cr` runs without load errors.",
   "id": "fetcherc-c1h.1",
   "labels": [],
   "parent": "fetcherc-c1h",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fold uncommitted dns_cache_spec.cr require into refactor",
   "type": "task",
-  "updated_at": "2026-06-06T22:34:34Z"
+  "updated_at": "2026-06-06T22:35:59Z"
 }
