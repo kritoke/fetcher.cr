@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Move the class-level DNS cache state and rebinding-check logic out of\nCrestHttpClient into its own class.\n\nCurrent scope (src/fetcher/crest_http_client.cr lines ~22-65, 311-396):\n\n  @@dns_cache, @@dns_cache_lock, @@dns_max_entries, @@dns_cleanup_registered,\n  @@dns_cleanup_proc, ensure_dns_cleanup_registered, dns_max_entries=,\n  dns_max_entries, dns_cleanup_proc, get_cached_dns, cache_dns,\n  enforce_dns_limit, clear_dns_cache (instance), clear_expired_dns,\n  verify_dns_rebinding, should_check_dns_rebinding?, extract_host, valid_host?,\n  validate_cached_dns, resolve_and_validate_new_dns, valid_address?,\n  validate_address_for_host.\n\nTarget:\n\n  src/fetcher/dns_cache.cr with Fetcher::DnsCache (singleton or class-methods),\n  and a thin Fetcher::DnsRebindingChecker (or method on the cache) that\n  encapsulates the resolve/validate/cache flow.\n\nSpecific issues to fix while moving:\n\n  - Replace the @@dns_cache + @@dns_cache_lock + @@dns_max_entries trio with a\n    proper class that owns its own state and exposes a constructor that takes\n    a max_entries (so tests can size it down).\n  - Replace the side-effecting ensure_dns_cleanup_registered flag with explicit\n    start/stop. Add a #stop method that unregisters from PeriodicCleanup.\n  - Fix the inconsistent config behaviour: cache_enabled is checked in\n    get_cached_dns/cache_dns via @config.dns.cache_enabled, but the class\n    methods that mutate state do not check it. Either check uniformly or\n    document and enforce that the cache_enabled flag is process-wide.\n  - Replace the random-eviction loop in enforce_dns_limit (current implementation\n    samples keys while the cache is at capacity, which is O(infinite) when the\n    size never drops - the sample-then-delete pattern only shrinks when\n    @@dns_cache.size \u003e target_size, so it can spin).\n  - Replace Socket::IPAddress equality with a hash that includes port, or\n    document that port-less entries are shared across ports.\n  - Move valid_address?, extract_host, valid_host? into a small helper or onto\n    URLValidator::Service (they are already in the validator's domain).\n\nTest impact:\n\n  spec/dns_cache_spec.cr currently pokes the DNS cache through debug_* helpers\n  on CrestHttpClient. After this lands, those helpers should call into\n  Fetcher::DnsCache. Update the spec to require ./support/dns_cache_test_helpers\n  (which the uncommitted diff already references - fold that in here).",
+  "id": "fetcherc-tbk.1",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Extract DNS cache + rebinding into Fetcher::DnsCache",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
