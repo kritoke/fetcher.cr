@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-06T22:10:04Z",
+  "description": "Move error-mapping logic out of CrestHttpClient.\n\nCurrent scope (src/fetcher/crest_http_client.cr lines ~398-475):\n\n  handle_error, handle_uri_error, handle_socket_error, handle_timeout_error,\n  handle_ssl_error, handle_request_failed, handle_unknown_error.\n\nTarget:\n\n  src/fetcher/error_mapper.cr with Fetcher::ErrorMapper.map(ex, url) that\n  raises the appropriate Fetcher exception based on the input.\n\nSpecific issues to fix while moving:\n\n  - Every error path raises DNSError as the wrapper, regardless of whether\n    the underlying cause is DNS-related. URI::Error and OpenSSL::SSL::Error\n    become DNSError, which makes it impossible for callers to distinguish\n    \"bad URL\" from \\\"DNS lookup failed\\\" from \\\"SSL handshake failed\\\". Each\n    handler should raise its own exception type (or use a common FetchError\n    parent without claiming DNSError specifically).\n  - handle_request_failed constructs the wrapper exception (HTTPClientError\n    or HTTPServerError) but sets cause=nil even though it has the original\n    Crest::RequestFailed in scope. Pass ex as the cause.\n  - handle_unknown_error builds an Error object via Error.unknown(message, url)\n    and then constructs a FetchError with a different message string that\n    *omits the URL*. The URL is in the wrapped Error but not in the top\n    message - the wrapper's message and the underlying Error's message should\n    not disagree.\n  - handle_uri_error and handle_ssl_error both call Error.dns() and\n    Error.invalid_url() then wrap in DNSError. This is double-labelling\n    (the Error's own type says \\\"dns\\\" but it's wrapped in DNSError too).\n    Pick one.\n  - MissingLocationHeaderError is re-raised by `raise ex` inside the case\n    branch. This is fine but the pattern means every call site has to\n    know that handle_error may re-raise. Add a docstring.\n\nTest impact:\n\n  spec/crest_http_client_error_handling_spec.cr (5KB) currently drives the\n  error mapping through the client. After the split, add unit tests at\n  spec/error_mapper_spec.cr.",
+  "id": "fetcherc-tbk.3",
+  "labels": [],
+  "parent": "fetcherc-tbk",
+  "priority": 2,
+  "status": "open",
+  "title": "Extract error translation into Fetcher::ErrorMapper",
+  "type": "task",
+  "updated_at": "2026-06-06T22:10:04Z"
+}
