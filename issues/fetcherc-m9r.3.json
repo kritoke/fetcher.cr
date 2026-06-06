@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-m9r.6"
+  ],
   "created": "2026-06-06T23:31:35Z",
   "description": "Move handle_error, handle_uri_error, handle_socket_error, handle_timeout_error, handle_ssl_error, handle_request_failed, handle_unknown_error into a new src/fetcher/error_mapper.cr. The mapper should take config + url and raise the appropriate typed error. This removes the longest block of case-statement code from the client.",
   "id": "fetcherc-m9r.3",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Extract error mapping into its own module",
   "type": "task",
-  "updated_at": "2026-06-06T23:31:35Z"
+  "updated_at": "2026-06-06T23:31:38Z"
 }
