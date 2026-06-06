@@ -8,13 +8,15 @@
     "fetcherc-9el.4",
     "fetcherc-9el.5"
   ],
+  "closed_at": "2026-06-06T22:34:24Z",
+  "close_reason": "Duplicate of fetcherc-c1h — work is already broken down in c1h's children (c1h.1, c1h.2, c1h.3, c1h.4, c1h.5, c1h.7, c1h.8). Closing to keep a single source of truth for the CrestHttpClient refactor epic.",
   "created": "2026-06-06T22:29:20Z",
   "description": "src/fetcher/crest_http_client.cr is 531 lines and violates SRP: DNS cache, HTTP execution, redirect chain, error mapping, header building, SSL context, semaphore, circuit breaker, and rate limiter are all in one class. Refactor into focused units with no breaking public API changes.\n\nKey findings:\n1. Class-level DNS cache state (5 class vars, eviction, cleanup proc, registered flag) — extract to Fetcher::DnsCache module/class\n2. build_headers / with_cache are pure header utilities — move to HeaderBuilder\n3. handle_redirects + perform_follow_redirect both call Crest::Request.execute with the same options — extract execute_crest\n4. DRY violation in handle_request_failed: identical case statement duplicated for error + wrapper\n5. transition_domain only called when domains differ but record_success also called unconditionally later\n6. extract_domain private method just delegates to @validator\n7. DNS_EVICTION_BUFFER constant defined mid-file, magic number 10_000\n8. clear_dns_cache class method unnecessarily constructs a new client\n9. SafeFeedProcessor::MAX_FEED_SIZE check embedded in perform_request (feed concern in HTTP client)\n10. Uncommitted spec/dns_cache_spec.cr require line — include in landing\n\nPublic API surface (must NOT break):\n- Fetcher::CrestHttpClient.new(config, validator?)\n- .new, .build_headers, .with_cache, .clear_rate_limiters, .clear_dns_cache\n- .dns_max_entries / .dns_max_entries=\n- #head, #get, #clear_dns_cache (instance)\n\nCallers in src/: fetcher.cr (88,89,126,127,153), json_feed.cr:19, rss.cr:23, youtube.cr (82,118,119,139,140), software.cr:179, software/atom_parser.cr:62, software/codeberg.cr (14,30), software/github.cr (11,18,33), software/gitlab.cr (12,20), reddit.cr:134\n\nTests touching API: spec/crest_http_client_spec.cr, spec/crest_http_client_di_spec.cr, spec/crest_http_client_cache_spec.cr, spec/crest_http_client_redirect_spec.cr, spec/crest_http_client_ssrf_spec.cr, spec/crest_http_client_rebinding_spec.cr, spec/crest_http_client_rebinding_flow_spec.cr, spec/crest_http_client_error_handling_spec.cr, spec/crest_http_client_extract_redirect_spec.cr, spec/redirects_spec.cr, spec/redirects_psl_spec.cr, spec/dns_cache_spec.cr",
   "id": "fetcherc-9el",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Refactor CrestHttpClient for SRP and reliability",
   "type": "epic",
-  "updated_at": "2026-06-06T22:29:56Z"
+  "updated_at": "2026-06-06T22:34:24Z"
 }
