@@ -10,9 +10,15 @@
   "id": "fetcherc-c1h.6",
   "labels": [],
   "parent": "fetcherc-c1h",
+  "comments": [
+    {
+      "text": "Starting work in worktree /workspaces/fetcher.cr.c1h.6 on branch fetcherc-c1h.6/dry-crest-execute-call",
+      "timestamp": "2026-06-07T01:20:29Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "DRY: collapse duplicated Crest::Request.execute call",
   "type": "task",
-  "updated_at": "2026-06-06T23:43:51Z"
+  "updated_at": "2026-06-07T01:20:29Z"
 }
