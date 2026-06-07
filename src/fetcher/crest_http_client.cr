@@ -121,16 +121,7 @@ module Fetcher
 
         verify_dns_rebinding(url)
 
-        response = Crest::Request.execute(
-          method,
-          url,
-          headers: crest_headers,
-          max_redirects: 0,
-          handle_errors: false,
-          connect_timeout: @config.timeout.connect,
-          read_timeout: @config.timeout.read,
-          tls: build_tls_context
-        )
+        response = execute_crest(method, url, crest_headers)
 
         final_response = handle_redirects(response, url, crest_headers, domain, method)
 
@@ -207,7 +198,16 @@ module Fetcher
     end
 
     private def perform_follow_redirect(method : Symbol, url : String, headers : Hash(String, String), domain : String, remaining : Int32?) : ::HTTP::Client::Response
-      crest_response = Crest::Request.execute(
+      crest_response = execute_crest(method, url, headers)
+      handle_redirects(crest_response, url, headers, domain, method, remaining.try(&.- 1))
+    end
+
+    # Single source of truth for the underlying Crest::Request.execute call.
+    # Both perform_request and perform_follow_redirect funnel through here so
+    # request-shape changes (timeouts, TLS, headers, etc.) only need to be made
+    # in one place.
+    private def execute_crest(method : Symbol, url : String, headers : Hash(String, String)) : Crest::Response
+      Crest::Request.execute(
         method,
         url,
         headers: headers,
@@ -217,7 +217,6 @@ module Fetcher
         read_timeout: @config.timeout.read,
         tls: build_tls_context
       )
-      handle_redirects(crest_response, url, headers, domain, method, remaining.try(&.- 1))
     end
 
     private def extract_domain(url : String) : String
