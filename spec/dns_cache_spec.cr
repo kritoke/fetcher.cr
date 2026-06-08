@@ -1,4 +1,5 @@
 require "spec"
+require "./support/crest_http_client_test_helpers"
 require "../src/fetcher"
 
 describe Fetcher::CrestHttpClient do
