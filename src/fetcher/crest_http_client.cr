@@ -20,32 +20,20 @@ module Fetcher
     @request_semaphore : Channel(Nil)?
     @semaphore_lock : Mutex = Mutex.new
 
-    # DNS cache with lazy initialization for cleanup registration
-    # Size-capped with LRU eviction to prevent unbounded growth
-    @@dns_cache = {} of String => {addr: Socket::IPAddress, expires: Time}
-    @@dns_cache_lock = Mutex.new
-    @@dns_max_entries : Int32 = 10_000
-    @@dns_cleanup_registered = false
-    @@dns_cleanup_proc : Proc(Nil)?
-
-    private def self.dns_cleanup_proc : Proc(Nil)
-      @@dns_cleanup_proc ||= Proc(Nil).new { clear_expired_dns }
-    end
-
-    # Register DNS cache cleanup exactly once when first DNS entry is cached
-    def self.ensure_dns_cleanup_registered : Nil
-      return if @@dns_cleanup_registered
-      @@dns_cleanup_registered = true
-      PeriodicCleanup.register_cleanup { dns_cleanup_proc.call }
-    end
-
-    # Configure max DNS cache entries. Call once during app init.
+    # DNS cache delegation shims.
+    # The cache, lock, eviction policy, and cleanup registration all live in
+    # Fetcher::DnsCache. These class-level methods exist only to preserve the
+    # public API used by callers and the spec test helpers.
     def self.dns_max_entries=(value : Int32) : Nil
-      @@dns_max_entries = value
+      Fetcher::DnsCache.max_entries = value
     end
 
     def self.dns_max_entries : Int32
-      @@dns_max_entries
+      Fetcher::DnsCache.max_entries
+    end
+
+    def self.ensure_dns_cleanup_registered : Nil
+      Fetcher::DnsCache.ensure_cleanup_registered
     end
 
     def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
@@ -57,8 +45,7 @@ module Fetcher
     end
 
     def self.clear_dns_cache : Nil
-      client = new
-      client.clear_dns_cache
+      Fetcher::DnsCache.clear
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
@@ -308,58 +295,28 @@ module Fetcher
     end
 
     private def get_cached_dns(host : String) : Socket::IPAddress?
-      return unless @config.dns.cache_enabled
-      @@dns_cache_lock.synchronize do
-        entry = @@dns_cache[host]?
-        return unless entry
-        if entry[:expires] > Time.utc
-          entry[:addr]
-        else
-          @@dns_cache.delete(host)
-          nil
-        end
-      end
+      Fetcher::DnsCache.lookup(host, @config.dns.cache_enabled)
     end
 
     private def cache_dns(host : String, addr : Socket::IPAddress) : Nil
-      return unless @config.dns.cache_enabled
-      ttl = @config.dns.cache_ttl
-      @@dns_cache_lock.synchronize do
-        # Register DNS cleanup when first entry is added
-        CrestHttpClient.ensure_dns_cleanup_registered
-        # Enforce size limit before adding to prevent unbounded growth
-        CrestHttpClient.enforce_dns_limit
-        @@dns_cache[host] = {addr: addr, expires: Time.utc + ttl}
-      end
+      Fetcher::DnsCache.store(host, addr, @config.dns.cache_ttl, @config.dns.cache_enabled)
     end
 
-    # Eviction buffer - remove this many entries above capacity
-    DNS_EVICTION_BUFFER = 100
-
     # Enforce size limit by randomly evicting entries when at capacity
-    # Uses random eviction instead of LRU sorting to avoid O(n log n) overhead
+    # (delegated to DnsCache, which owns the policy and EVICTION_BUFFER).
     def self.enforce_dns_limit : Nil
-      return unless @@dns_cache.size >= @@dns_max_entries
-      # Randomly evict entries to stay within max + buffer
-      target_size = @@dns_max_entries + DNS_EVICTION_BUFFER
-      while @@dns_cache.size > target_size
-        key = @@dns_cache.keys.sample
-        @@dns_cache.delete(key) if key
-      end
+      Fetcher::DnsCache.enforce_limit
     end
 
     def clear_dns_cache : Nil
-      @@dns_cache_lock.synchronize { @@dns_cache.clear }
+      Fetcher::DnsCache.clear
     end
 
     # Proactively sweep all expired entries from the DNS cache.
     # Call this periodically (e.g., every few minutes) to prevent memory growth
     # from stale entries that haven't been accessed since expiration.
     def self.clear_expired_dns : Nil
-      @@dns_cache_lock.synchronize do
-        now = Time.utc
-        @@dns_cache.reject! { |_, entry| entry[:expires] <= now }
-      end
+      Fetcher::DnsCache.clear_expired
     end
 
 
