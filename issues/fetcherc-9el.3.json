@@ -12,9 +12,15 @@
   "id": "fetcherc-9el.3",
   "labels": [],
   "parent": "fetcherc-9el",
+  "comments": [
+    {
+      "text": "\"Done.",
+      "timestamp": "2026-06-10T10:05:01Z"
+    }
+  ],
   "priority": 3,
   "status": "closed",
   "title": "Extract redirect chain and Crest execution into private methods",
   "type": "task",
-  "updated_at": "2026-06-10T09:50:43Z"
+  "updated_at": "2026-06-10T10:05:01Z"
 }
