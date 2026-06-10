@@ -5,14 +5,15 @@
     "fetcherc-9el.7"
   ],
   "blocks": [],
+  "closed_at": "2026-06-10T09:50:43Z",
   "created": "2026-06-06T22:29:51Z",
   "description": "build_headers and with_cache are pure header utilities called from fetcher.cr, software/*.cr, youtube.cr, and tests. They have no dependency on CrestHttpClient state. They are already documented in src/fetcher/header_builder.cr. Keep thin class-method shims on CrestHttpClient that delegate to HeaderBuilder so external callers (.new-style API) continue to work.",
   "id": "fetcherc-9el.2",
   "labels": [],
   "parent": "fetcherc-9el",
   "priority": 3,
-  "status": "open",
+  "status": "closed",
   "title": "Move build_headers / with_cache to HeaderBuilder",
   "type": "task",
-  "updated_at": "2026-06-06T22:29:56Z"
+  "updated_at": "2026-06-10T09:50:43Z"
 }
