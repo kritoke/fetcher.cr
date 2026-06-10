@@ -271,12 +271,10 @@ module Fetcher
         raise URI::Error.new("Failed to resolve redirect URL: #{redirect_url} from #{original_url}") unless resolved.host
         resolved.to_s
       end
+    rescue ex : URI::Error
+      raise ex
     rescue ex
-      if ex.is_a?(URI::Error)
-        raise ex
-      else
-        raise URI::Error.new("Invalid redirect URL: #{redirect_url}")
-      end
+      raise URI::Error.new("Invalid redirect URL: #{redirect_url} (#{ex.class}: #{ex.message})")
     end
 
     private def check_ssrf(url : String) : Nil
