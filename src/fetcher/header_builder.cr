@@ -22,5 +22,16 @@ module Fetcher
       end
       hash
     end
+
+    # Add conditional If-None-Match / If-Modified-Since headers so a client
+    # can revalidate against a previously-issued ETag or Last-Modified value.
+    # Both arguments are optional; the corresponding header is only added when
+    # the value is present.
+    def self.with_cache(base : ::HTTP::Headers, etag : String?, last_modified : String?) : ::HTTP::Headers
+      result = base.dup
+      result["If-None-Match"] = etag if etag
+      result["If-Modified-Since"] = last_modified if last_modified
+      result
+    end
   end
 end

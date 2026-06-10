@@ -61,10 +61,7 @@ module Fetcher
     end
 
     def self.with_cache(base : ::HTTP::Headers, etag : String?, last_modified : String?) : ::HTTP::Headers
-      result = base.dup
-      result["If-None-Match"] = etag if etag
-      result["If-Modified-Since"] = last_modified if last_modified
-      result
+      HeaderBuilder.with_cache(base, etag, last_modified)
     end
 
     private def ensure_semaphore : Channel(Nil)?
