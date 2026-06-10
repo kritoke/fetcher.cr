@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [
     "fetcherc-9el.3"
@@ -10,8 +10,8 @@
   "labels": [],
   "parent": "fetcherc-9el",
   "priority": 4,
-  "status": "open",
+  "status": "in_progress",
   "title": "Move SafeFeedProcessor size check out of CrestHttpClient",
   "type": "task",
-  "updated_at": "2026-06-06T22:29:56Z"
+  "updated_at": "2026-06-10T10:19:39Z"
 }
