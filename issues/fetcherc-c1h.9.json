@@ -4,14 +4,15 @@
   "blocks": [
     "fetcherc-c1h.4"
   ],
+  "closed_at": "2026-06-10T10:38:15Z",
   "created": "2026-06-06T22:25:08Z",
   "description": "resolve_redirect_url has a  block that re-checks . Crystal's  only binds Exception subtypes, so the inner check is dead code. Replace the catch-all with  only, and let the inner  stand alone. Combine with the rest of the redirect extraction (c1h.3) or land independently.",
   "id": "fetcherc-c1h.9",
   "labels": [],
   "parent": "fetcherc-c1h",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fix resolve_redirect_url dead branch in rescue",
   "type": "task",
-  "updated_at": "2026-06-10T10:10:23Z"
+  "updated_at": "2026-06-10T10:38:15Z"
 }
