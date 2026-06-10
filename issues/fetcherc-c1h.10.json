@@ -5,14 +5,15 @@
     "fetcherc-c1h.2",
     "fetcherc-c1h.8"
   ],
+  "closed_at": "2026-06-10T09:50:43Z",
   "created": "2026-06-06T22:25:08Z",
   "description": "ensure_dns_cleanup_registered registers a Proc that calls back into the class, so PeriodicCleanup holds a closure referencing the singleton state. There is no unregister path, so a client that disables cache_enabled can never remove itself. The class-level @@dns_cache also conflates with per-instance @config.dns.cache_enabled — the first caller's config wins, subsequent clients with cache_enabled=false still write to the shared cache. When extracting DnsCache, scope the cleanup proc to the new class, document the lifecycle, and consider making the cache instance-scoped if practical. Blocked by c1h.2 (DnsCache extraction).",
   "id": "fetcherc-c1h.10",
   "labels": [],
   "parent": "fetcherc-c1h",
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Fix DNS cache cleanup registration leak",
   "type": "task",
-  "updated_at": "2026-06-06T22:25:08Z"
+  "updated_at": "2026-06-10T09:50:43Z"
 }
