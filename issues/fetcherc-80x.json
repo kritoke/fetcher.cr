@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-11T10:15:42Z",
+  "description": "## What\n\nDrop the `cache_enabled?` parameter from `DnsCache.lookup` and `DnsCache.store`. Move the policy gate to the `CrestHttpClient` shim's `get_cached_dns` and `cache_dns` methods, where the config flag actually lives.\n\n## Why\n\n- The cache's `cache_enabled?` param is a hidden coupling: the cache depends on a feature flag the caller is supposed to remember. Three call sites in the shim thread the same flag.\n- The param name triggers a Crystal 'invalid parameter name' warning (the `?` suffix is reserved for predicate methods).\n- Functional critique: the cache should be a pure storage abstraction; the policy belongs at the call site.\n\n## What about the public API?\n\n- The only caller of `DnsCache.lookup(host, cache_enabled?)` and `DnsCache.store(host, addr, ttl, cache_enabled?)` is the `CrestHttpClient` shim (verified via grep). The shim is being updated in this same change.\n- `Fetcher::CrestHttpClient`'s public surface is unchanged (the shims `get_cached_dns`/`cache_dns` are private; signatures don't change).\n- No backward-compat alias needed — there are no other callers.\n\n## How\n\n### `src/fetcher/dns_cache.cr`\n\n```crystal\ndef self.lookup(host : String) : Socket::IPAddress?\n  @@lock.synchronize do\n    entry = @@cache[host]?\n    return unless entry\n    entry[:expires] \u003e Time.utc ? entry[:addr] : nil\n  end\nend\n\ndef self.store(host : String, addr : Socket::IPAddress, ttl : Time::Span) : Nil\n  @@lock.synchronize do\n    ensure_cleanup_registered_unlocked\n    enforce_limit\n    @@cache[host] = {addr: addr, expires: Time.utc + ttl}\n  end\nend\n```\n\nUpdate docstrings to note that callers must gate on their own policy.\n\n### `src/fetcher/crest_http_client.cr`\n\n```crystal\nprivate def get_cached_dns(host : String) : Socket::IPAddress?\n  return unless @config.dns.cache_enabled\n  DnsCache.lookup(host)\nend\n\nprivate def cache_dns(host : String, addr : Socket::IPAddress) : Nil\n  return unless @config.dns.cache_enabled\n  DnsCache.store(host, addr, @config.dns.cache_ttl)\nend\n```\n\n## Done when\n\n- `DnsCache.lookup(host)` and `DnsCache.store(host, addr, ttl)` have the new clean signatures\n- Shim gates on `@config.dns.cache_enabled` before calling\n- `cache_enabled?` Crystal warning is gone\n- `spec/dns_cache_spec.cr` still passes (uses `cache_enabled: true` in its config, so the gate is transparent)\n- Full spec suite still green\n",
+  "id": "fetcherc-80x",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Refactor: move cache_enabled gate from DnsCache to call site (9el.1 follow-up)",
+  "type": "task",
+  "updated_at": "2026-06-11T10:15:42Z"
+}
