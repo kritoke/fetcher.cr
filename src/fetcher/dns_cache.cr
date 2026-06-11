@@ -31,17 +31,17 @@ module Fetcher
 
     # Lookup a cached address for `host`. Returns nil if not cached, expired,
     # or the caller has not enabled caching.
+    #
+    # Pure read: does not mutate the cache. Expired entries remain in the
+    # cache until `clear_expired` removes them. `PeriodicCleanup` runs
+    # `clear_expired` on a fixed interval (60s by default) so the cache is
+    # bounded in practice.
     def self.lookup(host : String, cache_enabled? : Bool) : Socket::IPAddress?
       return unless cache_enabled?
       @@lock.synchronize do
         entry = @@cache[host]?
         return unless entry
-        if entry[:expires] > Time.utc
-          entry[:addr]
-        else
-          @@cache.delete(host)
-          nil
-        end
+        entry[:expires] > Time.utc ? entry[:addr] : nil
       end
     end
 
