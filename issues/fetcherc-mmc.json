@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-11T18:06:15Z",
+  "description": "## What\n\nThree small dead-code removals discovered in a recent code-review pass:\n\n1. `src/fetcher/rate_limiter_registry.cr` — `record Entry, limiter : TokenBucketRateLimiter, last_accessed : Time, ttl : Time::Span` is defined but never referenced anywhere in the codebase. (The actual storage lives in `RateLimiterStore`.)\n\n2. `src/fetcher/circuit_breaker.cr` — `record RegistryEntry, breaker : CircuitBreaker, last_accessed : Time, ttl : Time::Span` defined inside `CircuitBreaker` class. Never referenced. (The actual storage lives in `CircuitBreakerStore`.)\n\n3. `src/fetcher/url_validator.cr` — `LINK_LOCAL_IPV4 = \"169.254.0.0/16\"` and `LINK_LOCAL_IPV6 = \"fe80::/10\"` constants are defined but never used. The actual IP-range checks use the per-octet constants (`IPV4_LINK_LOCAL_FIRST_OCTET` etc.) instead.\n\n## Why\n\nDead code adds visual noise, increases the surface for future confusion, and signals 'maybe this is important' when it isn't.\n\n## How\n\nDelete the dead definitions. No callers will break (verified via grep).\n\n## Done when\n\n- Three definitions removed\n- Full spec suite still green\n- No new warnings from ameba/catseye\n",
+  "id": "fetcherc-mmc",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Cleanup: remove dead records and constants in registries",
+  "type": "task",
+  "updated_at": "2026-06-11T18:06:15Z"
+}
