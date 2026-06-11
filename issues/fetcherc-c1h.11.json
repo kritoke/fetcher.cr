@@ -10,6 +10,12 @@
   "id": "fetcherc-c1h.11",
   "labels": [],
   "parent": "fetcherc-c1h",
+  "comments": [
+    {
+      "text": "Done in commit 0ca78c4. Renamed transition_domain -\u003e preflight_redirect_target; moved record_success to perform_follow_redirect (after Crest returns). Added regression spec with 3 examples, all green.",
+      "timestamp": "2026-06-11T01:10:44Z"
+    }
+  ],
   "priority": 2,
   "status": "closed",
   "title": "Stop recording success on target before contact (transition_domain)",
