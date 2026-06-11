@@ -12,9 +12,12 @@ module Fetcher
     # in a single sweep so we don't evict on every insert at the boundary.
     EVICTION_BUFFER = 100
 
+    # Default size cap for the cache when no explicit value is configured.
+    DEFAULT_MAX_ENTRIES = 10_000
+
     @@cache = {} of String => {addr: Socket::IPAddress, expires: Time}
     @@lock = Mutex.new
-    @@max_entries : Int32 = 10_000
+    @@max_entries : Int32 = DEFAULT_MAX_ENTRIES
     @@cleanup_registered = false
 
     # Configure the maximum number of cache entries. Call once during app init.
