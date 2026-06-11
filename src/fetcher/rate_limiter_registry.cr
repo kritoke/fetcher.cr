@@ -6,11 +6,6 @@ require "./rate_limiter_store"
 
 module Fetcher
   class RateLimiterRegistry
-    record Entry,
-      limiter : TokenBucketRateLimiter,
-      last_accessed : Time,
-      ttl : Time::Span
-
     DEFAULT_TTL = 5.minutes
 
     def self.get(domain : String, config : RequestConfig) : TokenBucketRateLimiter

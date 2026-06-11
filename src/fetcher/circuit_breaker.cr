@@ -12,11 +12,6 @@ module Fetcher
       HalfOpen
     end
 
-    record RegistryEntry,
-      breaker : CircuitBreaker,
-      last_accessed : Time,
-      ttl : Time::Span
-
     getter failure_threshold : Int32
     getter recovery_timeout : Time::Span
     getter failure_count : Int32 = 0

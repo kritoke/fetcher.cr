@@ -9,10 +9,6 @@ module Fetcher
     ALLOWED_SCHEMES = {"http", "https"}
     MAX_URL_LENGTH  = 2048
 
-    # Standard private and reserved IP ranges that should be blocked for SSRF protection
-    LINK_LOCAL_IPV4 = "169.254.0.0/16"
-    LINK_LOCAL_IPV6 = "fe80::/10"
-
     # IPv4 first octet ranges (for private/reserved IP detection)
     IPV4_LINK_LOCAL_FIRST_OCTET  = 169
     IPV4_CGNAT_FIRST_OCTET      = 100
