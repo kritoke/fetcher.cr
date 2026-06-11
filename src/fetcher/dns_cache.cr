@@ -5,8 +5,9 @@ module Fetcher
   # Process-wide DNS resolution cache.
   #
   # Owns its own lock, size cap, and one-shot periodic-cleanup registration.
-  # Lookup/store are no-ops when the caller signals `cache_enabled? == false`,
-  # so the gate check happens in exactly one place per public method.
+  # Pure storage abstraction: the cache does not know about the caller's
+  # cache_enabled policy. Callers gate before calling (see
+  # `CrestHttpClient#get_cached_dns` and `#cache_dns`).
   class DnsCache
     # Eviction buffer - remove this many entries above the configured cap
     # in a single sweep so we don't evict on every insert at the boundary.
@@ -30,15 +31,15 @@ module Fetcher
       @@max_entries = value
     end
 
-    # Lookup a cached address for `host`. Returns nil if not cached, expired,
-    # or the caller has not enabled caching.
+    # Lookup a cached address for `host`. Returns nil if not cached or
+    # expired. Pure read: does not mutate the cache. Expired entries
+    # remain in the cache until `clear_expired` removes them.
+    # `PeriodicCleanup` runs `clear_expired` on a fixed interval (60s by
+    # default) so the cache is bounded in practice.
     #
-    # Pure read: does not mutate the cache. Expired entries remain in the
-    # cache until `clear_expired` removes them. `PeriodicCleanup` runs
-    # `clear_expired` on a fixed interval (60s by default) so the cache is
-    # bounded in practice.
-    def self.lookup(host : String, cache_enabled? : Bool) : Socket::IPAddress?
-      return unless cache_enabled?
+    # The cache is a pure storage abstraction; enabling/disabling caching
+    # is the caller's responsibility (see `CrestHttpClient#get_cached_dns`).
+    def self.lookup(host : String) : Socket::IPAddress?
       @@lock.synchronize do
         entry = @@cache[host]?
         return unless entry
@@ -46,10 +47,12 @@ module Fetcher
       end
     end
 
-    # Store `addr` for `host` with the given TTL. No-op when caching is
-    # disabled. Registers the periodic cleanup exactly once.
-    def self.store(host : String, addr : Socket::IPAddress, ttl : Time::Span, cache_enabled? : Bool) : Nil
-      return unless cache_enabled?
+    # Store `addr` for `host` with the given TTL. Registers the periodic
+    # cleanup exactly once.
+    #
+    # The cache is a pure storage abstraction; enabling/disabling caching
+    # is the caller's responsibility (see `CrestHttpClient#cache_dns`).
+    def self.store(host : String, addr : Socket::IPAddress, ttl : Time::Span) : Nil
       @@lock.synchronize do
         ensure_cleanup_registered_unlocked
         enforce_limit

@@ -296,11 +296,13 @@ module Fetcher
     end
 
     private def get_cached_dns(host : String) : Socket::IPAddress?
-      DnsCache.lookup(host, @config.dns.cache_enabled)
+      return unless @config.dns.cache_enabled
+      DnsCache.lookup(host)
     end
 
     private def cache_dns(host : String, addr : Socket::IPAddress) : Nil
-      DnsCache.store(host, addr, @config.dns.cache_ttl, @config.dns.cache_enabled)
+      return unless @config.dns.cache_enabled
+      DnsCache.store(host, addr, @config.dns.cache_ttl)
     end
 
     # Enforce size limit by randomly evicting entries when at capacity
