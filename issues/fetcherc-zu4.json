@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T10:09:23Z",
   "created": "2026-06-11T02:02:31Z",
   "description": "## What\n\nIn `src/fetcher/dns_cache.cr`, `ensure_cleanup_registered` reads-then-writes `@@cleanup_registered` without holding `@@lock`. The OLD code got away with this because the only caller was inside the lock. Now that `CrestHttpClient.ensure_dns_cleanup_registered` exposes it as a public shim, two concurrent external shim calls can both pass the `return if @@cleanup_registered` check and both call `PeriodicCleanup.register_cleanup` — registering duplicate procs (the `Set` de-dups by identity, but each call passes a fresh proc literal).\n\n## Why\n\nPre-existing race, exposed by the 9el.1 refactor. Self-locking fixes it without changing the public API.\n\n## How\n\nIn `dns_cache.cr`, split into an internal unlocked helper + a public locked wrapper:\n\n```crystal\nprivate def self.ensure_cleanup_registered_unlocked : Nil\n  return if @@cleanup_registered\n  @@cleanup_registered = true\n  PeriodicCleanup.register_cleanup { clear_expired }\nend\n\n# Public wrapper. Takes the lock so external shim callers are safe.\n# Note: store() also calls this helper directly under @@lock, which is why\n# the unlocked variant exists — Crystal Mutex is not re-entrant.\ndef self.ensure_cleanup_registered : Nil\n  @@lock.synchronize { ensure_cleanup_registered_unlocked }\nend\n```\n\nUpdate `store` to call the unlocked variant.\n\n## Done when\n\n- `@@cleanup_registered` write is always under `@@lock`\n- `store` still works (uses unlocked variant)\n- Public shim `CrestHttpClient.ensure_dns_cleanup_registered` is concurrency-safe\n- Full spec suite still green (415 examples)\n",
   "id": "fetcherc-zu4",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Refactor: make DnsCache.ensure_cleanup_registered self-locking (9el.1 follow-up)",
   "type": "task",
-  "updated_at": "2026-06-11T02:42:09Z"
+  "updated_at": "2026-06-11T10:09:23Z"
 }
