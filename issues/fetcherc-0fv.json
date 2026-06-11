@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T23:37:33Z",
   "created": "2026-06-11T18:06:16Z",
   "description": "## What\n\n`Fetcher::URLValidator.max_validated_entries` is a class method that delegates to `validated_store.max_entries`. The comment above it says 'Legacy compatibility: max_validated_entries method-style accessor for the limit on tracked hostname/IP associations. Delegates to the store's actual limit.' Grep across the codebase shows no callers in `src/` or `spec/`.\n\n## Why\n\nThis is the same 'dead shim preserved for API stability' pattern we just removed for the DNS shims (commit 8499e62). Zero callers, one-line delegation, 'legacy' comment. If anyone needs the limit, they can call `URLValidator.validated_store.max_entries` directly (which is the pattern the other validator methods use).\n\n## How\n\nDelete the method. The class-level `@@validated_store` lazy-init stays (used by `register_ip`, `purge_expired`, etc.).\n\n## Done when\n\n- Method removed\n- Full spec suite still green\n- `grep -rn 'max_validated_entries' src/ spec/` returns no hits\n",
   "id": "fetcherc-0fv",
   "labels": [],
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Cleanup: remove unused URLValidator.max_validated_entries shim",
   "type": "task",
-  "updated_at": "2026-06-11T18:43:12Z"
+  "updated_at": "2026-06-11T23:37:33Z"
 }
