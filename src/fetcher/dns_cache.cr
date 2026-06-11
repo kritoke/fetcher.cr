@@ -74,7 +74,6 @@ module Fetcher
     end
 
     # Enforce max_entries + EVICTION_BUFFER. Caller must hold @@lock.
-    # Public so CrestHttpClient can delegate its `enforce_dns_limit` shim.
     def self.enforce_limit : Nil
       return unless @@cache.size >= @@max_entries
       target_size = @@max_entries + EVICTION_BUFFER
@@ -85,10 +84,9 @@ module Fetcher
     end
 
     # Register the periodic cleanup exactly once. Public, self-locking.
-    # Safe to call from anywhere (the CrestHttpClient shim, application
-    # init code, tests). Internally split from the unlocked helper because
-    # Crystal's Mutex is not re-entrant and `store` already holds the lock
-    # when it registers.
+    # Safe to call from anywhere (application init, tests). Internally
+    # split from the unlocked helper because Crystal's Mutex is not
+    # re-entrant and `store` already holds the lock when it registers.
     def self.ensure_cleanup_registered : Nil
       @@lock.synchronize { ensure_cleanup_registered_unlocked }
     end

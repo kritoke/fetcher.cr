@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+- **CrestHttpClient DNS shims**: Dropped five class-level methods that were added in 9el.1 as "preserved public API" shims but had zero production callers in the codebase: `.dns_max_entries`, `.dns_max_entries=`, `.ensure_dns_cleanup_registered`, `.enforce_dns_limit`, `.clear_expired_dns`, and the class-level `.clear_dns_cache`. The corresponding test assertions in `spec/crest_http_client_public_api_spec.cr` are also removed. The actual cache lives on `Fetcher::DnsCache`; callers can use that directly. Also resolves a latent race in `ensure_cleanup_registered` that was only exposed because the shim was callable from external code without holding the lock.
+
 ### Performance Improvements
 
 ---

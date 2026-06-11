@@ -44,20 +44,20 @@ describe Fetcher::CrestHttpClient do
 
   describe "max_entries setter" do
     it "rejects zero" do
-      expect_raises(ArgumentError) { Fetcher::CrestHttpClient.dns_max_entries = 0 }
+      expect_raises(ArgumentError) { Fetcher::DnsCache.max_entries = 0 }
     end
 
     it "rejects negative values" do
-      expect_raises(ArgumentError) { Fetcher::CrestHttpClient.dns_max_entries = -1 }
+      expect_raises(ArgumentError) { Fetcher::DnsCache.max_entries = -1 }
     end
 
     it "accepts positive values" do
-      original = Fetcher::CrestHttpClient.dns_max_entries
+      original = Fetcher::DnsCache.max_entries
       begin
-        Fetcher::CrestHttpClient.dns_max_entries = 5
-        Fetcher::CrestHttpClient.dns_max_entries.should eq 5
+        Fetcher::DnsCache.max_entries = 5
+        Fetcher::DnsCache.max_entries.should eq 5
       ensure
-        Fetcher::CrestHttpClient.dns_max_entries = original
+        Fetcher::DnsCache.max_entries = original
       end
     end
   end

@@ -20,21 +20,9 @@ module Fetcher
     @request_semaphore : Channel(Nil)?
     @semaphore_lock : Mutex = Mutex.new
 
-    # DNS cache delegation shims.
-    # The cache, lock, eviction policy, and cleanup registration all live in
-    # DnsCache. These class-level methods exist only to preserve the
-    # public API used by callers and the spec test helpers.
-    def self.dns_max_entries=(value : Int32) : Nil
-      DnsCache.max_entries = value
-    end
-
-    def self.dns_max_entries : Int32
-      DnsCache.max_entries
-    end
-
-    def self.ensure_dns_cleanup_registered : Nil
-      DnsCache.ensure_cleanup_registered
-    end
+    # DNS cache lookup/store are private instance methods below. The cache
+    # itself, its lock, eviction policy, and periodic-cleanup registration
+    # all live in DnsCache.
 
     def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
       # Semaphore created lazily on first request to avoid race condition
@@ -42,10 +30,6 @@ module Fetcher
 
     def self.clear_rate_limiters : Nil
       RateLimiterRegistry.clear
-    end
-
-    def self.clear_dns_cache : Nil
-      DnsCache.clear
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
@@ -305,21 +289,8 @@ module Fetcher
       DnsCache.store(host, addr, @config.dns.cache_ttl)
     end
 
-    # Enforce size limit by randomly evicting entries when at capacity
-    # (delegated to DnsCache, which owns the policy and EVICTION_BUFFER).
-    def self.enforce_dns_limit : Nil
-      DnsCache.enforce_limit
-    end
-
     def clear_dns_cache : Nil
       DnsCache.clear
-    end
-
-    # Proactively sweep all expired entries from the DNS cache.
-    # Call this periodically (e.g., every few minutes) to prevent memory growth
-    # from stale entries that haven't been accessed since expiration.
-    def self.clear_expired_dns : Nil
-      DnsCache.clear_expired
     end
 
 
