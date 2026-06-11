@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-11T01:59:08Z",
@@ -7,8 +7,8 @@
   "id": "fetcherc-0h6",
   "labels": [],
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Refactor: extract DEFAULT_MAX_ENTRIES constant in DnsCache",
   "type": "task",
-  "updated_at": "2026-06-11T01:59:08Z"
+  "updated_at": "2026-06-11T02:42:09Z"
 }
