@@ -50,7 +50,7 @@ module Fetcher
     def self.store(host : String, addr : Socket::IPAddress, ttl : Time::Span, cache_enabled? : Bool) : Nil
       return unless cache_enabled?
       @@lock.synchronize do
-        ensure_cleanup_registered
+        ensure_cleanup_registered_unlocked
         enforce_limit
         @@cache[host] = {addr: addr, expires: Time.utc + ttl}
       end
@@ -80,9 +80,17 @@ module Fetcher
       end
     end
 
-    # Register the periodic cleanup exactly once. Caller must hold @@lock.
-    # Public so CrestHttpClient can delegate its `ensure_dns_cleanup_registered` shim.
+    # Register the periodic cleanup exactly once. Public, self-locking.
+    # Safe to call from anywhere (the CrestHttpClient shim, application
+    # init code, tests). Internally split from the unlocked helper because
+    # Crystal's Mutex is not re-entrant and `store` already holds the lock
+    # when it registers.
     def self.ensure_cleanup_registered : Nil
+      @@lock.synchronize { ensure_cleanup_registered_unlocked }
+    end
+
+    # Internal helper. Caller must hold @@lock.
+    private def self.ensure_cleanup_registered_unlocked : Nil
       return if @@cleanup_registered
       @@cleanup_registered = true
       PeriodicCleanup.register_cleanup { clear_expired }
