@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-11T01:57:22Z",
@@ -7,8 +7,8 @@
   "id": "fetcherc-sks",
   "labels": [],
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Style: drop Fetcher:: prefix on DnsCache in CrestHttpClient shims",
   "type": "task",
-  "updated_at": "2026-06-11T01:57:22Z"
+  "updated_at": "2026-06-11T02:42:09Z"
 }
