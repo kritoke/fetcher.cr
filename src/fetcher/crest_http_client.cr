@@ -22,18 +22,18 @@ module Fetcher
 
     # DNS cache delegation shims.
     # The cache, lock, eviction policy, and cleanup registration all live in
-    # Fetcher::DnsCache. These class-level methods exist only to preserve the
+    # DnsCache. These class-level methods exist only to preserve the
     # public API used by callers and the spec test helpers.
     def self.dns_max_entries=(value : Int32) : Nil
-      Fetcher::DnsCache.max_entries = value
+      DnsCache.max_entries = value
     end
 
     def self.dns_max_entries : Int32
-      Fetcher::DnsCache.max_entries
+      DnsCache.max_entries
     end
 
     def self.ensure_dns_cleanup_registered : Nil
-      Fetcher::DnsCache.ensure_cleanup_registered
+      DnsCache.ensure_cleanup_registered
     end
 
     def initialize(@config : RequestConfig = RequestConfig.new, @validator : URLValidator::Service = URLValidator.default_service)
@@ -45,7 +45,7 @@ module Fetcher
     end
 
     def self.clear_dns_cache : Nil
-      Fetcher::DnsCache.clear
+      DnsCache.clear
     end
 
     def head(url : String, headers : ::HTTP::Headers = ::HTTP::Headers.new) : ::HTTP::Client::Response
@@ -296,28 +296,28 @@ module Fetcher
     end
 
     private def get_cached_dns(host : String) : Socket::IPAddress?
-      Fetcher::DnsCache.lookup(host, @config.dns.cache_enabled)
+      DnsCache.lookup(host, @config.dns.cache_enabled)
     end
 
     private def cache_dns(host : String, addr : Socket::IPAddress) : Nil
-      Fetcher::DnsCache.store(host, addr, @config.dns.cache_ttl, @config.dns.cache_enabled)
+      DnsCache.store(host, addr, @config.dns.cache_ttl, @config.dns.cache_enabled)
     end
 
     # Enforce size limit by randomly evicting entries when at capacity
     # (delegated to DnsCache, which owns the policy and EVICTION_BUFFER).
     def self.enforce_dns_limit : Nil
-      Fetcher::DnsCache.enforce_limit
+      DnsCache.enforce_limit
     end
 
     def clear_dns_cache : Nil
-      Fetcher::DnsCache.clear
+      DnsCache.clear
     end
 
     # Proactively sweep all expired entries from the DNS cache.
     # Call this periodically (e.g., every few minutes) to prevent memory growth
     # from stale entries that haven't been accessed since expiration.
     def self.clear_expired_dns : Nil
-      Fetcher::DnsCache.clear_expired
+      DnsCache.clear_expired
     end
 
 
