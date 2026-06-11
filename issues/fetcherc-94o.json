@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T23:37:33Z",
   "created": "2026-06-11T18:06:15Z",
   "description": "## What\n\nIn `src/fetcher/circuit_breaker.cr`, `recovery_timeout_elapsed?` uses `Time.utc - last_failure \u003e= @recovery_timeout` to decide when an open circuit breaker should transition to half-open. `@last_failure_time` is written via `Time.utc` in `record_failure` and `allow_request?`. The same wall-clock-vs-monotonic problem we just fixed in the stress specs (commit e79213c).\n\n## Why\n\nNTP corrections or system suspend/resume can jump the wall clock. A backwards jump makes the recovery timeout appear elapsed prematurely, transitioning the breaker to half-open too early. A forwards jump keeps the circuit stuck open past the intended recovery time. `Time.monotonic` never goes backwards and is the right primitive for elapsed-time comparisons.\n\n## How\n\n```crystal\nprivate def recovery_timeout_elapsed? : Bool\n  if last_failure = @last_failure_time\n    Time.monotonic - last_failure \u003e= @recovery_timeout\n  else\n    false\n  end\nend\n```\n\nUpdate the two writes in `record_failure` and `allow_request?` to use `Time.monotonic`. Update field type to `Time?` (it's already that, just a value change).\n\n## Note on scope\n\nThe same `Time.utc` elapsed-time pattern exists in ValidatedIpStore, RegistryHelpers, and BoundedRegistry. Those are a system-wide pattern fix (separate ticket / OpenSpec candidate). This ticket is the single-file, surgical fix for CircuitBreaker.\n\n## Done when\n\n- `Time.monotonic` used for `@last_failure_time` writes and `recovery_timeout_elapsed?` comparison\n- `spec/circuit_breaker_spec.cr` still passes\n- Full spec suite still green\n",
   "id": "fetcherc-94o",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fix: use Time.monotonic in CircuitBreaker timeout logic",
   "type": "task",
-  "updated_at": "2026-06-11T18:43:12Z"
+  "updated_at": "2026-06-11T23:37:33Z"
 }
