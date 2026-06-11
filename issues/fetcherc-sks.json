@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T10:09:23Z",
   "created": "2026-06-11T01:57:22Z",
   "description": "## What\n\nIn `src/fetcher/crest_http_client.cr`, the new DNS shim methods (lines 25-34, 47, 308-313, 318-330) all call the delegate as `Fetcher::DnsCache.X`. The rest of the file uses unqualified module-local references (`HeaderBuilder.build`, `RateLimiterRegistry.clear`, `Crest::Request.execute`). Inside `module Fetcher`, the `Fetcher::` prefix on `DnsCache` is inconsistent noise.\n\n## Why\n\nStyle consistency. Also makes the file slightly easier to read.\n\n## How\n\nIn `src/fetcher/crest_http_client.cr`, replace `Fetcher::DnsCache.X` with `DnsCache.X` in each shim method (7 call sites).\n\n## Done when\n\n- Grep `Fetcher::DnsCache` in crest_http_client.cr returns no hits.\n- Full spec suite still green (415 examples).\n",
   "id": "fetcherc-sks",
   "labels": [],
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Style: drop Fetcher:: prefix on DnsCache in CrestHttpClient shims",
   "type": "task",
-  "updated_at": "2026-06-11T02:42:09Z"
+  "updated_at": "2026-06-11T10:09:23Z"
 }
