@@ -45,12 +45,6 @@ module Fetcher
       @@validated_store_lock.synchronize { @@validated_store ||= ValidatedIpStore.new }
     end
 
-    # Legacy compatibility: max_validated_entries method-style accessor for
-    # the limit on tracked hostname/IP associations. Delegates to the store's actual limit.
-    def self.max_validated_entries : Int32
-      validated_store.max_entries
-    end
-
     def self.clear_validated : Nil
       validated_store.clear
     end
