@@ -16,7 +16,10 @@ module Fetcher
     getter recovery_timeout : Time::Span
     getter failure_count : Int32 = 0
     getter state : State = State::Closed
-    property last_failure_time : Time? = nil
+    # Time::Span from Time.monotonic -- a monotonic counter that's safe
+    # against NTP/suspend jumps. Wall-clock (Time.utc) would miscalculate
+    # the recovery window if the system clock jumped.
+    property last_failure_time : Time::Span? = nil
 
     @mutex : Mutex = Mutex.new
 
@@ -36,7 +39,7 @@ module Fetcher
         in State::Open
           if recovery_timeout_elapsed?
             @state = State::HalfOpen
-            @last_failure_time = Time.utc  # Reset for correct timeout calculation
+            @last_failure_time = Time.monotonic  # Reset for correct timeout calculation
             true
           else
             false
@@ -57,7 +60,7 @@ module Fetcher
     def record_failure : Nil
       @mutex.synchronize do
         @failure_count += 1
-        @last_failure_time = Time.utc
+        @last_failure_time = Time.monotonic
 
         if @state == State::HalfOpen
           @state = State::Open
@@ -69,7 +72,7 @@ module Fetcher
 
     private def recovery_timeout_elapsed? : Bool
       if last_failure = @last_failure_time
-        Time.utc - last_failure >= @recovery_timeout
+        Time.monotonic - last_failure >= @recovery_timeout
       else
         false
       end

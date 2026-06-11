@@ -35,7 +35,7 @@ describe Fetcher::CircuitBreaker do
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
 
-      cb.last_failure_time = Time.utc - 2.seconds
+      cb.last_failure_time = Time.monotonic - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
 
@@ -65,7 +65,7 @@ describe Fetcher::CircuitBreaker do
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
 
-      cb.last_failure_time = Time.utc - 2.seconds
+      cb.last_failure_time = Time.monotonic - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
 
@@ -93,7 +93,7 @@ describe Fetcher::CircuitBreaker do
       cb.record_failure
       cb.state.should eq Fetcher::CircuitBreaker::State::Open
 
-      cb.last_failure_time = Time.utc - 2.seconds
+      cb.last_failure_time = Time.monotonic - 2.seconds
       cb.allow_request?.should be_true
       cb.state.should eq Fetcher::CircuitBreaker::State::HalfOpen
     end
@@ -101,7 +101,7 @@ describe Fetcher::CircuitBreaker do
     it "returns true in HalfOpen state" do
       cb = Fetcher::CircuitBreaker.new(failure_threshold: 1, recovery_timeout: 1.second)
       cb.record_failure
-      cb.last_failure_time = Time.utc - 2.seconds
+      cb.last_failure_time = Time.monotonic - 2.seconds
 
       cb.allow_request?.should be_true
     end
