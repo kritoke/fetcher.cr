@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-11T02:02:31Z",
+  "description": "## What\n\nIn `src/fetcher/dns_cache.cr`, `lookup` deletes expired entries as a side effect of being a read. The pure version: lookup is a read; expired cleanup is `clear_expired`'s job.\n\n## Why\n\nSide effects in a read method make the cache harder to reason about and harder to test (the same input can produce different state across calls). The current behavior is a perf optimization (\"clean on read\") that mostly hides the periodic cleanup lag.\n\n## Trade-off\n\nExpired entries will persist up to one `PeriodicCleanup` interval (60s by default) after expiration instead of being removed on first lookup. `enforce_limit` might evict fresh entries before expired ones (random eviction doesn't know about expiration). Both effects are small in practice.\n\n## How\n\nIn `dns_cache.cr`, change `lookup` from:\n\n```crystal\nif entry[:expires] \u003e Time.utc\n  entry[:addr]\nelse\n  @@cache.delete(host)\n  nil\nend\n```\n\nto:\n\n```crystal\nentry[:expires] \u003e Time.utc ? entry[:addr] : nil\n```\n\nUpdate the docstring to call out the contract: `lookup` is a pure read; expired entries are removed by `clear_expired`.\n\n## Done when\n\n- `lookup` no longer mutates `@@cache`\n- Spec `dns_cache_spec.cr` still passes (it asserts on lookup return value, not on cache state)\n- Full spec suite still green (415 examples)\n",
+  "id": "fetcherc-242",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Refactor: make DnsCache.lookup pure (no delete on expired) (9el.1 follow-up)",
+  "type": "task",
+  "updated_at": "2026-06-11T02:02:31Z"
+}
