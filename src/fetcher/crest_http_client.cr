@@ -135,7 +135,7 @@ module Fetcher
 
       validate_redirect_target(resolved_url)
       validate_redirect_domain(original_url, domain, resolved_url, response.status_code)
-      transition_domain(domain, target_domain) if domain != target_domain
+      preflight_redirect_target(domain, target_domain) if domain != target_domain
       return convert_response(response) if (remaining_redirects || @config.max_redirects) <= 1
 
       verify_dns_rebinding(resolved_url)
@@ -183,6 +183,10 @@ module Fetcher
 
     private def perform_follow_redirect(method : Symbol, url : String, headers : Hash(String, String), domain : String, remaining : Int32?) : ::HTTP::Client::Response
       crest_response = execute_crest(method, url, headers)
+      # Record the successful HTTP exchange with the target as soon as it
+      # returns. This is the natural place: the response was just received
+      # from this domain, regardless of whether the chain continues.
+      record_success(domain)
       handle_redirects(crest_response, url, headers, domain, method, remaining.try(&.- 1))
     end
 
@@ -256,9 +260,11 @@ module Fetcher
       false
     end
 
-    private def transition_domain(from_domain : String, to_domain : String) : Nil
+    private def preflight_redirect_target(from_domain : String, to_domain : String) : Nil
+      # Pre-flight: if the target's circuit breaker is open, fail fast before
+      # issuing the redirected request. Success recording is the responsibility
+      # of the request path that actually completes contact with the target.
       check_circuit_breaker(to_domain)
-      record_success(to_domain)
     end
 
     private def resolve_redirect_url(redirect_url : String, original_url : String) : String

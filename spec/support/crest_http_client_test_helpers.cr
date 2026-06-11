@@ -60,5 +60,13 @@ module Fetcher
         extract_redirect_url(response)
       end
     end
+
+    # Test helper for fetcherc-c1h.11: preflight_redirect_target must only
+    # consult the target's circuit breaker; it must NOT call record_success
+    # on the target (success recording happens in perform_follow_redirect
+    # after the redirected request actually returns).
+    def debug_preflight_redirect_target(from_domain : String, to_domain : String) : Nil
+      preflight_redirect_target(from_domain, to_domain)
+    end
   end
 end
