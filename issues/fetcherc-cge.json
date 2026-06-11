@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T10:09:23Z",
   "created": "2026-06-11T02:41:25Z",
   "description": "## What\n\nIn `src/fetcher/dns_cache.cr`, `@@max_entries = 0` (or any non-positive value) silently fails to enforce the limit. `enforce_limit` checks `@@cache.size \u003e= @@max_entries` — for any non-positive max this is always true, so the cache grows to `EVICTION_BUFFER` (100) entries and stays there. The setter `max_entries=(value : Int32)` accepts any `Int32` including 0 and negatives.\n\n## Why\n\nLatent bug. No current caller sets a non-positive value, but the API accepts it and produces silently wrong behavior. Worth a guard.\n\n## How\n\nIn the setter:\n\n```crystal\ndef self.max_entries=(value : Int32) : Nil\n  raise ArgumentError.new(\"max_entries must be positive, got #{value}\") if value \u003c= 0\n  @@max_entries = value\nend\n```\n\nAdd a spec in `spec/dns_cache_spec.cr` (or a new direct-spec file) that asserts the setter raises on 0 and -1.\n\n## Done when\n\n- Setter raises `ArgumentError` on `value \u003c= 0`\n- Setter accepts positive values (no regression)\n- Spec asserts the raise\n- Full suite still green\n",
   "id": "fetcherc-cge",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fix: validate max_entries setter (reject zero/negative) (9el.1 follow-up)",
   "type": "task",
-  "updated_at": "2026-06-11T02:42:09Z"
+  "updated_at": "2026-06-11T10:09:23Z"
 }
