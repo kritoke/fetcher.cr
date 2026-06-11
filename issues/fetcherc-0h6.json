@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-11T10:09:23Z",
   "created": "2026-06-11T01:59:08Z",
   "description": "## What\n\nIn `src/fetcher/dns_cache.cr`, replace `@@max_entries : Int32 = 10_000` with a named `DEFAULT_MAX_ENTRIES = 10_000` constant. Use the constant in the type annotation.\n\n## Why\n\nCatseye flagged the literal `10000` as a MagicNumber. A named constant documents intent and makes future tuning explicit. Tiny style improvement.\n\n## How\n\n```crystal\nDEFAULT_MAX_ENTRIES = 10_000\n@@max_entries : Int32 = DEFAULT_MAX_ENTRIES\n```\n\n## Done when\n\n- `DEFAULT_MAX_ENTRIES` constant defined on `Fetcher::DnsCache`\n- `@@max_entries` uses it\n- Catseye MagicNumber finding goes away on dns_cache.cr\n- Full spec suite still green (415 examples)\n",
   "id": "fetcherc-0h6",
   "labels": [],
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Refactor: extract DEFAULT_MAX_ENTRIES constant in DnsCache",
   "type": "task",
-  "updated_at": "2026-06-11T02:42:09Z"
+  "updated_at": "2026-06-11T10:09:23Z"
 }
