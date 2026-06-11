@@ -26,6 +26,7 @@ module Fetcher
     end
 
     def self.max_entries=(value : Int32) : Nil
+      raise ArgumentError.new("max_entries must be positive, got #{value}") if value <= 0
       @@max_entries = value
     end
 
