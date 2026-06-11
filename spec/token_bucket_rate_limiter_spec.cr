@@ -92,9 +92,9 @@ describe Fetcher::TokenBucketRateLimiter do
     # Start a fiber that will try to acquire (should block initially)
     channel = Channel(Bool).new
     spawn do
-      start_time = Time.utc
+      start_time = Time.monotonic
       limiter.acquire(1.0) # This should block until tokens are refilled
-      elapsed = (Time.utc - start_time).total_seconds
+      elapsed = (Time.monotonic - start_time).total_seconds
       channel.send(elapsed > 0.01) # Should have waited at least a little
     end
 
