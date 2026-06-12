@@ -115,10 +115,10 @@ module Fetcher
 
       redirect_url = extract_redirect_url(response)
       resolved_url = resolve_redirect_url(redirect_url, original_url)
-      target_domain = extract_domain(resolved_url)
+      target_domain = @validator.extract_domain(resolved_url)
 
       validate_redirect_target(resolved_url)
-      validate_redirect_domain(original_url, domain, resolved_url, response.status_code)
+      validate_redirect_domain(original_url, domain, resolved_url, target_domain, response.status_code)
       preflight_redirect_target(domain, target_domain) if domain != target_domain
       return convert_response(response) if (remaining_redirects || @config.max_redirects) <= 1
 
@@ -157,8 +157,7 @@ module Fetcher
       raise DNSError.new("Redirect to blocked URL: #{url}")
     end
 
-    private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String, status_code : Int32 = 302) : Nil
-      target_domain = @validator.extract_domain(target_url)
+    private def validate_redirect_domain(original_url : String, source_domain : String, target_url : String, target_domain : String, status_code : Int32 = 302) : Nil
       return if allow_redirect?(source_domain, target_domain, status_code)
       # NOTE(catseye): We include the original and target URLs in error messages for debugging.
       # These messages are not executed or evaluated. The redirect decision is made above.
@@ -189,10 +188,6 @@ module Fetcher
         read_timeout: @config.timeout.read,
         tls: build_tls_context
       )
-    end
-
-    private def extract_domain(url : String) : String
-      @validator.extract_domain(url)
     end
 
     # Check if redirect to target_domain from source_domain is allowed
