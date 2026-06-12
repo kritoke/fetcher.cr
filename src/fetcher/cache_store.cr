@@ -158,7 +158,7 @@ module Fetcher
     end
 
     private def update_entry(key : String, value : Result, ttl : Time::Span)
-      @entries[key] = CacheEntry.new(value, Time.utc, ttl)
+      @entries[key] = CacheEntry.new(value, Time.monotonic, ttl)
       @eviction_order.reject! { |k| k == key }
       @eviction_set.delete(key)
       @eviction_order << key
@@ -166,7 +166,7 @@ module Fetcher
     end
 
     private def add_entry(key : String, value : Result, ttl : Time::Span) : Nil
-      @entries[key] = CacheEntry.new(value, Time.utc, ttl)
+      @entries[key] = CacheEntry.new(value, Time.monotonic, ttl)
       # Guard against duplicate additions to preserve LRU order
       unless @eviction_set.includes?(key)
         @eviction_order << key

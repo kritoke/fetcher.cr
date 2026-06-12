@@ -10,7 +10,7 @@ module Fetcher
   class RateLimiterStore
     record Entry,
       limiter : TokenBucketRateLimiter,
-      last_accessed : Time,
+      last_accessed : Time::Span,
       ttl : Time::Span
 
     DEFAULT_TTL = 5.minutes
@@ -33,7 +33,7 @@ module Fetcher
       @lock.synchronize do
         entry = @entries[domain]?
         if entry
-          @entries[domain] = Entry.new(limiter: entry.limiter, last_accessed: Time.utc, ttl: entry.ttl)
+          @entries[domain] = Entry.new(limiter: entry.limiter, last_accessed: Time.monotonic, ttl: entry.ttl)
           return entry.limiter
         end
 
@@ -47,7 +47,7 @@ module Fetcher
           config.rate_limit.refill_rate,
           config.rate_limit.max_waiter_queue_size || 1000
         )
-        @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.utc, ttl: DEFAULT_TTL)
+        @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.monotonic, ttl: DEFAULT_TTL)
 
         # Register cleanup exactly once per store instance, not per domain.
         # The cleanup proc is cached in @cleanup_proc and reused for all domains.

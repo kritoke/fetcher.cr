@@ -9,7 +9,7 @@ module Fetcher
     end
 
     def self.cleanup(entries : Hash(String, T)) : Nil forall T
-      now = Time.utc
+      now = Time.monotonic
       entries.reject! do |_, entry|
         now - entry.last_accessed > entry.ttl
       end
@@ -21,7 +21,7 @@ module Fetcher
     def self.mark_access(entries : Hash(String, T), key : String) : Bool forall T
       if entry = entries[key]?
         begin
-          entry.last_accessed = Time.utc
+          entry.last_accessed = Time.monotonic
           true
         rescue ex
           Log.debug { "BoundedRegistry mark_access failed: #{ex.message}" }

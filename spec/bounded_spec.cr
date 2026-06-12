@@ -3,15 +3,15 @@ require "time"
 require "../src/fetcher/bounded_registry"
 
 struct TestEntry
-  property last_accessed : Time
+  property last_accessed : Time::Span
   getter ttl : Time::Span
 
-  def initialize(@last_accessed : Time, @ttl : Time::Span); end
+  def initialize(@last_accessed : Time::Span, @ttl : Time::Span); end
 end
 
 describe Fetcher::BoundedRegistry do
   it "cleans up expired entries" do
-    now = Time.utc
+    now = Time.monotonic
     entries = {
       "a" => TestEntry.new(now - 3600.seconds, 30.seconds),
       "b" => TestEntry.new(now, 30.seconds),
@@ -26,7 +26,7 @@ describe Fetcher::BoundedRegistry do
   it "ensures limit by evicting oldest entries" do
     entries = {} of String => TestEntry
     0.upto(5) do |i|
-      entries[i.to_s] = TestEntry.new(Time.utc - (i * 60).seconds, 60.minutes)
+      entries[i.to_s] = TestEntry.new(Time.monotonic - (i * 60).seconds, 60.minutes)
     end
 
     # enforce limit to 3 entries
@@ -36,9 +36,9 @@ describe Fetcher::BoundedRegistry do
 
   it "marks access" do
     entries = {} of String => TestEntry
-    entries["x"] = TestEntry.new(Time.utc - 60.seconds, 60.minutes)
+    entries["x"] = TestEntry.new(Time.monotonic - 60.seconds, 60.minutes)
 
     Fetcher::BoundedRegistry.mark_access(entries, "x").should be_true
-    entries["x"].last_accessed.should be > Time.utc - 120.seconds
+    entries["x"].last_accessed.should be > Time.monotonic - 120.seconds
   end
 end

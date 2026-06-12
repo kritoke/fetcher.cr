@@ -60,7 +60,7 @@ module Fetcher
       end
 
       # Collect results with timeout to prevent hanging everlasting
-      deadline = Time.utc + timeout
+      deadline = Time.monotonic + timeout
       received = 0
       timeout_channel = Channel(Bool).new
 

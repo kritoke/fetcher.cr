@@ -8,7 +8,7 @@ module Fetcher
   class CircuitBreakerStore
     record Entry,
       breaker : CircuitBreaker,
-      last_accessed : Time,
+      last_accessed : Time::Span,
       ttl : Time::Span
 
     DEFAULT_TTL = 5.minutes
@@ -31,7 +31,7 @@ module Fetcher
       @lock.synchronize do
         entry = @entries[domain]?
         if entry
-          @entries[domain] = Entry.new(breaker: entry.breaker, last_accessed: Time.utc, ttl: entry.ttl)
+          @entries[domain] = Entry.new(breaker: entry.breaker, last_accessed: Time.monotonic, ttl: entry.ttl)
           return entry.breaker
         end
 
@@ -44,7 +44,7 @@ module Fetcher
           failure_threshold: config.circuit_breaker.failure_threshold,
           recovery_timeout: config.circuit_breaker.recovery_timeout
         )
-        entry = Entry.new(breaker: breaker, last_accessed: Time.utc, ttl: DEFAULT_TTL)
+        entry = Entry.new(breaker: breaker, last_accessed: Time.monotonic, ttl: DEFAULT_TTL)
         @entries[domain] = entry
 
         # Register cleanup exactly once per store instance, not per domain.
@@ -84,7 +84,7 @@ module Fetcher
     # from stale entries that haven't been accessed since expiration.
     def clear_expired : Nil
       @lock.synchronize do
-        now = Time.utc
+        now = Time.monotonic
         @entries.reject! do |_, entry|
           entry.last_accessed + entry.ttl < now
         end

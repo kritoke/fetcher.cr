@@ -11,7 +11,7 @@ module Fetcher
     # Internal entry record
     record Entry,
       ip : Socket::IPAddress,
-      last_accessed : Time
+      last_accessed : Time::Span
 
     getter max_entries : Int32
 
@@ -36,7 +36,7 @@ module Fetcher
     private def register_internal(host : String, ip : Socket::IPAddress) : Nil
       drain_if_needed
       enforce_limit
-      @map[host] = Entry.new(ip, Time.utc)
+      @map[host] = Entry.new(ip, Time.monotonic)
     end
 
     # Drains stale entries when MAP approaches capacity. Safe to call frequently;
@@ -55,7 +55,7 @@ module Fetcher
     # Called implicitly by `register` when approaching max capacity (80%).
     def purge_expired(expiry : Time::Span? = nil) : Nil
       ttl = expiry || @ttl
-      now = Time.utc
+      now = Time.monotonic
       @mutex.synchronize do
         @map.reject! { |_, entry| (now - entry.last_accessed) > ttl }
       end
@@ -67,7 +67,7 @@ module Fetcher
     def check_rebinding(host : String, current_ip : Socket::IPAddress) : Bool?
       @mutex.synchronize do
         if entry = @map[host]?
-          if (Time.utc - entry.last_accessed) <= @ttl
+          if (Time.monotonic - entry.last_accessed) <= @ttl
             return entry.ip == current_ip
           else
             @map.delete(host)
