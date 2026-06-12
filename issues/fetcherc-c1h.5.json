@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [
     "fetcherc-c1h.2"
   ],
@@ -13,8 +13,8 @@
   "labels": [],
   "parent": "fetcherc-c1h",
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Extract RebindingChecker into src/fetcher/crest_http_client/rebinding_checker.cr",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:39Z"
+  "updated_at": "2026-06-12T10:42:37Z"
 }
