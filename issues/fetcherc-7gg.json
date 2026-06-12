@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-12T10:05:19Z",
+  "description": "## What\n\nThe \"lazy-init class-level store with @@store + @@store_lock\" pattern is duplicated in 3 files:\n\n- `src/fetcher/rate_limiter_registry.cr` (RateLimiterRegistry.store)\n- `src/fetcher/circuit_breaker.cr` (CircuitBreaker::Registry.store)\n- `src/fetcher/url_validator.cr` (URLValidator.validated_store)\n\nEach follows the same shape:\n\n```crystal\n@@store : SomeStore? = nil\n@@store_lock = Mutex.new\n\ndef self.store : SomeStore\n  @@store_lock.synchronize { @@store ||= SomeStore.new }\nend\n```\n\n## Why\n\nDRY violation. Adding a new registry means copying the pattern. The shape is mechanical and identical.\n\n## How\n\nExtract a module-level helper:\n\n```crystal\nmodule LazyStore(T)\n  @@instance : T? = nil\n  @@lock = Mutex.new\n\n  def self.instance : T\n    @@lock.synchronize { @@instance ||= T.new }\n  end\n\n  def self.instance=(value : T)\n    @@lock.synchronize { @@instance = value }\n  end\n\n  def self.reset!\n    @@lock.synchronize { @@instance = nil }\n  end\nend\n```\n\nOr use a macro. Each registry then declares `LazyStore(MyStore).instance` instead of hand-rolling the lazy init.\n\n## Counter-considerations\n\nCrystal modules can't have generics in the same way classes can. May need a macro or a different abstraction. Alternatively, a single `class Registry(T)` generic class could host the lazy-init logic.\n\n## Done when\n\n- All 3 sites use the shared helper\n- No more hand-rolled `@@store` / `@@store_lock` pairs\n- Full spec suite still green\n",
+  "id": "fetcherc-7gg",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Refactor: deduplicate lazy @@store init pattern (3 places)",
+  "type": "task",
+  "updated_at": "2026-06-12T10:05:19Z"
+}
