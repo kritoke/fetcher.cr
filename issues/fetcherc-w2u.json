@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-12T10:05:19Z",
+  "description": "## What\n\nThe \"store with Entry record (limiter/breaker, last_accessed, ttl) + DEFAULT_TTL = 5.minutes + get/create/cleanup\" template is duplicated in 3 files:\n\n- `src/fetcher/cache_store.cr` (CacheStore + CacheEntry)\n- `src/fetcher/circuit_breaker_store.cr` (CircuitBreakerStore + Entry)\n- `src/fetcher/rate_limiter_store.cr` (RateLimiterStore + Entry)\n\nEach has:\n- An Entry record with the same 3 fields (value, last_accessed, ttl)\n- A `DEFAULT_TTL = 5.minutes` constant\n- A `get(domain, config)` method that lazy-creates a new entry\n- A `cleanup` method\n- The one-shot PeriodicCleanup registration pattern (separate ticket)\n\n## Why\n\nDRY violation. The structural template is identical. Adding a new \"registry store\" (e.g., a future one) means copying ~30 lines of boilerplate.\n\nFunctional/purity angle: the get/cleanup logic is mechanical. A shared base class or generic `class RegistryStore(T)` could host the common parts.\n\n## How\n\nExtract a base class:\n\n```crystal\nabstract class RegistryStore(T)\n  record Entry, value : T, last_accessed : Time::Span, ttl : Time::Span\n\n  DEFAULT_TTL = 5.minutes\n\n  @entries = {} of String =\u003e Entry\n  @max_entries : Int32\n\n  def initialize(@max_entries : Int32 = 10_000)\n  end\n\n  def get(key : String, config) : T\n    # common get logic\n  end\n\n  def cleanup : Nil\n    # common cleanup using BoundedRegistry\n  end\n\n  abstract def create_value(config) : T\nend\n```\n\nEach concrete store implements `create_value(config)` to build the value (Cache, RateLimiter, CircuitBreaker).\n\n## Counter-considerations\n\nThe three concrete stores have different lifecycles:\n- CacheStore has a full actor (owner fiber) for stats, enabled flag, etc.\n- CircuitBreakerStore is simpler but has cleanup registration\n- RateLimiterStore is similar to CircuitBreakerStore\n\nA shared base class works for the common parts (Entry, get/cleanup skeleton, periodic cleanup registration) but the unique parts (actor, stats) stay in subclasses. This is a healthy base-vs-subclass split.\n\n## Done when\n\n- Shared base class or generic `RegistryStore(T)` extracts the common template\n- The 3 concrete stores inherit / instantiate the template\n- Full spec suite still green\n",
+  "id": "fetcherc-w2u",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Refactor: deduplicate store template (3 places)",
+  "type": "task",
+  "updated_at": "2026-06-12T10:05:19Z"
+}
