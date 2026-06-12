@@ -127,26 +127,20 @@ module Fetcher
       Math.min(delay, retry.max_delay)
     end
 
-    # Return a copy of this RequestConfig with the retry.max_retries overridden.
-    # This avoids constructing a new RequestConfig by copying every field manually.
-    def with_retry_max_retries(max_retries : Int32) : RequestConfig
-      new_retry = RetryConfig.new(
-        max_retries: max_retries,
-        base_delay: @retry.base_delay,
-        max_delay: @retry.max_delay,
-        exponential_base: @retry.exponential_base
-      )
-
+    # Internal copy helper. When a new field is added to RequestConfig, it
+    # only needs to be wired here -- the `with_*` methods below stay short.
+    # Returns a new RequestConfig with the given sub-configs overridden.
+    private def copy_with(retry : RetryConfig? = nil, redirect : RedirectConfig? = nil) : RequestConfig
       RequestConfig.new(
         timeout: @timeout,
-        retry: new_retry,
+        retry: retry || @retry,
         circuit_breaker: @circuit_breaker,
         rate_limit: @rate_limit,
         streaming: @streaming,
         cache_config: @cache_config,
         dns: @dns,
         content: @content,
-        redirect: @redirect,
+        redirect: redirect || @redirect,
         max_redirects: @max_redirects,
         follow_redirects: @follow_redirects,
         ssl_verify: @ssl_verify,
@@ -163,37 +157,26 @@ module Fetcher
       )
     end
 
+    # Return a copy of this RequestConfig with the retry.max_retries overridden.
+    def with_retry_max_retries(max_retries : Int32) : RequestConfig
+      copy_with(
+        retry: RetryConfig.new(
+          max_retries: max_retries,
+          base_delay: @retry.base_delay,
+          max_delay: @retry.max_delay,
+          exponential_base: @retry.exponential_base
+        )
+      )
+    end
+
     # Return a copy of this RequestConfig with specific allowed domains for redirects.
     def with_redirect_allowed_domains(domains : Array(String)) : RequestConfig
-      new_redirect = RedirectConfig.new(
-        allow_external: @redirect.allow_external,
-        allowed_domains: domains,
-        allow_permanent_external: @redirect.allow_permanent_external
-      )
-
-      RequestConfig.new(
-        timeout: @timeout,
-        retry: @retry,
-        circuit_breaker: @circuit_breaker,
-        rate_limit: @rate_limit,
-        streaming: @streaming,
-        cache_config: @cache_config,
-        dns: @dns,
-        content: @content,
-        redirect: new_redirect,
-        max_redirects: @max_redirects,
-        follow_redirects: @follow_redirects,
-        ssl_verify: @ssl_verify,
-        driver_detection_mode: @driver_detection_mode,
-        error_detail_level: @error_detail_level,
-        max_concurrent_requests: @max_concurrent_requests,
-        ssl_verify_bypass_acknowledged: @ssl_verify_bypass_acknowledged,
-        gitlab_token: @gitlab_token,
-        codeberg_token: @codeberg_token,
-        reddit_client_id: @reddit_client_id,
-        reddit_client_secret: @reddit_client_secret,
-        reddit_username: @reddit_username,
-        reddit_password: @reddit_password
+      copy_with(
+        redirect: RedirectConfig.new(
+          allow_external: @redirect.allow_external,
+          allowed_domains: domains,
+          allow_permanent_external: @redirect.allow_permanent_external
+        )
       )
     end
 
