@@ -15,8 +15,9 @@ module Fetcher
       clear_dns_cache
     end
 
+    # Test helper to exercise the rebinding checker's verify method
     def debug_verify_dns_rebinding(url : String) : Nil
-      verify_dns_rebinding(url)
+      @rebinding_checker.verify(url)
     end
 
     # Test helper to verify the redirect policy's allow? behaviour for unit tests
