@@ -202,7 +202,6 @@ module Fetcher
       false
     end
 
-    # Same domain is always allowed
     private def same_domain_redirect?(source : String, target : String) : Bool
       source == target
     end
