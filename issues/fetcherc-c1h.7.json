@@ -10,14 +10,15 @@
   "blocks": [
     "fetcherc-c1h.8"
   ],
+  "closed_at": "2026-06-12T10:34:32Z",
   "created": "2026-06-06T22:03:22Z",
   "description": "## What\n\nTwo small cleanups surfaced during the audit:\n\n1. **`extract_domain(url)` on CrestHttpClient** is a one-line passthrough to\n   `@validator.extract_domain(url)`. Remove it; callers (there is exactly one,\n   `perform_request`) use `@validator.extract_domain` directly.\n\n2. **`transition_domain(from, to)`** does two things: check the target\n   circuit breaker and record success on the target. The name suggests\n   circuit-breaker accounting but the body is barely a transition. Either:\n   - Inline it (it's called from exactly one place), or\n   - Rename to `record_domain_transition` to make intent explicit.\n\n3. **`# Same domain is always allowed`** style comments are redundant restatements\n   of the method name. The good ones (subdomain, permanent, registrable domain)\n   stay; the noise ones go.\n\n## Why\n\n- Small, but they make the file longer than it needs to be and the\n  `transition_domain` name is misleading.\n- Defer until after the four extractions land so the diff is reviewable in\n  one place (the slimmed-down `crest_http_client.cr`).\n\n## Done when\n\n- `extract_domain` is gone from `CrestHttpClient`.\n- `transition_domain` is either inlined or renamed.\n- No comment-only noise.",
   "id": "fetcherc-c1h.7",
   "labels": [],
   "parent": "fetcherc-c1h",
   "priority": 3,
-  "status": "open",
+  "status": "closed",
   "title": "Cleanup: remove redundant extract_domain wrapper, rename transition_domain",
   "type": "task",
-  "updated_at": "2026-06-06T22:03:39Z"
+  "updated_at": "2026-06-12T10:34:32Z"
 }
