@@ -9,25 +9,22 @@ module Fetcher
     ALLOWED_SCHEMES = {"http", "https"}
     MAX_URL_LENGTH  = 2048
 
-    # IPv4 first octet ranges (for private/reserved IP detection)
-    IPV4_LINK_LOCAL_FIRST_OCTET  = 169
-    IPV4_CGNAT_FIRST_OCTET      = 100
-    IPV4_CGNAT_SECOND_OCTET_MIN = 64
-    IPV4_CGNAT_SECOND_OCTET_MAX = 127
-    IPV4_BENCHMARK_FIRST_OCTET  = 198
-    IPV4_BENCHMARK_SECOND_OCTET_1 = 18
-    IPV4_BENCHMARK_SECOND_OCTET_2 = 19
-    IPV4_MULTICAST_FIRST_OCTET  = 224
-    IPV4_MULTICAST_RANGE_SIZE   = 16   # 224-239
-    IPV4_RESERVED_FIRST_OCTET   = 240
-
-    # IPv4 link-local second octet (169.254.x.x)
-    IPV4_LINK_LOCAL_SECOND_OCTET = 254
-
-    # IPv6 link-local scope ID range (fe80::/10) - second nibble valid range 8-f
-    IPV6_LINK_LOCAL_SCOPE_MIN     = 8
-    IPV6_LINK_LOCAL_SCOPE_MAX     = 15
-    IPV6_LINK_LOCAL_SCOPE_RANGE   = 7  # MAX - MIN
+    # IPv4 CIDR ranges blocked for SSRF protection.
+    # Format: {prefix_as_uint32, prefix_length, description}
+    BLOCKED_IPV4_RANGES = [
+      {0x0A000000_u32,  8, "10.0.0.0/8 (RFC 1918 private)"},
+      {0xAC100000_u32, 12, "172.16.0.0/12 (RFC 1918 private)"},
+      {0xC0A80000_u32, 16, "192.168.0.0/16 (RFC 1918 private)"},
+      {0xA9FE0000_u32, 16, "169.254.0.0/16 (link-local)"},
+      {0x64400000_u32, 10, "100.64.0.0/10 (CGNAT, RFC 6598)"},
+      {0xC6120000_u32, 15, "198.18.0.0/15 (benchmark, RFC 2544)"},
+      {0xE0000000_u32,  4, "224.0.0.0/4 (multicast)"},
+      {0xF0000000_u32,  4, "240.0.0.0/4 (reserved)"},
+      {0x00000000_u32,  8, "0.0.0.0/8 (current network)"},
+      {0xC0000200_u32, 24, "192.0.2.0/24 (TEST-NET-1, RFC 5737)"},
+      {0xC6336400_u32, 24, "198.51.100.0/24 (TEST-NET-2, RFC 5737)"},
+      {0xCB007100_u32, 24, "203.0.113.0/24 (TEST-NET-3, RFC 5737)"},
+    ]
 
     # DNS rebinding mitigation: track recently validated hostnames and their IPs
     DNS_RESOLVE_PORT = 80
@@ -264,81 +261,58 @@ module Fetcher
     end
 
     private def self.blocked_ip?(ip_address : Socket::IPAddress) : Bool
-      ip_address.private? || ip_address.loopback? || link_local?(ip_address) ||
-        ipv6_unique?(ip_address) || ipv6_site?(ip_address) ||
-        ipv6_mapped_ipv4?(ip_address) || cgnat?(ip_address) ||
-        benchmark?(ip_address) || multicast?(ip_address) ||
-        reserved?(ip_address) || current_network?(ip_address) ||
-        documentation?(ip_address)
+      ip_address.private? || ip_address.loopback? ||
+        blocked_ipv6?(ip_address.address) ||
+        ipv6_mapped_ipv4_blocked?(ip_address) ||
+        blocked_ipv4?(ip_address)
     end
 
-    private def self.ipv6_site?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
+    # Check if an IPv6 address matches a blocked prefix.
+    # Covers: fe80::/10 (link-local), fec0::/10 (site-local), fc00::/7 (unique local).
+    private def self.blocked_ipv6?(address : String) : Bool
       return false unless address.includes?(":")
-
       downcase = address.downcase
-      second_char = downcase[2]?
-      return false unless second_char && downcase.starts_with?("fe") && second_char.in?('c', 'd', 'e', 'f')
-      true
+      return true if downcase.starts_with?("fc") || downcase.starts_with?("fd")  # fc00::/7 (unique local)
+      return false unless downcase.starts_with?("fe")
+      third = downcase[2]?
+      return false unless third
+      case third
+      when '8', '9', 'a', 'b' then true   # fe80::/10 (link-local)
+      when 'c', 'd', 'e', 'f' then true   # fec0::/10 (site-local)
+      else false
+      end
     rescue ex
-      Log.debug { "ipv6_site? failed: #{ex.message}" }
+      Log.debug { "blocked_ipv6? failed: #{ex.message}" }
       false
     end
 
-    private def self.link_local?(ip_address : Socket::IPAddress) : Bool
+    # Check if an IPv6-mapped IPv4 address (::ffff:x.x.x.x) contains a blocked IPv4.
+    private def self.ipv6_mapped_ipv4_blocked?(ip_address : Socket::IPAddress) : Bool
       address = ip_address.address
-      if address.includes?(":")
-        downcase = address.downcase
-        if downcase.starts_with?("fe")
-          second_char = downcase[2]?
-          return false unless second_char
-          second_nibble = second_char.to_i?(16)
-          return false unless second_nibble && second_nibble >= IPV6_LINK_LOCAL_SCOPE_MIN && second_nibble <= IPV6_LINK_LOCAL_SCOPE_MAX
-          true
-        else
-          false
-        end
-      else
-        return false unless parts = ipv4_octets(ip_address)
-        parts.size == 4 && parts[0] == IPV4_LINK_LOCAL_FIRST_OCTET && parts[1] == IPV4_LINK_LOCAL_SECOND_OCTET
-      end
-    end
-
-    # IPv6 unique local addresses (fc00::/7) - RFC 4193
-    private def self.ipv6_unique?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      if address.includes?(":")
-        # IPv6 unique local addresses (fc00::/7)
-        # Covers fc00::/8 and fd00::/8
-        address.downcase.starts_with?("fc") || address.downcase.starts_with?("fd")
-      else
+      return false unless address.includes?(":") && address.downcase.starts_with?("::ffff:")
+      ipv4_str = address.downcase.sub("::ffff:", "")
+      begin
+        ipv4 = Socket::IPAddress.new(ipv4_str, DNS_RESOLVE_PORT)
+        ipv4.private? || ipv4.loopback? || blocked_ipv4?(ipv4)
+      rescue ex
+        Log.debug { "ipv6_mapped_ipv4_blocked? failed: #{ex.message}" }
         false
       end
     rescue ex
-      Log.debug { "ipv6_unique? failed: #{ex.message}" }
+      Log.debug { "ipv6_mapped_ipv4_blocked? failed: #{ex.message}" }
       false
     end
 
-    # IPv6 mapped IPv4 addresses (::ffff:x.x.x.x) - check if mapped IPv4 is private
-    private def self.ipv6_mapped_ipv4?(ip_address : Socket::IPAddress) : Bool
-      address = ip_address.address
-      if address.includes?(":") && address.downcase.starts_with?("::ffff:")
-        # IPv6 mapped IPv4 (e.g., ::ffff:192.168.1.1)
-        # Extract the IPv4 portion
-        ipv4_str = address.downcase.sub("::ffff:", "")
-        begin
-          ipv4 = Socket::IPAddress.new(ipv4_str, DNS_RESOLVE_PORT)
-          ipv4.private? || ipv4.loopback? || link_local?(ipv4)
-        rescue ex
-          Log.debug { "ipv6_mapped_ipv4? nested failed: #{ex.message}" }
-          false
-        end
-      else
-        false
+    # Check if an IPv4 address falls within any blocked CIDR range.
+    # Uses BLOCKED_IPV4_RANGES for data-driven matching.
+    private def self.blocked_ipv4?(ip_address : Socket::IPAddress) : Bool
+      octets = ipv4_octets(ip_address)
+      return false unless octets && octets.size == 4
+      ip_int = (octets[0].to_u32 << 24) | (octets[1].to_u32 << 16) | (octets[2].to_u32 << 8) | octets[3].to_u32
+      BLOCKED_IPV4_RANGES.any? do |(prefix, mask_len, _)|
+        mask = mask_len == 0 ? 0_u32 : ~(0xFFFFFFFF_u32 >> mask_len)
+        (ip_int & mask) == (prefix & mask)
       end
-    rescue ex
-      Log.debug { "ipv6_mapped_ipv4? failed: #{ex.message}" }
-      false
     end
 
     private def self.ipv4_octets(ip_address : Socket::IPAddress) : Array(Int32)?
@@ -348,52 +322,6 @@ module Fetcher
     rescue ex
       Log.debug { "ipv4_octets failed: #{ex.message}" }
       nil
-    end
-
-    # Carrier-Grade NAT (100.64.0.0/10) - RFC 6598
-    private def self.cgnat?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] == IPV4_CGNAT_FIRST_OCTET && parts[1] >= IPV4_CGNAT_SECOND_OCTET_MIN && parts[1] <= IPV4_CGNAT_SECOND_OCTET_MAX
-    end
-
-    # Network Benchmark Testing (198.18.0.0/15) - RFC 2544
-    private def self.benchmark?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] == IPV4_BENCHMARK_FIRST_OCTET && (parts[1] == IPV4_BENCHMARK_SECOND_OCTET_1 || parts[1] == IPV4_BENCHMARK_SECOND_OCTET_2)
-    end
-
-    # Multicast (224.0.0.0/4)
-    private def self.multicast?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] >= IPV4_MULTICAST_FIRST_OCTET && parts[0] <= IPV4_MULTICAST_FIRST_OCTET + IPV4_MULTICAST_RANGE_SIZE
-    end
-
-    # Reserved / Future Use (240.0.0.0/4)
-    private def self.reserved?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] >= IPV4_RESERVED_FIRST_OCTET
-    end
-
-    # Current Network (0.0.0.0/8)
-    private def self.current_network?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      parts.size == 4 && parts[0] == 0
-    end
-
-    # RFC 5737 documentation address blocks (TEST-NET-* used in documentation)
-    # 192.0.2.0/24 - TEST-NET-1
-    # 198.51.100.0/24 - TEST-NET-2
-    # 203.0.113.0/24 - TEST-NET-3
-    private def self.documentation?(ip_address : Socket::IPAddress) : Bool
-      return false unless parts = ipv4_octets(ip_address)
-      return false unless parts.size == 4
-
-      case parts[0]
-      when 192 then parts[1] == 0 && parts[2] == 2           # TEST-NET-1
-      when 198 then parts[1] == 51 && parts[2] == 100        # TEST-NET-2
-      when 203 then parts[1] == 0 && parts[2] == 113          # TEST-NET-3
-      else false
-      end
     end
   end
 end
