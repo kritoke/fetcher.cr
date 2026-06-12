@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-11T23:38:55Z",
@@ -7,8 +7,8 @@
   "id": "fetcherc-526",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Refactor: deduplicate RequestConfig.with_* copy methods",
   "type": "task",
-  "updated_at": "2026-06-11T23:38:55Z"
+  "updated_at": "2026-06-12T09:51:40Z"
 }
