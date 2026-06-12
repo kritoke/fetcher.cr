@@ -22,6 +22,7 @@ module Fetcher
   define_fetch_error TimeoutError
   define_fetch_error InvalidURLError
   define_fetch_error InvalidFormatError
+  define_fetch_error SSLError
 
   class HTTPError < FetchError
     getter status_code : Int32?

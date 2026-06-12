@@ -213,7 +213,7 @@ module Fetcher
       # NOTE(catseye): We create an Error object that includes the URL for clarity in logs.
       # This does not perform any execution of the URL content.
       error = Error.invalid_url("Invalid URL: #{ex.message}", url)
-      raise DNSError.new(error.message, error, ex)
+      raise InvalidURLError.new(error.message, error, ex)
     end
 
     private def handle_socket_error(ex : Socket::Error, url : String) : Nil
@@ -229,7 +229,7 @@ module Fetcher
 
     private def handle_ssl_error(ex : OpenSSL::SSL::Error, url : String) : Nil
       error = Error.dns("SSL error: #{ex.message}", url)
-      raise DNSError.new(error.message, error, ex)
+      raise SSLError.new(error.message, error, ex)
     end
 
     private def handle_request_failed(ex : Crest::RequestFailed, url : String) : Nil

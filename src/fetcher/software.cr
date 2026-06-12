@@ -278,7 +278,7 @@ module Fetcher
       return result if result && result.success?
 
       Fetcher.error_result(ErrorKind::HTTPError, "#{provider_name} fetch error: No releases found", 404)
-    rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError
+    rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError | InvalidURLError | SSLError
       ErrorHandler.handle_network_error(ex, provider.api_url)
     rescue ex
       Log.warn { "Unexpected error in software fetch: #{ex.class} - #{ex.message}" }
@@ -291,7 +291,7 @@ module Fetcher
         begin
           atom_result = AtomParser.try_parse(http_client, atom_url, provider, limit)
           return atom_result if atom_result && atom_result.success?
-        rescue ex : DNSError
+        rescue ex : DNSError | InvalidURLError | SSLError
           return Fetcher.error_result(ErrorKind::DNSError, "#{provider.name} DNS error: #{ex.message}")
         rescue ex
           ::Log.for("fetcher.software").debug { "#{provider.name} atom feed failed for #{atom_url}: #{ex.class} - #{ex.message}" }

@@ -62,7 +62,7 @@ describe Fetcher::CrestHttpClient do
     begin
       client.debug_validate_redirect_target("https://bad.example.com/feed")
       raise "expected DNSError"
-    rescue Fetcher::DNSError
+    rescue Fetcher::DNSError | Fetcher::InvalidURLError | Fetcher::SSLError
       # expected
     end
   end
@@ -84,7 +84,7 @@ describe Fetcher::CrestHttpClient do
     begin
       client.debug_check_ssrf("https://unsafe.example.com/feed")
       raise "expected DNSError"
-    rescue Fetcher::DNSError
+    rescue Fetcher::DNSError | Fetcher::InvalidURLError | Fetcher::SSLError
       # expected
     end
   end

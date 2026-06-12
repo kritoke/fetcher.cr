@@ -26,7 +26,7 @@ module Fetcher
       ErrorHandler.handle_response(response, url) do
         parse_feed(response.body, url, limit, config)
       end
-    rescue ex : DNSError | TimeoutError | IO::TimeoutError | Socket::Error
+    rescue ex : DNSError | InvalidURLError | SSLError | TimeoutError | IO::TimeoutError | Socket::Error
       ErrorHandler.handle_network_error(ex, url)
     rescue ex
       Log.warn { "RSS fetch unexpected error: #{ex.class} - #{ex.message}" }

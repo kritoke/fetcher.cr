@@ -20,7 +20,7 @@ module Fetcher
 
         # Return the original API result (even if it was an error)
         result || Fetcher.error_result(ErrorKind::HTTPError, "GitHub fetch error: No releases found", 404)
-      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError
+      rescue ex : JSON::ParseException | IO::TimeoutError | Socket::Error | DNSError | InvalidURLError | SSLError
         ErrorHandler.handle_network_error(ex, provider.api_url)
       rescue ex
         Log.warn { "Unexpected error in GitHub fetch: #{ex.class} - #{ex.message}" }

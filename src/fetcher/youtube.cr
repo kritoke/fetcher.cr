@@ -85,7 +85,7 @@ module Fetcher
       ErrorHandler.handle_response(response, rss_url) do
         parse_youtube_feed(response.body, channel_id, limit)
       end
-    rescue ex : DNSError | TimeoutError | IO::TimeoutError | Socket::Error
+    rescue ex : DNSError | InvalidURLError | SSLError | TimeoutError | IO::TimeoutError | Socket::Error
       ErrorHandler.handle_network_error(ex, rss_url)
     rescue ex
       Log.warn { "YouTube fetch unexpected error: #{ex.class} - #{ex.message}" }

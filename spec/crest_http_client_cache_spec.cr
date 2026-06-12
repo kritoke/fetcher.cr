@@ -65,7 +65,7 @@ describe Fetcher::CrestHttpClient do
     begin
       client.debug_verify_dns_rebinding("https://example.com/feed")
       raise "expected DNSError"
-    rescue Fetcher::DNSError
+    rescue Fetcher::DNSError | Fetcher::InvalidURLError | Fetcher::SSLError
       # expected
     end
   end
