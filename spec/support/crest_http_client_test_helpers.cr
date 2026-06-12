@@ -19,9 +19,9 @@ module Fetcher
       verify_dns_rebinding(url)
     end
 
-    # Test helper to verify allow_redirect? behaviour for unit tests
+    # Test helper to verify the redirect policy's allow? behaviour for unit tests
     def debug_allow_redirect?(source_domain : String, target_domain : String, status_code : Int32 = 302) : Bool
-      allow_redirect?(source_domain, target_domain, status_code)
+      @policy.allow?(source_domain, target_domain, status_code)
     end
 
     # Test helper to exercise check_ssrf() without needing a full request
@@ -29,9 +29,9 @@ module Fetcher
       check_ssrf(url)
     end
 
-    # Test helper to exercise validate_redirect_target() directly
+    # Test helper to exercise the redirect policy's validate_target() directly
     def debug_validate_redirect_target(url : String) : Nil
-      validate_redirect_target(url)
+      @policy.validate_target(url)
     end
 
     # Test helper to seed the DNS cache for network-free tests
@@ -51,13 +51,13 @@ module Fetcher
       cache_dns(host, ip)
     end
 
-    # Test helper to expose extract_redirect_url
+    # Test helper to expose the redirect policy's extract_url methods
     def debug_extract_redirect_url(response)
       # If a Hash was passed (test-only), call the headers-based helper directly.
       if response.is_a?(Hash)
-        extract_redirect_url_from_headers(response.as(Hash(String, String | Array(String))))
+        @policy.extract_url_from_headers(response.as(Hash(String, String | Array(String))))
       else
-        extract_redirect_url(response)
+        @policy.extract_url(response)
       end
     end
 
