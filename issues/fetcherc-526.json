@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-12T09:57:54Z",
   "created": "2026-06-11T23:38:55Z",
   "description": "## What\n\n`src/fetcher/request_config.cr` has two `with_*` methods that build a new `RequestConfig` by manually copying ALL 16+ fields:\n\n- `with_retry_max_retries(max_retries : Int32)` — overrides retry.max_retries, copies every other field\n- `with_redirect_allowed_domains(domains : Array(String))` — overrides redirect.allowed_domains, copies every other field\n\n## Why\n\nMaintenance hazard: any new field added to `RequestConfig` (or its component records) must be added to BOTH copy methods or the new field will be silently lost. The `RequestConfig` class has 19 fields today. Both copy methods are 30+ lines of repetitive boilerplate.\n\nFunctional/purity angle: this is a classic sign that the class is missing a proper copy primitive. Crystal records get `.with(...)` for free; a class with this many fields should have an equivalent.\n\n## How\n\nExtract a private `copy_with(**overrides)` that takes a hash of overrides and produces a new RequestConfig with the overrides applied. Or refactor `RequestConfig` to be a record (immutable, automatic `.with(field: value)` method, no manual field copying).\n\nThe class-as-record refactor is the cleaner option but touches every constructor call site. The private-helper refactor is the surgical fix.\n\n## Counter-considerations\n\n- Refactoring to record would change `RequestConfig.new(...)` semantics (positional vs keyword, mutability). This is a public API change.\n- The private-helper approach keeps the existing API but reduces the boilerplate.\n\n## Done when\n\n- No manual `RequestConfig.new(timeout: @timeout, retry: new_retry, ...)` boilerplate remains\n- Both `with_*` methods are short (a handful of lines each)\n- Full spec suite still green\n- Any new field added to `RequestConfig` automatically works with `with_*` methods\n",
   "id": "fetcherc-526",
   "labels": [],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Refactor: deduplicate RequestConfig.with_* copy methods",
   "type": "task",
-  "updated_at": "2026-06-12T09:51:40Z"
+  "updated_at": "2026-06-12T09:57:54Z"
 }
