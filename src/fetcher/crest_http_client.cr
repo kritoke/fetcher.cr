@@ -93,9 +93,11 @@ module Fetcher
 
         final_response = handle_redirects(response, url, crest_headers, domain, method)
 
-        if method == :get && (body = final_response.body) && body.bytesize > SafeFeedProcessor::MAX_FEED_SIZE
-          raise InvalidFormatError.new("Response too large (#{body.bytesize} bytes, max: #{SafeFeedProcessor::MAX_FEED_SIZE} bytes)")
-        end
+        # NOTE: response-size check was removed from this layer (see fetcherc-9el.6).
+        # CrestHttpClient is now feed-agnostic; feed-parsing drivers own size limits.
+        # The constant SafeFeedProcessor::MAX_FEED_SIZE is now used only by
+        # SafeFeedProcessor itself (which the feed drivers do not currently invoke
+        # in production -- a separate follow-up is needed to wire that in).
 
         record_success(domain)
         final_response
