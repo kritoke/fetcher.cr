@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-12T10:06:12Z",
+  "description": "## What\n\n`Fetcher::URLValidator` has two methods for URL validation that disagree:\n\n- `valid?(url : String?) : Bool`: returns false for nil/empty/relative/invalid-URL. Uses `ALLOWED_SCHEMES = {\"http\", \"https\"}` whitelist.\n- `safe_scheme?(url : String?) : Bool`: returns TRUE for nil/empty/relative URLs. Uses `DANGEROUS_SCHEMES` blacklist (`javascript`, `vbscript`, `data`, etc.).\n\nThe two methods have different rules. `valid?` blocks relative URLs (\"comments/123\" returns false). `safe_scheme?` allows them (\"comments/123\" returns true).\n\n## Why\n\nTwo validation paths with different rules. Code that uses one might be vulnerable to what the other would block. `entry_factory.cr` uses `safe_scheme?` for secondary URLs (sanitize_secondary_url, sanitize_attachment) and `valid?` for the main URL. The two paths can disagree on edge cases.\n\nThere's also a `DANGEROUS_SCHEMES` constant in url_validator.cr that is only consulted by `safe_scheme?`. The main `valid?` path uses `ALLOWED_SCHEMES` whitelist only.\n\n## How\n\nUnify the two methods. Options:\n\n(a) Make `valid?` the single source of truth. Have `safe_scheme?` call `valid?` and return its result (or a less-strict version of it).\n\n(b) Make `safe_scheme?` a strict superset of `valid?`. Add the relative-URL / empty checks to `safe_scheme?` so it never permits what `valid?` blocks.\n\n(c) Delete `safe_scheme?`. `valid?` is sufficient. Update `entry_factory.cr` and the `url_sanitization_spec.cr` to use `valid?`.\n\n(c) is the cleanest. `safe_scheme?` was added for defense-in-depth against `javascript:`-style attacks, but `valid?`'s ALLOWED_SCHEMES whitelist already blocks those schemes.\n\n## Counter-considerations\n\n`safe_scheme?` has separate test coverage in `spec/security/url_sanitization_spec.cr`. If we delete it, those tests need to be updated to use `valid?` (or removed if redundant).\n\n## Done when\n\n- One canonical URL-validation method on URLValidator\n- `entry_factory.cr` and any other callers use it\n- `spec/security/url_sanitization_spec.cr` is updated or removed\n- Full spec suite still green\n- `grep -rn 'safe_scheme?' src/ spec/` returns no hits (or only tests for the deletion)",
+  "id": "fetcherc-oxq",
+  "labels": [],
+  "priority": 3,
+  "status": "open",
+  "title": "Fix: URLValidator.safe_scheme? vs valid? inconsistency",
+  "type": "task",
+  "updated_at": "2026-06-12T10:06:12Z"
+}
