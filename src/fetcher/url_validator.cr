@@ -123,6 +123,19 @@ module Fetcher
     SAFE_SCHEMES      = {"http", "https"}
     DANGEROUS_SCHEMES = {"javascript", "vbscript", "data", "file", "ftp", "jar", "mailto"}
 
+    # Permissive scheme check: returns true for nil/empty, relative URLs
+    # (no colon), and http/https URLs. Returns false only for explicitly
+    # dangerous schemes (javascript:, data:, vbscript:, file:, etc.).
+    #
+    # This is intentionally more permissive than `valid?`, which requires
+    # a full http/https URL with a valid host. `safe_scheme?` is used for
+    # secondary URLs (comment URLs, author URLs, attachment URLs) that
+    # may legitimately be relative paths like "/comments/123".
+    #
+    # Both methods block dangerous schemes -- `safe_scheme?` via the
+    # DANGEROUS_SCHEMES blacklist, `valid?` via the ALLOWED_SCHEMES
+    # whitelist. The defense-in-depth is: secondary URLs go through
+    # safe_scheme? (permissive), primary URLs go through valid? (strict).
     def self.safe_scheme?(url : String?) : Bool
       return true if url.nil? || url.empty?
 
