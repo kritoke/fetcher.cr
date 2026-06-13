@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-13T02:16:52Z",
   "created": "2026-06-12T10:05:19Z",
   "description": "## What\n\n`src/fetcher/url_validator.cr` has 10+ IP-range-check methods with similar shapes:\n\n- `link_local?` (IPv4 + IPv6 variants)\n- `cgnat?`\n- `benchmark?`\n- `multicast?`\n- `reserved?`\n- `current_network?`\n- `documentation?`\n- `ipv6_unique?`\n- `ipv6_site?`\n- `ipv6_mapped_ipv4?`\n\nEach does its own `ipv4_octets` parse, manual first/second octet checks, etc. Some use CIDR-style constants (`LINK_LOCAL_IPV4 = \"169.254.0.0/16\"`), some use per-octet constants.\n\n## Why\n\nDRY violation. 10+ methods with the same shape. Adding a new range to block (e.g., RFC 6890 unicast) requires a new method. Reading the code requires understanding each method's quirks.\n\n## How\n\nReplace the per-method logic with a data-driven table:\n\n```crystal\nBLOCKED_CIDR_RANGES = [\n  IPAddress.parse(\"10.0.0.0/8\"),\n  IPAddress.parse(\"172.16.0.0/12\"),\n  IPAddress.parse(\"192.168.0.0/16\"),\n  IPAddress.parse(\"169.254.0.0/16\"),\n  # ...\n]\n\nprivate def self.blocked_ip?(ip) : Bool\n  BLOCKED_CIDR_RANGES.any? { |range| range.includes?(ip) }\nend\n```\n\nCrystal's `IPAddress` already provides `private?`, `loopback?`, and CIDR matching. The custom octet-parsing logic duplicates what IPAddress gives for free.\n\n## Done when\n\n- All 10+ per-method IP checks replaced by a single `blocked_ip?` that uses a CIDR table\n- `spec/url_validator_spec.cr` still passes\n- `spec/url_validator_ssrf_spec.cr` still passes\n- `spec/security/url_sanitization_spec.cr` still passes\n",
   "id": "fetcherc-pza",
   "labels": [],
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Refactor: deduplicate URLValidator IP-range checks via CIDR table",
   "type": "task",
-  "updated_at": "2026-06-12T10:54:35Z"
+  "updated_at": "2026-06-13T02:16:52Z"
 }
