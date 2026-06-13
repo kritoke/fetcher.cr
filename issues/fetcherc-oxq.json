@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-12T10:06:12Z",
@@ -7,8 +7,8 @@
   "id": "fetcherc-oxq",
   "labels": [],
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Fix: URLValidator.safe_scheme? vs valid? inconsistency",
   "type": "task",
-  "updated_at": "2026-06-12T10:06:12Z"
+  "updated_at": "2026-06-13T02:21:45Z"
 }
