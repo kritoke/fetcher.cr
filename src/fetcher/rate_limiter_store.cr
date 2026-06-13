@@ -3,6 +3,7 @@ require "mutex"
 require "./token_bucket_rate_limiter"
 require "./registry_helpers"
 require "./periodic_cleanup"
+require "./periodic_cleanup_handle"
 
 module Fetcher
   # Encapsulated store for rate limiters. Localizes mutation and locking so the
@@ -15,18 +16,12 @@ module Fetcher
 
     DEFAULT_TTL = 5.minutes
 
-    @cleanup_proc : Proc(Nil)?
-    @cleanup_registered : Bool
+    @cleanup_handle : PeriodicCleanupHandle
 
     def initialize(@max_entries : Int32 = 10_000)
       @entries = {} of String => Entry
       @lock = Mutex.new
-      @cleanup_proc = nil
-      @cleanup_registered = false
-    end
-
-    private def cleanup_proc : Proc(Nil)
-      @cleanup_proc ||= Proc(Nil).new { cleanup }
+      @cleanup_handle = PeriodicCleanupHandle.new
     end
 
     def get(domain : String, config : RequestConfig) : TokenBucketRateLimiter
@@ -50,18 +45,12 @@ module Fetcher
         @entries[domain] = Entry.new(limiter: limiter, last_accessed: Time.monotonic, ttl: DEFAULT_TTL)
 
         # Register cleanup exactly once per store instance, not per domain.
-        # The cleanup proc is cached in @cleanup_proc and reused for all domains.
-        register_store_cleanup
+        @cleanup_handle.register { cleanup }
         limiter
       end
     end
 
-    # Register this store's cleanup proc exactly once.
-    private def register_store_cleanup : Nil
-      return if @cleanup_registered
-      @cleanup_registered = true
-      PeriodicCleanup.register_cleanup { cleanup_proc.call }
-    end
+
 
     def clear : Nil
       @lock.synchronize do

@@ -2,6 +2,7 @@ require "time"
 require "mutex"
 require "./registry_helpers"
 require "./periodic_cleanup"
+require "./periodic_cleanup_handle"
 
 module Fetcher
   # Actor-backed cache store that owns mutation for cache entries, eviction and stats.
@@ -18,8 +19,7 @@ module Fetcher
     record CleanupMsg
     record StopMsg
 
-    @cleanup_proc : Proc(Nil)?
-    @cleanup_registered : Bool
+    @cleanup_handle : PeriodicCleanupHandle
     @stopped : Bool = false
 
     def initialize(max_size : Int32 = 1000, enabled : Bool = true)
@@ -30,23 +30,11 @@ module Fetcher
       @stats = CacheStats.new
       @max_size = max_size
       @enabled = enabled
-      @cleanup_proc = nil
-      @cleanup_registered = false
+      @cleanup_handle = PeriodicCleanupHandle.new
 
       spawn { run_owner_fiber }
 
-      register_cleanup_once
-    end
-
-    private def cleanup_proc : Proc(Nil)
-      @cleanup_proc ||= Proc(Nil).new { cleanup }
-    end
-
-    # Register this store's cleanup proc exactly once.
-    private def register_cleanup_once : Nil
-      return if @cleanup_registered
-      @cleanup_registered = true
-      PeriodicCleanup.register_cleanup { cleanup_proc.call }
+      @cleanup_handle.register { cleanup }
     end
 
     private def run_owner_fiber
@@ -76,12 +64,7 @@ module Fetcher
     # Call this when RequestConfig is no longer needed.
     def close : Nil
       @cmd.send(StopMsg.new)
-      unregister_cleanup
-    end
-
-    private def unregister_cleanup : Nil
-      return unless @cleanup_registered && @cleanup_proc
-      PeriodicCleanup.unregister_cleanup { @cleanup_proc.try(&.call) }
+      @cleanup_handle.unregister
     end
 
     # Named handlers for testability
