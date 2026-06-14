@@ -2,13 +2,14 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-14T18:40:12Z",
   "created": "2026-06-12T10:05:19Z",
   "description": "## What\n\nThe \"one-shot PeriodicCleanup.register_cleanup with lazy cleanup_proc\" pattern is duplicated in 4 files:\n\n- `src/fetcher/dns_cache.cr` (ensure_cleanup_registered, class-level)\n- `src/fetcher/cache_store.cr` (register_cleanup_once, instance-level, with unregister)\n- `src/fetcher/circuit_breaker_store.cr` (register_cleanup_once, instance-level)\n- `src/fetcher/rate_limiter_store.cr` (register_cleanup_once, instance-level)\n\nEach declares `@cleanup_proc : Proc(Nil)?`, `@cleanup_registered : Bool`, a lazy `cleanup_proc` getter, and a `register_cleanup_once` (or `ensure_cleanup_registered`) method that does read-then-write on the flag.\n\n## Why\n\nDRY violation. The pattern is identical; only the callback target differs. The `dns_cache.cr` self-locking fix (fetcherc-zu4) had to be applied 4 times. Adding a new periodic-cleanup-using store means repeating the pattern.\n\nFunctional/purity angle: the lazy `@cleanup_proc ||= ...` initializer and the read-then-write on the flag are both imperative patterns. A cleaner design would have a single \"register one cleanup proc\" primitive.\n\n## How\n\nExtract a mixin or helper class:\n\n```crystal\nmodule PeriodicCleanupRegistration\n  @cleanup_proc : Proc(Nil)? = nil\n  @cleanup_registered : Bool = false\n\n  def register_cleanup_once(\u0026block : -\u003e Nil)\n    @cleanup_registered = true\n    PeriodicCleanup.register_cleanup { block.call }\n  end\nend\n```\n\nStores that want periodic cleanup `include PeriodicCleanupRegistration` and call `register_cleanup_once { cleanup }` once during init. The mixin owns the flag and the lazy proc.\n\nThe dns_cache case (class-level) is slightly different (no instance state). For that, a separate module or a class-level variant.\n\n## Counter-considerations\n\nThe dns_cache version (class-level) and the store versions (instance-level) have different shapes. May need two helpers or a design that bridges both.\n\n## Done when\n\n- All 4 sites use the shared helper\n- No more hand-rolled cleanup_proc / cleanup_registered pairs (in the new code; dns_cache's existing pair is one-shot)\n- Full spec suite still green\n",
   "id": "fetcherc-zul",
   "labels": [],
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Refactor: deduplicate one-shot PeriodicCleanup registration (4 places)",
   "type": "task",
-  "updated_at": "2026-06-13T16:45:26Z"
+  "updated_at": "2026-06-14T18:40:12Z"
 }
