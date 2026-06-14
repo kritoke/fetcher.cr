@@ -2,7 +2,6 @@ require "time"
 require "mutex"
 require "./registry_helpers"
 require "./periodic_cleanup"
-require "./circuit_breaker_store"
 
 module Fetcher
   class CircuitBreaker
