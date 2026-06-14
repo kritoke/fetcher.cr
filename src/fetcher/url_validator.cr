@@ -3,6 +3,7 @@ require "uri"
 require "socket"
 require "./bounded_registry"
 require "./validated_ip_store"
+require "./lazy_store"
 
 module Fetcher
   module URLValidator
@@ -35,12 +36,7 @@ module Fetcher
     # Backwards-compatible store. We encapsulate the mutable cache in
     # ValidatedIpStore but keep a class-level default instance so existing
     # call-sites remain functional without signature changes.
-    @@validated_store : ValidatedIpStore? = nil
-    @@validated_store_lock = Mutex.new
-
-    def self.validated_store
-      @@validated_store_lock.synchronize { @@validated_store ||= ValidatedIpStore.new }
-    end
+    lazy_store(ValidatedIpStore, var_name: "validated_store", method_name: "validated_store")
 
     def self.clear_validated : Nil
       validated_store.clear

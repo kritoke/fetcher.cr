@@ -3,9 +3,12 @@ require "mutex"
 require "./registry_helpers"
 require "./periodic_cleanup"
 require "./rate_limiter_store"
+require "./lazy_store"
 
 module Fetcher
   class RateLimiterRegistry
+    lazy_store(RateLimiterStore)
+
     DEFAULT_TTL = 5.minutes
 
     def self.get(domain : String, config : RequestConfig) : TokenBucketRateLimiter
@@ -19,12 +22,5 @@ module Fetcher
     def self.cleanup : Nil
       store.cleanup
     end
-
-    def self.store : RateLimiterStore
-      @@store_lock.synchronize { @@store ||= RateLimiterStore.new }
-    end
-
-    @@store : RateLimiterStore? = nil
-    @@store_lock = Mutex.new
   end
 end
