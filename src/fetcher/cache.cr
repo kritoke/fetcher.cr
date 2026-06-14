@@ -168,25 +168,36 @@ module Fetcher
       @store.close
     end
 
-    {% for method, ret in {
-                            "get"             => "Result?",
-                            "clear"           => "Void",
-                            "clear_by_prefix" => "Void",
-                            "stats"           => "CacheStats",
-                            "enabled?"        => "Bool",
-                            "max_size"        => "Int32",
-                          } %}
-      def self.{{ method.id }}(*args) : {{ ret.id }}
-        store.{{ method.id }}(*args)
-      end
-    {% end %}
+    def self.get(key : String) : Result?
+      store.get(key)
+    end
 
     def self.set(key : String, value : Result, ttl : Time::Span = DEFAULT_TTL) : Nil
       store.set(key, value, ttl)
     end
 
+    def self.clear : Void
+      store.clear
+    end
+
+    def self.clear_by_prefix(prefix : String) : Void
+      store.clear_by_prefix(prefix)
+    end
+
+    def self.stats : CacheStats
+      store.stats
+    end
+
+    def self.enabled? : Bool
+      store.enabled?
+    end
+
     def self.enabled=(value : Bool)
       store.enabled = value
+    end
+
+    def self.max_size : Int32
+      store.max_size
     end
 
     def self.max_size=(value : Int32)
