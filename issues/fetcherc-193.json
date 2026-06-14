@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-12T10:06:34Z",
@@ -7,8 +7,8 @@
   "id": "fetcherc-193",
   "labels": [],
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Refactor: unify Cache class-method generation (macro vs explicit)",
   "type": "task",
-  "updated_at": "2026-06-12T10:06:34Z"
+  "updated_at": "2026-06-14T18:41:04Z"
 }
