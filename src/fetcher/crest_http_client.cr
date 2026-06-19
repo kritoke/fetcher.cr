@@ -1,4 +1,5 @@
 require "crest"
+require "compress/gzip"
 require "./request_config"
 require "./rate_limiter_registry"
 require "./circuit_breaker"
@@ -279,11 +280,32 @@ module Fetcher
     end
 
     private def convert_response(crest_response : Crest::Response) : ::HTTP::Client::Response
+      body = CrestHttpClient.ensure_decompressed(crest_response.body)
       ::HTTP::Client::Response.new(
         status_code: crest_response.status_code,
-        body: crest_response.body,
+        body: body,
         headers: ::HTTP::Headers.new.merge!(crest_response.headers)
       )
+    end
+
+    # Defensive decompression: some servers (especially behind CDNs like
+    # Vercel/Cloudflare) send gzip-compressed bodies without a proper
+    # Content-Encoding header. Crystal's auto-decompress relies on that
+    # header, so we check for gzip magic bytes (\x1f\x08b) manually.
+    def self.ensure_decompressed(body : String) : String
+      return body unless body.bytesize >= 2
+
+      bytes = body.to_slice
+      return body unless bytes[0] == 0x1f_u8 && bytes[1] == 0x8b_u8
+
+      ::Log.for("fetcher.http").info { "Decompressing gzip body (missing Content-Encoding header)" }
+      io = IO::Memory.new(body)
+      Compress::Gzip::Reader.open(io) do |gzip|
+        gzip.gets_to_end
+      end
+    rescue ex
+      ::Log.for("fetcher.http").warn { "Failed to decompress gzip body: #{ex.message}" }
+      body
     end
 
     private def build_tls_context : OpenSSL::SSL::Context::Client?
