@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.5",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:51:58Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Wire-SafeFeedProcessor-into-drivers",
   "type": "task",
-  "updated_at": "2026-06-20T16:50:29Z"
+  "updated_at": "2026-06-20T16:51:58Z"
 }
