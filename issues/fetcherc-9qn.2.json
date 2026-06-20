@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-9qn.1"
+  ],
   "blocks": [],
   "created": "2026-06-20T16:49:59Z",
   "description": "",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "Consolidate-release-parsing-duplication",
   "type": "task",
-  "updated_at": "2026-06-20T16:51:21Z"
+  "updated_at": "2026-06-20T16:52:37Z"
 }
