@@ -6,9 +6,15 @@
   "description": "\"Code",
   "id": "fetcherc-9qn",
   "labels": [],
+  "comments": [
+    {
+      "text": "\"Architecture",
+      "timestamp": "2026-06-20T16:48:52Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Cleanup",
   "type": "epic",
-  "updated_at": "2026-06-20T16:48:34Z"
+  "updated_at": "2026-06-20T16:48:52Z"
 }
