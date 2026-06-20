@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-9qn.7"
+  ],
   "blocks": [],
   "created": "2026-06-20T16:50:10Z",
   "description": "",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "Unify-driver-error-handling",
   "type": "task",
-  "updated_at": "2026-06-20T16:51:34Z"
+  "updated_at": "2026-06-20T16:52:50Z"
 }
