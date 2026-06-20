@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.6",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:52:07Z"
+    }
+  ],
   "priority": 4,
   "status": "open",
   "title": "Remove-dead-YouTube-method",
   "type": "task",
-  "updated_at": "2026-06-20T16:50:38Z"
+  "updated_at": "2026-06-20T16:52:07Z"
 }
