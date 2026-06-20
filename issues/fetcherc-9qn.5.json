@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-9qn.7"
+  ],
   "blocks": [],
   "created": "2026-06-20T16:50:29Z",
   "description": "",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "Wire-SafeFeedProcessor-into-drivers",
   "type": "task",
-  "updated_at": "2026-06-20T16:51:58Z"
+  "updated_at": "2026-06-20T16:52:56Z"
 }
