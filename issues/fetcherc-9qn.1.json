@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.1",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:51:07Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Remove-dead-software-cr-code",
   "type": "task",
-  "updated_at": "2026-06-20T16:49:54Z"
+  "updated_at": "2026-06-20T16:51:07Z"
 }
