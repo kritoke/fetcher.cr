@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.3",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:51:34Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Unify-driver-error-handling",
   "type": "task",
-  "updated_at": "2026-06-20T16:50:10Z"
+  "updated_at": "2026-06-20T16:51:34Z"
 }
