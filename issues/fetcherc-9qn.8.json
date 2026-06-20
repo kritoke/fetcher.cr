@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.8",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:52:27Z"
+    }
+  ],
   "priority": 3,
   "status": "open",
   "title": "Reduce-global-mutable-state",
   "type": "task",
-  "updated_at": "2026-06-20T16:50:55Z"
+  "updated_at": "2026-06-20T16:52:27Z"
 }
