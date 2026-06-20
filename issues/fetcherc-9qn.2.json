@@ -7,9 +7,15 @@
   "id": "fetcherc-9qn.2",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "\"Violation:",
+      "timestamp": "2026-06-20T16:51:21Z"
+    }
+  ],
   "priority": 2,
   "status": "open",
   "title": "Consolidate-release-parsing-duplication",
   "type": "task",
-  "updated_at": "2026-06-20T16:49:59Z"
+  "updated_at": "2026-06-20T16:51:21Z"
 }
