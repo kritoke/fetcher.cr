@@ -12,11 +12,15 @@
     {
       "text": "\"Priority",
       "timestamp": "2026-06-20T16:51:46Z"
+    },
+    {
+      "text": "Done. Added #post to CrestHttpClient (form-encoded) so RedditOAuth can route through the same protection pipeline as every other request. Stash at 95b15f7. regression tests in spec/reddit_oauth_spec.cr assert the routing.",
+      "timestamp": "2026-06-21T18:03:37Z"
     }
   ],
   "priority": 1,
   "status": "closed",
   "title": "Remove-RedditOAuth-CrestHttp-bypass",
   "type": "task",
-  "updated_at": "2026-06-21T18:03:15Z"
+  "updated_at": "2026-06-21T18:03:37Z"
 }
