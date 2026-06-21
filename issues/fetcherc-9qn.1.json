@@ -5,7 +5,7 @@
     "fetcherc-9qn.2"
   ],
   "created": "2026-06-20T16:49:54Z",
-  "description": "",
+  "description": "\"Architecture",
   "id": "fetcherc-9qn.1",
   "labels": [],
   "parent": "fetcherc-9qn",
@@ -19,5 +19,5 @@
   "status": "open",
   "title": "Remove-dead-software-cr-code",
   "type": "task",
-  "updated_at": "2026-06-20T16:52:37Z"
+  "updated_at": "2026-06-21T14:34:19Z"
 }
