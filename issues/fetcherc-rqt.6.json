@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-21T14:11:21Z",
+  "description": "",
+  "id": "fetcherc-rqt.6",
+  "labels": [],
+  "parent": "fetcherc-rqt",
+  "priority": 1,
+  "status": "open",
+  "title": "Remove-RedditOAuth-CrestHttp-bypass",
+  "type": "task",
+  "updated_at": "2026-06-21T14:11:21Z"
+}
