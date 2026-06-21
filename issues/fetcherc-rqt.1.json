@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-rqt.2"
+  ],
   "created": "2026-06-21T14:11:20Z",
   "description": "",
   "id": "fetcherc-rqt.1",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "Extract-common-feed-driver-interface",
   "type": "task",
-  "updated_at": "2026-06-21T14:12:43Z"
+  "updated_at": "2026-06-21T14:12:57Z"
 }

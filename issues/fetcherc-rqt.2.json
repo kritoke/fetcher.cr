@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-rqt.1"
+  ],
   "blocks": [],
   "created": "2026-06-21T14:11:20Z",
   "description": "",
@@ -17,5 +19,5 @@
   "status": "open",
   "title": "Unify-driver-error-handling",
   "type": "task",
-  "updated_at": "2026-06-21T14:12:43Z"
+  "updated_at": "2026-06-21T14:12:57Z"
 }
