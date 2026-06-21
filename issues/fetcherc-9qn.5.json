@@ -5,7 +5,7 @@
   ],
   "blocks": [],
   "created": "2026-06-20T16:50:29Z",
-  "description": "",
+  "description": "\"Architecture",
   "id": "fetcherc-9qn.5",
   "labels": [],
   "parent": "fetcherc-9qn",
@@ -19,5 +19,5 @@
   "status": "open",
   "title": "Wire-SafeFeedProcessor-into-drivers",
   "type": "task",
-  "updated_at": "2026-06-20T16:52:56Z"
+  "updated_at": "2026-06-21T14:34:20Z"
 }
