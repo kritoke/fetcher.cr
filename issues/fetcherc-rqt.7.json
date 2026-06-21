@@ -7,9 +7,15 @@
   "id": "fetcherc-rqt.7",
   "labels": [],
   "parent": "fetcherc-rqt",
+  "comments": [
+    {
+      "text": "\"Architecture",
+      "timestamp": "2026-06-21T14:12:44Z"
+    }
+  ],
   "priority": 4,
   "status": "open",
   "title": "Remove-dead-YouTube-method",
   "type": "task",
-  "updated_at": "2026-06-21T14:11:21Z"
+  "updated_at": "2026-06-21T14:12:44Z"
 }
