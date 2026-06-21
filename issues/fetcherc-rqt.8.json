@@ -2,6 +2,8 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-21T14:32:31Z",
+  "close_reason": "\"Duplicate",
   "created": "2026-06-21T14:11:33Z",
   "description": "",
   "id": "fetcherc-rqt.8",
@@ -14,8 +16,8 @@
     }
   ],
   "priority": 3,
-  "status": "open",
+  "status": "closed",
   "title": "Reduce-global-mutable-state",
   "type": "task",
-  "updated_at": "2026-06-21T14:12:44Z"
+  "updated_at": "2026-06-21T14:32:31Z"
 }
