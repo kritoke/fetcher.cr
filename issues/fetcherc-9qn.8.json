@@ -3,7 +3,7 @@
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-20T16:50:55Z",
-  "description": "",
+  "description": "\"Architecture",
   "id": "fetcherc-9qn.8",
   "labels": [],
   "parent": "fetcherc-9qn",
@@ -17,5 +17,5 @@
   "status": "open",
   "title": "Reduce-global-mutable-state",
   "type": "task",
-  "updated_at": "2026-06-20T16:52:27Z"
+  "updated_at": "2026-06-21T14:34:21Z"
 }
