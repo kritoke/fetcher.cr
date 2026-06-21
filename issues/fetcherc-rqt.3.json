@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-21T14:11:20Z",
+  "description": "",
+  "id": "fetcherc-rqt.3",
+  "labels": [],
+  "parent": "fetcherc-rqt",
+  "priority": 2,
+  "status": "open",
+  "title": "Wire-SafeFeedProcessor-into-drivers",
+  "type": "task",
+  "updated_at": "2026-06-21T14:11:20Z"
+}
