@@ -7,9 +7,15 @@
   "id": "fetcherc-rqt.8",
   "labels": [],
   "parent": "fetcherc-rqt",
+  "comments": [
+    {
+      "text": "\"Architecture",
+      "timestamp": "2026-06-21T14:12:44Z"
+    }
+  ],
   "priority": 3,
   "status": "open",
   "title": "Reduce-global-mutable-state",
   "type": "task",
-  "updated_at": "2026-06-21T14:11:33Z"
+  "updated_at": "2026-06-21T14:12:44Z"
 }
