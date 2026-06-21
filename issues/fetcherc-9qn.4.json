@@ -2,6 +2,7 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-21T18:03:15Z",
   "created": "2026-06-20T16:50:23Z",
   "description": "\"Architecture",
   "id": "fetcherc-9qn.4",
@@ -14,8 +15,8 @@
     }
   ],
   "priority": 1,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Remove-RedditOAuth-CrestHttp-bypass",
   "type": "task",
-  "updated_at": "2026-06-21T14:34:20Z"
+  "updated_at": "2026-06-21T18:03:15Z"
 }
