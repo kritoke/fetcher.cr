@@ -2,6 +2,8 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-21T14:32:30Z",
+  "close_reason": "\"Duplicate",
   "created": "2026-06-21T14:11:21Z",
   "description": "",
   "id": "fetcherc-rqt.7",
@@ -14,8 +16,8 @@
     }
   ],
   "priority": 4,
-  "status": "open",
+  "status": "closed",
   "title": "Remove-dead-YouTube-method",
   "type": "task",
-  "updated_at": "2026-06-21T14:12:44Z"
+  "updated_at": "2026-06-21T14:32:30Z"
 }
