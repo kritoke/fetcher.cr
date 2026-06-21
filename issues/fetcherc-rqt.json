@@ -2,13 +2,15 @@
   "assignee": "",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-06-21T14:32:29Z",
+  "close_reason": "\"Duplicate",
   "created": "2026-06-21T14:10:31Z",
   "description": "\"Architecture",
   "id": "fetcherc-rqt",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Architecture-cleanup",
   "type": "epic",
-  "updated_at": "2026-06-21T14:10:36Z"
+  "updated_at": "2026-06-21T14:32:29Z"
 }
