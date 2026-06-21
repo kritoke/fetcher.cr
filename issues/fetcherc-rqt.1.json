@@ -5,6 +5,8 @@
     "fetcherc-rqt.2",
     "fetcherc-rqt.3"
   ],
+  "closed_at": "2026-06-21T14:32:29Z",
+  "close_reason": "\"Duplicate",
   "created": "2026-06-21T14:11:20Z",
   "description": "",
   "id": "fetcherc-rqt.1",
@@ -17,8 +19,8 @@
     }
   ],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Extract-common-feed-driver-interface",
   "type": "task",
-  "updated_at": "2026-06-21T14:12:58Z"
+  "updated_at": "2026-06-21T14:32:29Z"
 }
