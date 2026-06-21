@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-06-21T14:11:33Z",
+  "description": "",
+  "id": "fetcherc-rqt.8",
+  "labels": [],
+  "parent": "fetcherc-rqt",
+  "priority": 3,
+  "status": "open",
+  "title": "Reduce-global-mutable-state",
+  "type": "task",
+  "updated_at": "2026-06-21T14:11:33Z"
+}
