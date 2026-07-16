@@ -13,15 +13,15 @@ module Fetcher
     # IPv4 CIDR ranges blocked for SSRF protection.
     # Format: {prefix_as_uint32, prefix_length, description}
     BLOCKED_IPV4_RANGES = [
-      {0x0A000000_u32,  8, "10.0.0.0/8 (RFC 1918 private)"},
+      {0x0A000000_u32, 8, "10.0.0.0/8 (RFC 1918 private)"},
       {0xAC100000_u32, 12, "172.16.0.0/12 (RFC 1918 private)"},
       {0xC0A80000_u32, 16, "192.168.0.0/16 (RFC 1918 private)"},
       {0xA9FE0000_u32, 16, "169.254.0.0/16 (link-local)"},
       {0x64400000_u32, 10, "100.64.0.0/10 (CGNAT, RFC 6598)"},
       {0xC6120000_u32, 15, "198.18.0.0/15 (benchmark, RFC 2544)"},
-      {0xE0000000_u32,  4, "224.0.0.0/4 (multicast)"},
-      {0xF0000000_u32,  4, "240.0.0.0/4 (reserved)"},
-      {0x00000000_u32,  8, "0.0.0.0/8 (current network)"},
+      {0xE0000000_u32, 4, "224.0.0.0/4 (multicast)"},
+      {0xF0000000_u32, 4, "240.0.0.0/4 (reserved)"},
+      {0x00000000_u32, 8, "0.0.0.0/8 (current network)"},
       {0xC0000200_u32, 24, "192.0.2.0/24 (TEST-NET-1, RFC 5737)"},
       {0xC6336400_u32, 24, "198.51.100.0/24 (TEST-NET-2, RFC 5737)"},
       {0xCB007100_u32, 24, "203.0.113.0/24 (TEST-NET-3, RFC 5737)"},
@@ -55,7 +55,6 @@ module Fetcher
       return res unless res.nil?
       !blocked_ip?(current_ip)
     end
-
 
     def self.valid?(url : String?) : Bool
       return false if url.nil? || url.empty?
@@ -281,14 +280,14 @@ module Fetcher
     private def self.blocked_ipv6?(address : String) : Bool
       return false unless address.includes?(":")
       downcase = address.downcase
-      return true if downcase.starts_with?("fc") || downcase.starts_with?("fd")  # fc00::/7 (unique local)
+      return true if downcase.starts_with?("fc") || downcase.starts_with?("fd") # fc00::/7 (unique local)
       return false unless downcase.starts_with?("fe")
       third = downcase[2]?
       return false unless third
       case third
-      when '8', '9', 'a', 'b' then true   # fe80::/10 (link-local)
-      when 'c', 'd', 'e', 'f' then true   # fec0::/10 (site-local)
-      else false
+      when '8', '9', 'a', 'b' then true # fe80::/10 (link-local)
+      when 'c', 'd', 'e', 'f' then true # fec0::/10 (site-local)
+      else                         false
       end
     rescue ex
       Log.debug { "blocked_ipv6? failed: #{ex.message}" }

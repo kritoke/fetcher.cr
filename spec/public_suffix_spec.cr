@@ -7,10 +7,10 @@ describe Fetcher::PublicSuffix do
       # Call twice - should not reload
       Fetcher::PublicSuffix.load_rules
       first_load = Fetcher::PublicSuffix.get_public_suffix("example.com")
-      
+
       Fetcher::PublicSuffix.load_rules
       second_load = Fetcher::PublicSuffix.get_public_suffix("example.com")
-      
+
       first_load.should eq(second_load)
     end
 

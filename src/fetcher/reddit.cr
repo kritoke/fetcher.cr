@@ -19,8 +19,8 @@ module Fetcher
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
     # Diagnostics and response formatting constants
-    HTTP_STATUS_WIDTH   = 80
-    MAX_BODY_SNIPPET    = 512
+    HTTP_STATUS_WIDTH =  80
+    MAX_BODY_SNIPPET  = 512
 
     class RedditFetchError < Exception
       getter original_cause : Exception?

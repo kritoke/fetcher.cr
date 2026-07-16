@@ -9,10 +9,10 @@ module Fetcher
   # Crystal's nested types don't inherit outer generic parameters.
   struct RegistryStoreEntry(T)
     getter value : T
-    getter last_accessed : Time::Span
+    getter last_accessed : Time::Instant
     getter ttl : Time::Span
 
-    def initialize(@value : T, @last_accessed : Time::Span, @ttl : Time::Span)
+    def initialize(@value : T, @last_accessed : Time::Instant, @ttl : Time::Span)
     end
   end
 
@@ -37,14 +37,14 @@ module Fetcher
       @lock.synchronize do
         entry = @entries[key]?
         if entry
-          @entries[key] = RegistryStoreEntry(T).new(value: entry.value, last_accessed: Time.monotonic, ttl: entry.ttl)
+          @entries[key] = RegistryStoreEntry(T).new(value: entry.value, last_accessed: Time.instant, ttl: entry.ttl)
           return entry.value
         end
 
         enforce_limit
 
         value = create_value(config)
-        @entries[key] = RegistryStoreEntry(T).new(value: value, last_accessed: Time.monotonic, ttl: DEFAULT_TTL)
+        @entries[key] = RegistryStoreEntry(T).new(value: value, last_accessed: Time.instant, ttl: DEFAULT_TTL)
         @cleanup_handle.register { cleanup }
         value
       end

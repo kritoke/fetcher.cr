@@ -193,7 +193,6 @@ module Fetcher
       DnsCache.clear
     end
 
-
     private def verify_dns_rebinding(url : String) : Nil
       @rebinding_checker.verify(url)
     end

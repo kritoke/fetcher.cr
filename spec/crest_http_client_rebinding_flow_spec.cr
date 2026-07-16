@@ -14,7 +14,7 @@ module Fetcher
     def initialize(
       @valid = true,
       @resolvable = true,
-      @connected_ip_ok = true
+      @connected_ip_ok = true,
     )
       @rebind_events = [] of String
     end
@@ -104,7 +104,7 @@ describe Fetcher::CrestHttpClient do
     it "validates cached DNS entry when present" do
       cfg = Fetcher::RequestConfig.new(dns: Fetcher::DnsConfig.new(rebinding_check: true, cache_enabled: true))
       mock = Fetcher::MockRebindingValidator.new
-      mock.connected_ip_ok = true  # IP is valid
+      mock.connected_ip_ok = true # IP is valid
       client = Fetcher::CrestHttpClient.new(cfg, mock)
 
       # Seed cache with known good IP
@@ -119,7 +119,7 @@ describe Fetcher::CrestHttpClient do
     it "raises DNSError when cached IP validation fails (rebind detected)" do
       cfg = Fetcher::RequestConfig.new(dns: Fetcher::DnsConfig.new(rebinding_check: true, cache_enabled: true))
       mock = Fetcher::MockRebindingValidator.new
-      mock.connected_ip_ok = false  # Simulate IP change (rebind)
+      mock.connected_ip_ok = false # Simulate IP change (rebind)
       client = Fetcher::CrestHttpClient.new(cfg, mock)
 
       # Seed cache with an IP

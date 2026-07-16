@@ -17,8 +17,8 @@ describe "TokenBucketRateLimiter stress" do
       end
     end
 
-    start = Time.monotonic
-    while completed.get < 1000 && (Time.monotonic - start) < 10.seconds
+    start = Time.instant
+    while completed.get < 1000 && (Time.instant - start) < 10.seconds
       ::sleep(10.milliseconds)
     end
 

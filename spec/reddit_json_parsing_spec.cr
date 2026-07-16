@@ -62,7 +62,7 @@ describe Fetcher::Reddit do
         "{\"data\": {\"title\": \"Post #{i}\", \"url\": \"https://example.com/#{i}\", \"permalink\": \"/r/test/#{i}\"}}"
       end.join(",")
       json = "{\"data\": {\"children\": [#{children}]}}"
-      
+
       result = Fetcher::Reddit.parse_reddit_response(json, 5)
       result.size.should eq(5)
     end
@@ -83,7 +83,7 @@ describe Fetcher::Reddit do
       # Crystal doesn't have eval, but verify the data is only used for extraction
       json = "{\"data\": {\"children\": [{\"data\": {\"title\": \"Test\", \"url\": \"https://test.com\", \"permalink\": \"/r/test/1\"}}]}}"
       result = Fetcher::Reddit.parse_reddit_response(json, 10)
-      
+
       result.size.should eq(1)
       result[0].title.should eq("Test")
       result[0].url.should eq("https://test.com")
@@ -92,7 +92,7 @@ describe Fetcher::Reddit do
     it "handles special characters in JSON values safely" do
       json = "{\"data\": {\"children\": [{\"data\": {\"title\": \"Test with <script> & \\\"quotes\\\"\", \"url\": \"https://test.com?a=1&b=2\", \"permalink\": \"/r/test/1\"}}]}}"
       result = Fetcher::Reddit.parse_reddit_response(json, 10)
-      
+
       result.size.should eq(1)
       result[0].title.should eq("Test with <script> & \"quotes\"")
     end

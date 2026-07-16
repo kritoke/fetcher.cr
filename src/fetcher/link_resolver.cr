@@ -7,7 +7,7 @@ module Fetcher
 
     # Pre-compiled patterns for URL matching (performance optimization)
     # Using single regex instead of multiple string scans reduces O(n) to O(1)
-    DISCUSSION_PATTERN = /\/comments\/|\/item\?id=|\/s\/|\/discuss/
+    DISCUSSION_PATTERN        = /\/comments\/|\/item\?id=|\/s\/|\/discuss/
     REDDIT_DISCUSSION_PATTERN = /reddit\.com\/r\/|old\.reddit\.com\/r\//i
 
     def self.resolve(node : XML::Node, main_url : String) : LinkData

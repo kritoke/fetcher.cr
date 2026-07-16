@@ -5,17 +5,17 @@ require "./cache_store"
 module Fetcher
   struct CacheEntry
     getter value : Result
-    # Time::Span from Time.monotonic -- a monotonic counter, not a point
-    # in time. Wall-clock (Time) would miscalculate TTL if the system
-    # clock jumped (NTP correction, suspend/resume).
-    getter last_accessed : Time::Span
+    # A monotonic instant (Time::Instant) from Time.instant -- not a
+    # wall-clock point. Wall-clock (Time) would miscalculate TTL if the
+    # system clock jumped (NTP correction, suspend/resume).
+    getter last_accessed : Time::Instant
     getter ttl : Time::Span
 
-    def initialize(@value : Result, @last_accessed : Time::Span, @ttl : Time::Span)
+    def initialize(@value : Result, @last_accessed : Time::Instant, @ttl : Time::Span)
     end
 
     def expired? : Bool
-      Time.monotonic - @last_accessed > @ttl
+      Time.instant - @last_accessed > @ttl
     end
   end
 

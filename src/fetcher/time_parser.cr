@@ -7,7 +7,7 @@ module Fetcher
   # consistent comparison behavior.
   module TimeParser
     # Pre-compiled regexes to avoid repeated compilation in hot path
-    FALLBACK_DATE_PATTERN = /\d{4}-\d{2}-\d{2}$/
+    FALLBACK_DATE_PATTERN     = /\d{4}-\d{2}-\d{2}$/
     FALLBACK_DATETIME_PATTERN = /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/
 
     # Normalize a Time to UTC. This ensures consistent location for comparisons

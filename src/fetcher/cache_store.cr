@@ -90,6 +90,7 @@ module Fetcher
     private def handle_stop : Nil
       @stopped = true
     end
+
     private def handle_enabled_set(value : Bool) : Nil
       @enabled = value
     end
@@ -141,7 +142,7 @@ module Fetcher
     end
 
     private def update_entry(key : String, value : Result, ttl : Time::Span)
-      @entries[key] = CacheEntry.new(value, Time.monotonic, ttl)
+      @entries[key] = CacheEntry.new(value, Time.instant, ttl)
       @eviction_order.reject! { |k| k == key }
       @eviction_set.delete(key)
       @eviction_order << key
@@ -149,7 +150,7 @@ module Fetcher
     end
 
     private def add_entry(key : String, value : Result, ttl : Time::Span) : Nil
-      @entries[key] = CacheEntry.new(value, Time.monotonic, ttl)
+      @entries[key] = CacheEntry.new(value, Time.instant, ttl)
       # Guard against duplicate additions to preserve LRU order
       unless @eviction_set.includes?(key)
         @eviction_order << key

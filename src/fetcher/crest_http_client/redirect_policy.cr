@@ -24,10 +24,10 @@ module Fetcher
 
         # When headers contain multiple Location values, prefer the first one.
         value = if redirect_url.is_a?(Array)
-          redirect_url.first.to_s
-        else
-          redirect_url.to_s
-        end
+                  redirect_url.first.to_s
+                else
+                  redirect_url.to_s
+                end
 
         value = value.strip
         raise MissingLocationHeaderError.new("Redirect response without Location header") if value.empty?

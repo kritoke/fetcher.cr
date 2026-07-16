@@ -7,7 +7,7 @@ module Fetcher
     def self.enforce_registry_limit(entries : Hash(String, T), max_entries : Int32, default_ttl : Time::Span) : Nil forall T
       return if entries.size < max_entries
 
-      now = Time.monotonic
+      now = Time.instant
       entries.reject! do |_, entry|
         now - entry.last_accessed > default_ttl
       end

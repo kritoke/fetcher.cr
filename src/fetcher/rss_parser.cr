@@ -230,8 +230,8 @@ module Fetcher
 
     private def extract_rss_pub_date(child_map : Hash(String, Array(XML::Node))) : Time?
       pub_date_str = extract_from_map(child_map, "pubDate").try(&.text) ||
-                    extract_from_map(child_map, "dc:date").try(&.text) ||
-                    extract_from_map(child_map, "date").try(&.text)
+                     extract_from_map(child_map, "dc:date").try(&.text) ||
+                     extract_from_map(child_map, "date").try(&.text)
       TimeParser.normalize(TimeParser.parse(pub_date_str)) if pub_date_str
     end
 

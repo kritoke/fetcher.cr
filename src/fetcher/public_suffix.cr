@@ -2,7 +2,6 @@ require "set"
 
 module Fetcher
   module PublicSuffix
-
     @@rules_loaded : Bool = false
     @@rules_lock = Mutex.new
     @@exact : Set(String) = Set(String).new

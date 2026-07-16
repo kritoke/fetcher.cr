@@ -9,10 +9,7 @@ module Fetcher
     CRASH_BACKOFF_INTERVALS = [100, 500, 1000, 5000]
     DEFAULT_CRASH_BACKOFF   = 5000
 
-    # Milliseconds per second for time conversions
-    MS_PER_SECOND = 1000.0
-
-    @last_refill : Float64
+    @last_refill : Time::Instant
     @max_waiters : Int32
     @pending_wakeup : Fiber?
     @wakeup_generation : UInt64 = 0
@@ -25,7 +22,7 @@ module Fetcher
     def initialize(@capacity : Float64, @refill_rate : Float64, @max_waiters : Int32 = 1000)
       @cmd = Channel(TryAcquireMsg | AcquireMsg | AvailableTokensMsg | TickMsg).new
       @tokens = @capacity
-      @last_refill = now_seconds
+      @last_refill = Time.instant
       @waiters = [] of Tuple(Float64, Channel(QueueFullError?))
       @wake_scheduled = false
       @wakeup_generation = 0_u64
@@ -119,7 +116,7 @@ module Fetcher
 
     private def cancel_pending_wakeup
       @pending_wakeup = nil
-      @wakeup_generation += 1  # Invalidate any pending wakeups
+      @wakeup_generation += 1 # Invalidate any pending wakeups
       @wake_scheduled = false
     end
 
@@ -145,18 +142,14 @@ module Fetcher
     end
 
     private def refill_tokens
-      now = now_seconds
-      elapsed = now - @last_refill
+      now = Time.instant
+      elapsed = (now - @last_refill).total_seconds
       if elapsed > 0.0
         # elapsed is in seconds (Float64), multiply by refill_rate
         new_tokens = elapsed * @refill_rate
         @tokens = [@tokens + new_tokens, @capacity].min
         @last_refill = now
       end
-    end
-
-    private def now_seconds : Float64
-      Time.monotonic.total_milliseconds / MS_PER_SECOND
     end
   end
 end

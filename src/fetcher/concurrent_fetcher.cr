@@ -7,7 +7,7 @@ module Fetcher
   class ConcurrentFetcher
     DEFAULT_MAX_CONCURRENT =   16
     DEFAULT_MAX_PENDING    = 1000
-    DEFAULT_TIMEOUT       = 60.seconds
+    DEFAULT_TIMEOUT        = 60.seconds
 
     def self.pull_multiple(
       urls : Array(String),
@@ -60,7 +60,7 @@ module Fetcher
       end
 
       # Collect results with timeout to prevent hanging everlasting
-      deadline = Time.monotonic + timeout
+      deadline = Time.instant + timeout
       received = 0
       timeout_channel = Channel(Bool).new
 

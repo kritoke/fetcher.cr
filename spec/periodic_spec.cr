@@ -11,9 +11,9 @@ describe Fetcher::PeriodicCleanup do
     end
 
     # wait up to 1 second for the cleanup to be called
-    timeout = Time.monotonic + 1.second
+    timeout = Time.instant + 1.second
     loop do
-      break if called || Time.monotonic > timeout
+      break if called || Time.instant > timeout
       ::sleep 0.01.seconds
     end
 
