@@ -4,7 +4,7 @@ A standalone Crystal library for fetching RSS feeds, Reddit posts, JSON Feeds, a
 
 > ⚠️ **Unstable API**: This library is undergoing active development. The API may change until v1.0.0.
 
-v0.9.4 adds Reddit OAuth2 authentication to bypass datacenter IP blocks. v0.9.3 adds GitLab/Codeberg token support and thread safety improvements. v0.9.0 introduced structured `RequestConfig` (replacing flat parameters) and moves `Cache` to a class-based API with a singleton. See Breaking Changes below.
+v0.9.21 upgrades to Crystal 1.19.1 (`Time.instant` migration), adds a GitHub Atom release fallback, a DNS cache size cap, and resource-cleanup helpers (`Cache#close`, `RequestConfig#close`). v0.9.4 adds Reddit OAuth2 authentication to bypass datacenter IP blocks. v0.9.3 adds GitLab/Codeberg token support and thread safety improvements. v0.9.0 introduced structured `RequestConfig` (replacing flat parameters) and moves `Cache` to a class-based API with a singleton. See Breaking Changes below.
 
 ## Features
 
@@ -137,6 +137,7 @@ result = Fetcher.pull("https://failing-domain.com/feed.xml", config: config)
 When a circuit breaker is open, requests to that domain are immediately rejected with a `CircuitOpenError` without making HTTP requests, reducing load on failing services.
 
 The circuit breaker follows a standard state machine:
+
 - **Closed**: Normal operation
 - **Open**: After threshold failures, reject all requests
 - **Half-Open**: After recovery timeout, allow one test request
@@ -144,7 +145,7 @@ The circuit breaker follows a standard state machine:
 
 ### Reddit OAuth (v0.9.4+)
 
-Reddit blocks requests from datacenter/VPS IP addresses. To bypass this, register a "script" app at https://www.reddit.com/prefs/apps and provide the credentials via `RequestConfig`. The OAuth token is cached and auto-refreshed. When credentials are not configured, unauthenticated requests are used as a fallback.
+Reddit blocks requests from datacenter/VPS IP addresses. To bypass this, register a "script" app at <https://www.reddit.com/prefs/apps> and provide the credentials via `RequestConfig`. The OAuth token is cached and auto-refreshed. When credentials are not configured, unauthenticated requests are used as a fallback.
 
 ```crystal
 config = Fetcher::RequestConfig.new(
@@ -226,6 +227,7 @@ config = Fetcher::RequestConfig.new(
 ```
 
 **Accessors changed:**
+
 - `config.connect_timeout` → `config.timeout.connect`
 - `config.read_timeout` → `config.timeout.read`
 - `config.max_retries` → `config.retry.max_retries`
@@ -276,6 +278,7 @@ result = channel.receive
 ```
 
 Removed methods:
+
 - `Fetcher.pull_async(url, ...)`
 - `Fetcher.pull_rss_async(url, ...)`
 - `Fetcher.pull_reddit_async(url, ...)`
@@ -379,6 +382,7 @@ The YouTube driver fetches videos from YouTube channels using their RSS feed.
 ### Supported URL Format
 
 Only direct channel ID URLs are supported:
+
 - `youtube.com/channel/UC...` ✓
 
 Other formats (handles, custom URLs, usernames) are not supported.
@@ -477,6 +481,7 @@ Fetcher::RequestConfig.new(
 ## Supported Feed Formats
 
 ### RSS 2.0
+
 - Standard RSS 2.0 elements (title, link, description, pubDate)
 - Content-encoded module (`content:encoded`)
 - Dublin Core (`dc:creator` for author)
@@ -485,6 +490,7 @@ Fetcher::RequestConfig.new(
 - RSS 1.0/RDF (basic support)
 
 ### Atom 1.0
+
 - Standard Atom elements (title, link, published, updated)
 - Content element (HTML, text, xhtml types)
 - Summary element
@@ -492,6 +498,7 @@ Fetcher::RequestConfig.new(
 - Categories (term attribute)
 
 ### JSON Feed 1.0/1.1
+
 - Full JSON Feed v1.0 and v1.1 support
 - `content_html` and `content_text`
 - `authors` array (feed and item level)
@@ -511,11 +518,13 @@ FETCHER_DEBUG=1 ./your_application
 ```
 
 This will output:
+
 - Driver selection for each URL
 - Specific exception details when errors occur
 - Error context for better diagnosis
 
 Debug logging is particularly useful for diagnosing issues with:
+
 - Reddit API failures
 - Feed parsing errors  
 - Network connectivity problems
@@ -535,9 +544,11 @@ end
 
 ## Development
 
+Requires Crystal >= 1.19.0.
+
 ```bash
 crystal deps
-crystal spec  # 147 tests
+crystal spec  # 423 examples
 ```
 
 ## Contributing
