@@ -1,8 +1,6 @@
 {
   "assignee": "",
-  "blocked_by": [
-    "fetcherc-9qn.13"
-  ],
+  "blocked_by": [],
   "blocks": [],
   "created": "2026-09-04T10:32:08Z",
   "description": "`RSSParser` currently handles two distinct XML dialects (RSS and Atom) within a single class. About 250 of its 390 lines are dedicated to Atom-specific extraction. This violates single-responsibility and makes the class name misleading.\n\nConcretely:\n- Create `src/fetcher/rss_parser/rss_parser.cr` — `Fetcher::RSSParser` keeps the current public surface (`parse_entries`, `parse_feed_metadata`, `parse_all`, `parse_xml_document`) but only the RSS code paths.\n- Create `src/fetcher/rss_parser/atom_parser.cr` — `Fetcher::AtomParser` owns all `parse_atom_*`/`extract_atom_*` methods.\n- Both share a small `BaseFeedParser` for the common bits: `parse_xml`, `check_entity_expansion_risk`, `MAX_ENTITY_DEFINITIONS`, and the public `parse_entries`/`parse_feed_metadata` dispatch that tries each backend.\n- The dispatch in `parse_entries` and `parse_feed_metadata` becomes the base class's responsibility; subclasses implement `parse_entries_impl` / `parse_metadata_impl`.\n\nWhy:\n- Reader sees a 150-line RSS parser and a 150-line Atom parser instead of one 390-line mix.\n- Future Atom-only changes don't touch RSS code (and vice versa).\n- Class name `RSSParser` becomes accurate.\n\nAcceptance:\n- Both new files exist, the original `rss_parser.cr` shrinks significantly or is removed.\n- All public APIs (`Fetcher::RSSParser.new.parse_entries(...)`) still work — the public surface must not break callers in `rss.cr`, `software/atom_parser.cr`, etc.\n- `crystal spec` passes; `crystal tool format` is clean.",
