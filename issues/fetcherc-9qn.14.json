@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:45:48Z",
   "created": "2026-09-04T10:43:27Z",
   "description": "`HTTP_STATUS_WIDTH = 80` is declared in `src/fetcher/reddit.cr:22` but never referenced anywhere in `src/` or `spec/`. Dead code from a formatting decision that didn't make it into the final implementation.\n\nAction:\n1. Delete the line.\n2. Verify `grep -rn HTTP_STATUS_WIDTH src/ spec/` returns nothing.\n\nAcceptance: file shrinks by 1 line, no other changes, all specs pass.",
   "id": "fetcherc-9qn.14",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Remove dead HTTP_STATUS_WIDTH constant from reddit.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:45:39Z"
+  "updated_at": "2026-09-04T10:45:48Z"
 }
