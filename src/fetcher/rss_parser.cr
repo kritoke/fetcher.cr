@@ -8,46 +8,16 @@ require "./attachment"
 require "./safe_feed_processor"
 require "./link_resolver"
 require "./entity_expansion_guard"
+require "./xml_helper"
 
 module Fetcher
-  # Helper module for XML node operations to reduce message chains
-  module XMLHelper
-    # Extract text content from an xpath result with optional stripping
-    def xpath_text(node : XML::Node, path : String) : String?
-      node.xpath_node(path).try(&.text).try(&.strip).presence
-    end
-
-    # Find first element child by name
-    def find_child(node : XML::Node, name : String) : XML::Node?
-      node.children.find { |child| child.element? && child.name == name }
-    end
-
-    # Find element by name and get attribute
-    def find_attr(node : XML::Node, name : String, attr : String) : String?
-      find_child(node, name).try(&.[attr]?).try(&.strip).presence
-    end
-
-    # Find link with optional rel and type filtering
-    def find_link(children : Array(XML::Node), rel : String? = nil, type : String? = nil) : XML::Node?
-      children.find do |child|
-        next unless child.name == "link" && child["href"]?
-        next if rel && child["rel"]? != rel
-        next if type && !child["type"]?.nil? && !child["type"].starts_with?(type)
-        true
-      end
-    end
-
-    # Extract href from link node
-    def extract_href(node : XML::Node?) : String?
-      node.try(&.["href"]).try(&.strip).presence || node.try(&.text).try(&.strip).presence || "#"
-    end
-  end
-
-  EMPTY_FEED_METADATA = FeedMetadata.new
-
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
     include XMLHelper
+
+    # Maximum entity definitions allowed before suspecting entity expansion attack.
+    # Used by `check_entity_expansion_risk` via `EntityExpansionGuard`.
+    MAX_ENTITY_DEFINITIONS = 10
 
     def parse_entries(data : String, limit : Int32, strip_content : Bool = false) : Array(Entry)
       xml = parse_xml(data)
@@ -72,15 +42,15 @@ module Fetcher
     end
 
     def parse_feed_metadata(xml : XML::Document) : FeedMetadata
-      return EMPTY_FEED_METADATA unless xml.root
+      return FeedMetadata::EMPTY unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
-      return rss_metadata unless rss_metadata.site_link.nil? && rss_metadata.feed_title.nil?
+      return rss_metadata unless rss_metadata.empty?
 
       atom_metadata = parse_atom_metadata(xml)
-      return atom_metadata unless atom_metadata.site_link.nil? && atom_metadata.feed_title.nil?
+      return atom_metadata unless atom_metadata.empty?
 
-      EMPTY_FEED_METADATA
+      FeedMetadata::EMPTY
     end
 
     def parse_all(data : String, limit : Int32) : Tuple(Array(Entry), FeedMetadata)
@@ -100,9 +70,6 @@ module Fetcher
       parse_xml(data)
     end
 
-    # Maximum entity definitions allowed before suspecting entity expansion attack
-    MAX_ENTITY_DEFINITIONS = 10
-
     private def parse_xml(data : String) : XML::Document
       check_entity_expansion_risk(data)
 
@@ -118,10 +85,6 @@ module Fetcher
     # Reject DOCTYPE with internal subset entirely, as well-formed feeds don't need them.
     private def check_entity_expansion_risk(content : String) : Nil
       EntityExpansionGuard.check(content, MAX_ENTITY_DEFINITIONS)
-    end
-
-    private def count_entity_definitions(content : String) : Int32
-      EntityExpansionGuard.count_entity_definitions(content)
     end
 
     private def parse_rss(xml : XML::Node, limit : Int32, strip_content : Bool) : Array(Entry)
@@ -143,11 +106,12 @@ module Fetcher
 
     private def parse_rss_metadata(xml : XML::Node) : FeedMetadata
       channel = xml.xpath_node("//*[local-name()='channel']")
-      return EMPTY_FEED_METADATA unless channel
+      return FeedMetadata::EMPTY unless channel
 
       FeedMetadata.new(
         site_link: resolve_rss_site_link(channel),
-        favicon: extract_rss_favicon(xml),
+        # RSS <image><url> is the channel logo (typically 60x60+), not a favicon — skip it.
+        favicon: nil,
         feed_title: extract_rss_title_text(channel),
         feed_description: extract_rss_description_text(channel),
         feed_language: extract_rss_language(channel),
@@ -165,12 +129,6 @@ module Fetcher
 
     private def extract_rss_language(channel : XML::Node) : String?
       xpath_text(channel, "./*[local-name()='language']")
-    end
-
-    private def extract_rss_favicon(xml : XML::Node) : String?
-      # Don't extract RSS <image><url> as favicon - it's the channel logo, not a favicon.
-      # This is typically 60x60 or larger and not appropriate for use as a favicon.
-      nil
     end
 
     private def resolve_rss_site_link(channel : XML::Node) : String
@@ -267,7 +225,7 @@ module Fetcher
 
     private def parse_atom_metadata(xml : XML::Node) : FeedMetadata
       feed_node = xml.xpath_node("//*[local-name()='feed']")
-      return EMPTY_FEED_METADATA unless feed_node
+      return FeedMetadata::EMPTY unless feed_node
 
       FeedMetadata.new(
         site_link: extract_atom_site_link(feed_node),
@@ -379,12 +337,6 @@ module Fetcher
       author_node = author_nodes.first?
       return unless author_node
       author_node.children.find { |c| c.name == "uri" }.try(&.text).try(&.strip).presence
-    end
-
-    private def extract_atom_categories(children : Array(XML::Node)) : Array(String)
-      children.select { |child| child.name == "category" }.compact_map do |cat|
-        cat["term"]?.try(&.strip).presence
-      end
     end
   end
 end
