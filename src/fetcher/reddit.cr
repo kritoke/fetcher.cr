@@ -11,16 +11,16 @@ require "./header_builder"
 require "./config"
 require "./reddit_oauth"
 require "./url_validator"
+require "./reddit_diagnostics"
+require "./reddit_post_parser"
 
 module Fetcher
   module Reddit
-    USER_AGENT          = "fetcher.cr/0.9.7 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
+    USER_AGENT          = "fetcher.cr/#{Fetcher::VERSION} (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)"
     REDDIT_API_BASE     = "https://www.reddit.com"
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
     # Diagnostics and response formatting constants
-    HTTP_STATUS_WIDTH =  80
-    MAX_BODY_SNIPPET  = 512
 
     class RedditFetchError < Exception
       getter original_cause : Exception?
@@ -80,25 +80,6 @@ module Fetcher
       RSS.pull(rss_url, rss_headers, limit, config)
     end
 
-    private def self.log_fetch_diagnostics(api_url : String, final_headers : ::HTTP::Headers) : Nil
-      uri = URI.parse(api_url)
-      host = uri.host
-      addresses = if host && !host.empty?
-                    begin
-                      Socket::Addrinfo.resolve(host, URLValidator::DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-                        .map(&.ip_address.to_s)
-                    rescue ex
-                      ["resolve_failed: #{ex.message}"]
-                    end
-                  else
-                    ["no_host"]
-                  end
-      ::Log.for("fetcher.reddit").debug { "Fetching Reddit API #{api_url} from resolved addresses: #{addresses.join(", ")}" }
-      ::Log.for("fetcher.reddit").debug { "Request headers: User-Agent=#{final_headers["User-Agent"]?}, Accept=#{final_headers["Accept"]?}" }
-    rescue ex
-      ::Log.for("fetcher.reddit").debug { "Failed to resolve/log diagnostics for #{api_url}: #{ex.message}" }
-    end
-
     private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : NamedTuple(result: Result, source: Symbol)
       result = Fetcher.with_retry(config) do
         fetch_reddit_api(subreddit, sort, limit, headers, config)
@@ -114,7 +95,9 @@ module Fetcher
         return {result: rss_result, source: :rss} if rss_result.success?
       end
 
-      old_result = fetch_old_reddit(subreddit, sort, limit, headers, config)
+      old_result = Fetcher.with_retry(config.with_retry_max_retries(2)) do
+        fetch_reddit_api(subreddit, sort, limit, headers, config, OLD_REDDIT_API_BASE)
+      end
       {result: old_result, source: old_result.success? ? :old_reddit : :failed}
     end
 
@@ -132,7 +115,7 @@ module Fetcher
       end
 
       http_client = Fetcher::CrestHttpClient.new(config)
-      log_fetch_diagnostics(api_url, final_headers)
+      RedditDiagnostics.log_fetch(api_url, final_headers)
 
       response = http_client.get(api_url, final_headers)
       handle_reddit_response(response, api_url, subreddit, limit, config)
@@ -157,13 +140,6 @@ module Fetcher
         RedditFetchError.new(wrapped.message, InvalidFormatError.new(wrapped.message, wrapped))
       else
         RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
-      end
-    end
-
-    private def self.fetch_old_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      old_config = config.with_retry_max_retries(2)
-      Fetcher.with_retry(old_config) do
-        fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
       end
     end
 
@@ -201,35 +177,12 @@ module Fetcher
         error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
         raise HTTPServerError.new(error.message, response.status_code, error)
       else
-        detail = build_response_detail(response)
+        detail = RedditDiagnostics.build_response_detail(response)
         ::Log.for("fetcher.reddit").warn { "Reddit API returned non-OK status: #{detail} for #{api_url}" }
 
         error = Error.http(response.status_code, "HTTP error #{response.status_code}: #{detail}", api_url)
         raise HTTPError.new(error.message, response.status_code, error)
       end
-    end
-
-    private def self.build_response_detail(response) : String
-      server = response.headers["server"]? || response.headers["Server"]?
-      via = response.headers["via"]? || response.headers["Via"]?
-      rate_remaining = response.headers["x-ratelimit-remaining"]? || response.headers["X-Ratelimit-Remaining"]?
-      content_type = response.headers["content-type"]? || response.headers["Content-Type"]?
-
-      body_snippet = begin
-        if response.body && response.body.is_a?(String)
-          response.body[0, MAX_BODY_SNIPPET].gsub(/\s+/, " ").strip
-        end
-      rescue
-        nil
-      end
-
-      parts = ["status=#{response.status_code}"]
-      parts << "server=#{server}" if server
-      parts << "via=#{via}" if via
-      parts << "rate_remaining=#{rate_remaining}" if rate_remaining
-      parts << "content_type=#{content_type}" if content_type
-      parts << "body=#{body_snippet}" if body_snippet
-      parts.join("; ")
     end
 
     private def self.build_result(entries : Array(Entry), subreddit : String) : Result
@@ -283,81 +236,7 @@ module Fetcher
     end
 
     def self.parse_reddit_response(body : String, limit : Int32) : Array(Entry)
-      parsed = JSON.parse(body)
-      children = extract_children(parsed)
-      return [] of Entry if children.nil?
-
-      children.first(limit).compact_map { |child| parse_reddit_post(child) }
-    rescue JSON::ParseException
-      raise InvalidFormatError.new("Failed to parse Reddit JSON response")
+      RedditPostParser.parse(body, limit)
     end
-
-    private def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
-      # Reddit returns either a single listing object or an array with a listing wrapper
-      listing = parsed.as_a?.try &.[]?(0).try &.["data"]? || parsed["data"]?
-      listing.try(&.["children"]?).try(&.as_a?)
-    rescue ex : KeyError | TypeCastError | IndexError
-      ::Log.for("fetcher.reddit").warn { "Unexpected JSON structure in Reddit response: #{ex.message}" }
-      nil
-    end
-
-    private def self.parse_reddit_post(child : JSON::Any) : Entry?
-      post_data = extract_post_data(child) || return
-
-      Entry.create(
-        title: post_data.title,
-        url: post_data.url,
-        source_type: SourceType::Reddit,
-        published_at: post_data.pub_date,
-        is_discussion_url: post_data.link_data.is_discussion_url,
-        comment_url: post_data.link_data.comment_url || post_data.discussion_url
-      )
-    end
-
-    private def self.extract_post_data(child : JSON::Any) : PostData?
-      post = child["data"]?
-      return unless post
-
-      discussion_url = build_discussion_url(extract_permalink(post))
-      effective_url = determine_effective_url(post, discussion_url)
-
-      PostData.new(
-        title: extract_title(post),
-        url: effective_url,
-        discussion_url: discussion_url,
-        pub_date: extract_pub_date(post),
-        link_data: LinkResolver.resolve_from_url(effective_url)
-      )
-    end
-
-    private def self.extract_title(post : JSON::Any) : String
-      post["title"]?.try(&.as_s) || "Untitled"
-    end
-
-    private def self.extract_permalink(post : JSON::Any) : String
-      post["permalink"]?.try(&.as_s) || ""
-    end
-
-    private def self.build_discussion_url(permalink : String) : String
-      "https://www.reddit.com#{permalink}"
-    end
-
-    private def self.determine_effective_url(post : JSON::Any, discussion_url : String) : String
-      is_self = post["is_self"]?.try(&.as_bool) || false
-      post_url = post["url"]?.try(&.as_s) || ""
-      is_self || post_url.empty? ? discussion_url : post_url
-    end
-
-    private def self.extract_pub_date(post : JSON::Any) : Time?
-      created_utc = post["created_utc"]?.try(&.as_f) || 0.0
-      created_utc > 0 ? TimeParser.normalize(Time.unix(created_utc.to_i64)) : nil
-    end
-
-    record PostData,
-      title : String,
-      url : String,
-      discussion_url : String,
-      pub_date : Time?,
-      link_data : LinkResolver::LinkData
   end
 end
