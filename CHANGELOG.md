@@ -5,7 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.22] - 2026-09-04
+
+### Changed
+
+- **Reddit User-Agent**: Now sourced from `Fetcher::VERSION` (sourced from `shard.yml`) instead of a hardcoded string. No more silent version drift on release.
+- **`RedditDiagnostics.log_fetch` DNS resolution**: The DNS lookup now lives inside the `Log.debug` block, so it only runs when debug logging is enabled. Previously it ran on every Reddit request regardless of log level.
+
+### Added
+
+- **`Fetcher::VERSION`**: New constant in `src/fetcher/version.cr` providing a programmatic source of truth for the library version. Used by `Reddit::USER_AGENT`.
+- **`FeedMetadata#empty?` predicate**: New method that returns true only when every metadata field is nil/empty. Replaces the brittle ad-hoc `unless site_link.nil? && feed_title.nil?` checks that mis-classified feeds with one populated field but not the other.
+
+### Fixed
+
+- **rss_parser dead code**: Removed three unused private methods (`count_entity_definitions`, `extract_rss_favicon`, `extract_atom_categories`).
+- **Reddit diagnostics dead code**: Removed unused `HTTP_STATUS_WIDTH` constant.
+- **`Fetcher::Reddit` User-Agent**: No longer reports stale version `0.9.7` on every release; now reads `Fetcher::VERSION`.
+
+### Refactored
+
+- **RSS parser**: `XMLHelper` module moved into its own file (`src/fetcher/xml_helper.cr`) so other XML consumers can include it without depending on `rss_parser.cr`. `MAX_ENTITY_DEFINITIONS` is now a proper class constant at the top of `RSSParser`. Local `EMPTY_FEED_METADATA` shim removed; callers use `FeedMetadata::EMPTY`.
+- **Reddit module**: ~90 lines of JSON shape parsing (`parse_reddit_response`, `extract_children`, `parse_reddit_post`, `extract_post_data`, `PostData`, field extractors) extracted to `src/fetcher/reddit_post_parser.cr` as `Fetcher::RedditPostParser`. `Fetcher::Reddit.parse_reddit_response` is preserved as a one-line delegation for backwards compatibility.
+- **Reddit diagnostics**: `log_fetch_diagnostics` and `build_response_detail` extracted to `src/fetcher/reddit_diagnostics.cr` as `Fetcher::RedditDiagnostics`. The header-lookup helper now walks case-insensitive name pairs instead of four `||` chains.
+- **`fetch_old_reddit`**: 5-line wrapper around `fetch_reddit_api` inlined into its single call site in `fetch_fallback`.
 
 ---
 
