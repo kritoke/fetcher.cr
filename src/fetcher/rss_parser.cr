@@ -8,41 +8,9 @@ require "./attachment"
 require "./safe_feed_processor"
 require "./link_resolver"
 require "./entity_expansion_guard"
+require "./xml_helper"
 
 module Fetcher
-  # Helper module for XML node operations to reduce message chains
-  module XMLHelper
-    # Extract text content from an xpath result with optional stripping
-    def xpath_text(node : XML::Node, path : String) : String?
-      node.xpath_node(path).try(&.text).try(&.strip).presence
-    end
-
-    # Find first element child by name
-    def find_child(node : XML::Node, name : String) : XML::Node?
-      node.children.find { |child| child.element? && child.name == name }
-    end
-
-    # Find element by name and get attribute
-    def find_attr(node : XML::Node, name : String, attr : String) : String?
-      find_child(node, name).try(&.[attr]?).try(&.strip).presence
-    end
-
-    # Find link with optional rel and type filtering
-    def find_link(children : Array(XML::Node), rel : String? = nil, type : String? = nil) : XML::Node?
-      children.find do |child|
-        next unless child.name == "link" && child["href"]?
-        next if rel && child["rel"]? != rel
-        next if type && !child["type"]?.nil? && !child["type"].starts_with?(type)
-        true
-      end
-    end
-
-    # Extract href from link node
-    def extract_href(node : XML::Node?) : String?
-      node.try(&.["href"]).try(&.strip).presence || node.try(&.text).try(&.strip).presence || "#"
-    end
-  end
-
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
     include XMLHelper
