@@ -113,7 +113,9 @@ module Fetcher
         return {result: rss_result, source: :rss} if rss_result.success?
       end
 
-      old_result = fetch_old_reddit(subreddit, sort, limit, headers, config)
+      old_result = Fetcher.with_retry(config.with_retry_max_retries(2)) do
+        fetch_reddit_api(subreddit, sort, limit, headers, config, OLD_REDDIT_API_BASE)
+      end
       {result: old_result, source: old_result.success? ? :old_reddit : :failed}
     end
 
@@ -156,13 +158,6 @@ module Fetcher
         RedditFetchError.new(wrapped.message, InvalidFormatError.new(wrapped.message, wrapped))
       else
         RedditFetchError.new("#{ex.class}: #{ex.message}", ex)
-      end
-    end
-
-    private def self.fetch_old_reddit(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : Result
-      old_config = config.with_retry_max_retries(2)
-      Fetcher.with_retry(old_config) do
-        fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
       end
     end
 
