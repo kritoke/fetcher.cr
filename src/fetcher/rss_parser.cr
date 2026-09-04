@@ -43,11 +43,13 @@ module Fetcher
     end
   end
 
-  EMPTY_FEED_METADATA = FeedMetadata.new
-
   # RSS and Atom feed parser implementation
   class RSSParser < EntryParser
     include XMLHelper
+
+    # Maximum entity definitions allowed before suspecting entity expansion attack.
+    # Used by `check_entity_expansion_risk` via `EntityExpansionGuard`.
+    MAX_ENTITY_DEFINITIONS = 10
 
     def parse_entries(data : String, limit : Int32, strip_content : Bool = false) : Array(Entry)
       xml = parse_xml(data)
@@ -72,7 +74,7 @@ module Fetcher
     end
 
     def parse_feed_metadata(xml : XML::Document) : FeedMetadata
-      return EMPTY_FEED_METADATA unless xml.root
+      return FeedMetadata::EMPTY unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
       return rss_metadata unless rss_metadata.empty?
@@ -80,7 +82,7 @@ module Fetcher
       atom_metadata = parse_atom_metadata(xml)
       return atom_metadata unless atom_metadata.empty?
 
-      EMPTY_FEED_METADATA
+      FeedMetadata::EMPTY
     end
 
     def parse_all(data : String, limit : Int32) : Tuple(Array(Entry), FeedMetadata)
@@ -99,9 +101,6 @@ module Fetcher
     def parse_xml_document(data : String) : XML::Document
       parse_xml(data)
     end
-
-    # Maximum entity definitions allowed before suspecting entity expansion attack
-    MAX_ENTITY_DEFINITIONS = 10
 
     private def parse_xml(data : String) : XML::Document
       check_entity_expansion_risk(data)
@@ -139,7 +138,7 @@ module Fetcher
 
     private def parse_rss_metadata(xml : XML::Node) : FeedMetadata
       channel = xml.xpath_node("//*[local-name()='channel']")
-      return EMPTY_FEED_METADATA unless channel
+      return FeedMetadata::EMPTY unless channel
 
       FeedMetadata.new(
         site_link: resolve_rss_site_link(channel),
@@ -258,7 +257,7 @@ module Fetcher
 
     private def parse_atom_metadata(xml : XML::Node) : FeedMetadata
       feed_node = xml.xpath_node("//*[local-name()='feed']")
-      return EMPTY_FEED_METADATA unless feed_node
+      return FeedMetadata::EMPTY unless feed_node
 
       FeedMetadata.new(
         site_link: extract_atom_site_link(feed_node),
