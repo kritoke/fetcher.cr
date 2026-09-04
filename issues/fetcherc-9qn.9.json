@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-9qn.11"
+  ],
   "created": "2026-09-04T10:31:55Z",
   "description": "rss_parser.cr contains three unused private methods that should be removed for clarity:\n\n1. `count_entity_definitions(content)` (lines ~108-110): Wraps `EntityExpansionGuard.count_entity_definitions` but is never called from within RSSParser — the guard is invoked via `EntityExpansionGuard.check`.\n\n2. `extract_rss_favicon(xml)` (lines ~191-197): Always returns `nil` with only a comment explaining the decision. The decision to skip RSS favicons is fine, but the method is misleading — readers expect a real implementation.\n\n3. `extract_atom_categories(children)` (lines ~374-381): Dead code. Atom categories are extracted inline in `parse_atom_entry` via `(child_map[\"category\"]? || [] of XML::Node).compact_map { |cat| cat[\"term\"]?... }` instead.\n\nAction: delete all three methods. Verify specs still pass (`crystal spec`).",
   "id": "fetcherc-9qn.9",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "Remove dead code from rss_parser.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:31:55Z"
+  "updated_at": "2026-09-04T10:32:24Z"
 }
