@@ -75,10 +75,10 @@ module Fetcher
       return EMPTY_FEED_METADATA unless xml.root
 
       rss_metadata = parse_rss_metadata(xml)
-      return rss_metadata unless rss_metadata.site_link.nil? && rss_metadata.feed_title.nil?
+      return rss_metadata unless rss_metadata.empty?
 
       atom_metadata = parse_atom_metadata(xml)
-      return atom_metadata unless atom_metadata.site_link.nil? && atom_metadata.feed_title.nil?
+      return atom_metadata unless atom_metadata.empty?
 
       EMPTY_FEED_METADATA
     end
