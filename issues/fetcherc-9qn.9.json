@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-04T10:31:55Z",
@@ -8,8 +8,8 @@
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Remove dead code from rss_parser.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:33:25Z"
+  "updated_at": "2026-09-04T10:37:43Z"
 }
