@@ -120,10 +120,6 @@ module Fetcher
       EntityExpansionGuard.check(content, MAX_ENTITY_DEFINITIONS)
     end
 
-    private def count_entity_definitions(content : String) : Int32
-      EntityExpansionGuard.count_entity_definitions(content)
-    end
-
     private def parse_rss(xml : XML::Node, limit : Int32, strip_content : Bool) : Array(Entry)
       entries = [] of Entry
 
@@ -147,7 +143,8 @@ module Fetcher
 
       FeedMetadata.new(
         site_link: resolve_rss_site_link(channel),
-        favicon: extract_rss_favicon(xml),
+        # RSS <image><url> is the channel logo (typically 60x60+), not a favicon — skip it.
+        favicon: nil,
         feed_title: extract_rss_title_text(channel),
         feed_description: extract_rss_description_text(channel),
         feed_language: extract_rss_language(channel),
@@ -165,12 +162,6 @@ module Fetcher
 
     private def extract_rss_language(channel : XML::Node) : String?
       xpath_text(channel, "./*[local-name()='language']")
-    end
-
-    private def extract_rss_favicon(xml : XML::Node) : String?
-      # Don't extract RSS <image><url> as favicon - it's the channel logo, not a favicon.
-      # This is typically 60x60 or larger and not appropriate for use as a favicon.
-      nil
     end
 
     private def resolve_rss_site_link(channel : XML::Node) : String
@@ -379,12 +370,6 @@ module Fetcher
       author_node = author_nodes.first?
       return unless author_node
       author_node.children.find { |c| c.name == "uri" }.try(&.text).try(&.strip).presence
-    end
-
-    private def extract_atom_categories(children : Array(XML::Node)) : Array(String)
-      children.select { |child| child.name == "category" }.compact_map do |cat|
-        cat["term"]?.try(&.strip).presence
-      end
     end
   end
 end
