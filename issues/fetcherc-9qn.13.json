@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-04T10:32:20Z",
+  "description": "`parse_feed_metadata` (lines ~63-72) and `parse_rss_metadata`/`parse_atom_metadata` use a brittle pattern to decide whether a feed produced usable metadata:\n\n```crystal\nrss_metadata = parse_rss_metadata(xml)\nreturn rss_metadata unless rss_metadata.site_link.nil? \u0026\u0026 rss_metadata.feed_title.nil?\n```\n\nProblems:\n- \"Empty\" is defined ad-hoc as `site_link` AND `feed_title` both nil — but a feed could legitimately have a title with no link (or vice versa), and this would return it as \"empty\" and fall through to Atom. That's wrong.\n- The pattern is duplicated three times in the file.\n- It looks like it means \"we have nothing\" but actually means \"we're missing both of two specific fields\".\n\nFix:\n1. Add an `empty?` predicate to `FeedMetadata` in `entry_parser.cr`:\n   ```crystal\n   def empty? : Bool\n     site_link.nil? \u0026\u0026 favicon.nil? \u0026\u0026 feed_title.nil? \u0026\u0026 feed_description.nil? \u0026\u0026 feed_language.nil? \u0026\u0026 feed_authors.empty?\n   end\n   ```\n2. Replace the three sites in rss_parser.cr with `return rss_metadata unless rss_metadata.empty?`.\n\nAcceptance:\n- All three ad-hoc checks replaced with `empty?`.\n- Specs pass; behavior is unchanged for existing feeds (a feed that produced a title-only result will now correctly return that instead of falling through to Atom).",
+  "id": "fetcherc-9qn.13",
+  "labels": [],
+  "parent": "fetcherc-9qn",
+  "priority": 3,
+  "status": "open",
+  "title": "Simplify feed-metadata empty-detection pattern",
+  "type": "task",
+  "updated_at": "2026-09-04T10:32:20Z"
+}
