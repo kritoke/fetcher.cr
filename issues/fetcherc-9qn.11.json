@@ -8,9 +8,15 @@
   "id": "fetcherc-9qn.11",
   "labels": [],
   "parent": "fetcherc-9qn",
+  "comments": [
+    {
+      "text": "Won't fix: user prefers keeping RSS+Atom in one class to avoid public API churn. The other 9qn.* tickets (9, 10, 12, 13) still apply and are unblocked.",
+      "timestamp": "2026-09-04T10:33:29Z"
+    }
+  ],
   "priority": 2,
   "status": "closed",
   "title": "Split RSS and Atom parsing into separate files",
   "type": "task",
-  "updated_at": "2026-09-04T10:33:26Z"
+  "updated_at": "2026-09-04T10:33:29Z"
 }
