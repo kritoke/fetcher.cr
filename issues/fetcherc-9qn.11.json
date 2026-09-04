@@ -3,8 +3,7 @@
   "blocked_by": [
     "fetcherc-9qn.10",
     "fetcherc-9qn.12",
-    "fetcherc-9qn.13",
-    "fetcherc-9qn.9"
+    "fetcherc-9qn.13"
   ],
   "blocks": [],
   "created": "2026-09-04T10:32:08Z",
@@ -16,5 +15,5 @@
   "status": "open",
   "title": "Split RSS and Atom parsing into separate files",
   "type": "task",
-  "updated_at": "2026-09-04T10:32:25Z"
+  "updated_at": "2026-09-04T10:33:25Z"
 }
