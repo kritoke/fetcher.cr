@@ -12,6 +12,7 @@ require "./config"
 require "./reddit_oauth"
 require "./url_validator"
 require "./reddit_diagnostics"
+require "./reddit_post_parser"
 
 module Fetcher
   module Reddit
@@ -235,81 +236,7 @@ module Fetcher
     end
 
     def self.parse_reddit_response(body : String, limit : Int32) : Array(Entry)
-      parsed = JSON.parse(body)
-      children = extract_children(parsed)
-      return [] of Entry if children.nil?
-
-      children.first(limit).compact_map { |child| parse_reddit_post(child) }
-    rescue JSON::ParseException
-      raise InvalidFormatError.new("Failed to parse Reddit JSON response")
+      RedditPostParser.parse(body, limit)
     end
-
-    private def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
-      # Reddit returns either a single listing object or an array with a listing wrapper
-      listing = parsed.as_a?.try &.[]?(0).try &.["data"]? || parsed["data"]?
-      listing.try(&.["children"]?).try(&.as_a?)
-    rescue ex : KeyError | TypeCastError | IndexError
-      ::Log.for("fetcher.reddit").warn { "Unexpected JSON structure in Reddit response: #{ex.message}" }
-      nil
-    end
-
-    private def self.parse_reddit_post(child : JSON::Any) : Entry?
-      post_data = extract_post_data(child) || return
-
-      Entry.create(
-        title: post_data.title,
-        url: post_data.url,
-        source_type: SourceType::Reddit,
-        published_at: post_data.pub_date,
-        is_discussion_url: post_data.link_data.is_discussion_url,
-        comment_url: post_data.link_data.comment_url || post_data.discussion_url
-      )
-    end
-
-    private def self.extract_post_data(child : JSON::Any) : PostData?
-      post = child["data"]?
-      return unless post
-
-      discussion_url = build_discussion_url(extract_permalink(post))
-      effective_url = determine_effective_url(post, discussion_url)
-
-      PostData.new(
-        title: extract_title(post),
-        url: effective_url,
-        discussion_url: discussion_url,
-        pub_date: extract_pub_date(post),
-        link_data: LinkResolver.resolve_from_url(effective_url)
-      )
-    end
-
-    private def self.extract_title(post : JSON::Any) : String
-      post["title"]?.try(&.as_s) || "Untitled"
-    end
-
-    private def self.extract_permalink(post : JSON::Any) : String
-      post["permalink"]?.try(&.as_s) || ""
-    end
-
-    private def self.build_discussion_url(permalink : String) : String
-      "https://www.reddit.com#{permalink}"
-    end
-
-    private def self.determine_effective_url(post : JSON::Any, discussion_url : String) : String
-      is_self = post["is_self"]?.try(&.as_bool) || false
-      post_url = post["url"]?.try(&.as_s) || ""
-      is_self || post_url.empty? ? discussion_url : post_url
-    end
-
-    private def self.extract_pub_date(post : JSON::Any) : Time?
-      created_utc = post["created_utc"]?.try(&.as_f) || 0.0
-      created_utc > 0 ? TimeParser.normalize(Time.unix(created_utc.to_i64)) : nil
-    end
-
-    record PostData,
-      title : String,
-      url : String,
-      discussion_url : String,
-      pub_date : Time?,
-      link_data : LinkResolver::LinkData
   end
 end
