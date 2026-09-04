@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:46:34Z",
   "created": "2026-09-04T10:43:38Z",
   "description": "`fetch_reddit_api` (reddit.cr:120) already takes `api_base` as a parameter with default `REDDIT_API_BASE`. `fetch_old_reddit` (reddit.cr:163) is a thin wrapper that calls it with `OLD_REDDIT_API_BASE` and `with_retry_max_retries(2)`:\n\n```crystal\nprivate def self.fetch_old_reddit(...) : Result\n  old_config = config.with_retry_max_retries(2)\n  Fetcher.with_retry(old_config) do\n    fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)\n  end\nend\n```\n\nBoth use `Fetcher.with_retry` (the main path inside `fetch_fallback`, the old path inside `fetch_old_reddit`). The wrapper adds no observable behavior beyond passing a different base + retry count.\n\nAction: drop `fetch_old_reddit` and inline its call site in `fetch_fallback` with the explicit retry config + base. Alternatively, keep the name as a 2-liner that captures only the config difference. Either way, eliminate the duplicated header setup path.\n\nAcceptance: behavior unchanged (same retry counts, same headers, same fallback order), no duplicated code paths, specs pass.",
   "id": "fetcherc-9qn.16",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Consolidate duplicate fetch_reddit_api and fetch_old_reddit",
   "type": "task",
-  "updated_at": "2026-09-04T10:46:16Z"
+  "updated_at": "2026-09-04T10:46:34Z"
 }
