@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-04T10:32:01Z",
@@ -8,8 +8,8 @@
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Move XMLHelper module to its own file",
   "type": "task",
-  "updated_at": "2026-09-04T10:33:25Z"
+  "updated_at": "2026-09-04T10:39:53Z"
 }
