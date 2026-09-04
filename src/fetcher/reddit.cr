@@ -11,6 +11,7 @@ require "./header_builder"
 require "./config"
 require "./reddit_oauth"
 require "./url_validator"
+require "./reddit_diagnostics"
 
 module Fetcher
   module Reddit
@@ -19,7 +20,6 @@ module Fetcher
     OLD_REDDIT_API_BASE = "https://old.reddit.com"
 
     # Diagnostics and response formatting constants
-    MAX_BODY_SNIPPET  = 512
 
     class RedditFetchError < Exception
       getter original_cause : Exception?
@@ -79,25 +79,6 @@ module Fetcher
       RSS.pull(rss_url, rss_headers, limit, config)
     end
 
-    private def self.log_fetch_diagnostics(api_url : String, final_headers : ::HTTP::Headers) : Nil
-      uri = URI.parse(api_url)
-      host = uri.host
-      addresses = if host && !host.empty?
-                    begin
-                      Socket::Addrinfo.resolve(host, URLValidator::DNS_RESOLVE_PORT.to_s, type: Socket::Type::STREAM, protocol: Socket::Protocol::TCP)
-                        .map(&.ip_address.to_s)
-                    rescue ex
-                      ["resolve_failed: #{ex.message}"]
-                    end
-                  else
-                    ["no_host"]
-                  end
-      ::Log.for("fetcher.reddit").debug { "Fetching Reddit API #{api_url} from resolved addresses: #{addresses.join(", ")}" }
-      ::Log.for("fetcher.reddit").debug { "Request headers: User-Agent=#{final_headers["User-Agent"]?}, Accept=#{final_headers["Accept"]?}" }
-    rescue ex
-      ::Log.for("fetcher.reddit").debug { "Failed to resolve/log diagnostics for #{api_url}: #{ex.message}" }
-    end
-
     private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : NamedTuple(result: Result, source: Symbol)
       result = Fetcher.with_retry(config) do
         fetch_reddit_api(subreddit, sort, limit, headers, config)
@@ -133,7 +114,7 @@ module Fetcher
       end
 
       http_client = Fetcher::CrestHttpClient.new(config)
-      log_fetch_diagnostics(api_url, final_headers)
+      RedditDiagnostics.log_fetch(api_url, final_headers)
 
       response = http_client.get(api_url, final_headers)
       handle_reddit_response(response, api_url, subreddit, limit, config)
@@ -195,35 +176,12 @@ module Fetcher
         error = Error.server_error(response.status_code, "Reddit server error: #{response.status_code}", api_url)
         raise HTTPServerError.new(error.message, response.status_code, error)
       else
-        detail = build_response_detail(response)
+        detail = RedditDiagnostics.build_response_detail(response)
         ::Log.for("fetcher.reddit").warn { "Reddit API returned non-OK status: #{detail} for #{api_url}" }
 
         error = Error.http(response.status_code, "HTTP error #{response.status_code}: #{detail}", api_url)
         raise HTTPError.new(error.message, response.status_code, error)
       end
-    end
-
-    private def self.build_response_detail(response) : String
-      server = response.headers["server"]? || response.headers["Server"]?
-      via = response.headers["via"]? || response.headers["Via"]?
-      rate_remaining = response.headers["x-ratelimit-remaining"]? || response.headers["X-Ratelimit-Remaining"]?
-      content_type = response.headers["content-type"]? || response.headers["Content-Type"]?
-
-      body_snippet = begin
-        if response.body && response.body.is_a?(String)
-          response.body[0, MAX_BODY_SNIPPET].gsub(/\s+/, " ").strip
-        end
-      rescue
-        nil
-      end
-
-      parts = ["status=#{response.status_code}"]
-      parts << "server=#{server}" if server
-      parts << "via=#{via}" if via
-      parts << "rate_remaining=#{rate_remaining}" if rate_remaining
-      parts << "content_type=#{content_type}" if content_type
-      parts << "body=#{body_snippet}" if body_snippet
-      parts.join("; ")
     end
 
     private def self.build_result(entries : Array(Entry), subreddit : String) : Result
