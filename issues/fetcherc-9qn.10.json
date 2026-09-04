@@ -1,9 +1,7 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [
-    "fetcherc-9qn.11"
-  ],
+  "blocks": [],
   "created": "2026-09-04T10:32:01Z",
   "description": "The `XMLHelper` module at the top of `src/fetcher/rss_parser.cr` (lines 6-39) is a collection of generic XML utility methods (`xpath_text`, `find_child`, `find_attr`, `find_link`, `extract_href`). None of its methods are RSS-specific — they're reusable for any XML processing.\n\nProblems with current location:\n- Lives inside `rss_parser.cr`, requiring that file to be loaded whenever the helper is needed.\n- Couples unrelated XML utility to RSS/Atom parsing.\n- Forces other code (e.g., `json_feed.cr`, `software/*.cr` if they grow XML handling) to either duplicate these helpers or take an awkward dependency on `rss_parser.cr`.\n\nAction:\n1. Create `src/fetcher/xml_helper.cr` with the `Fetcher::XMLHelper` module (verbatim from rss_parser.cr).\n2. Add `require \"./xml_helper\"` at the top of `rss_parser.cr` and remove the inline module definition.\n3. Run `crystal spec` to confirm no behavior change.\n\nAcceptance: `git diff --stat` shows the module moved (no content change), and the full spec suite passes.",
   "id": "fetcherc-9qn.10",
@@ -13,5 +11,5 @@
   "status": "open",
   "title": "Move XMLHelper module to its own file",
   "type": "task",
-  "updated_at": "2026-09-04T10:32:24Z"
+  "updated_at": "2026-09-04T10:33:25Z"
 }
