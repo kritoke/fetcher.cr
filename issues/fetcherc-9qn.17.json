@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:54:39Z",
   "created": "2026-09-04T10:43:44Z",
   "description": "About 90 of reddit.cr's 363 lines are dedicated to JSON parsing:\n\n- `parse_reddit_response`\n- `extract_children`\n- `parse_reddit_post`\n- `extract_post_data` + the `PostData` record\n- `extract_title`, `extract_permalink`, `build_discussion_url`, `determine_effective_url`, `extract_pub_date`\n\nNone of these methods touch the network, OAuth, caching, or response-status handling — they're pure JSON-shape adapters. They share no state with the fetch path.\n\nMove them to `src/fetcher/reddit_json_parser.cr` (note: there's already a `reddit_json_parser.cr` for the older non-OAuth path; pick a non-clashing name like `reddit_post_parser.cr` or co-locate them). Define `Fetcher::Reddit::PostParser` (or `Fetcher::RedditPostParser`) that owns these methods and exposes a single `parse(body : String, limit : Int32) : Array(Entry)` entry point.\n\nWhy:\n- Single responsibility: reddit.cr becomes the fetch/coordinator, the new file owns shape parsing.\n- Easier to swap parsing strategy (streaming vs DOM) without touching fetch code.\n- Smaller surface to unit-test.\n\nAcceptance:\n- New file exists; the listed methods live only there.\n- `parse_reddit_response` becomes a single delegation to the new module (or is removed entirely if no external caller).\n- Specs pass.",
   "id": "fetcherc-9qn.17",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Extract Reddit JSON parsing into its own file",
   "type": "task",
-  "updated_at": "2026-09-04T10:49:33Z"
+  "updated_at": "2026-09-04T10:54:39Z"
 }
