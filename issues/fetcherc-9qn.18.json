@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:49:28Z",
   "created": "2026-09-04T10:43:50Z",
   "description": "`log_fetch_diagnostics` (reddit.cr:83) and `build_response_detail` (reddit.cr:212) are diagnostic helpers:\n\n- `log_fetch_diagnostics` does a DNS resolution + log emission (only ever called from one site, fetch_reddit_api).\n- `build_response_detail` formats a debug string from response headers + body snippet (called only from handle_reddit_response's non-OK branch).\n\nThese are 50+ lines of code that are:\n1. Debug-only and unused on happy paths.\n2. Mix diagnostic output with fetch logic.\n3. Contain expensive DNS resolution that runs even when debug logging is disabled (the resolve happens before the log call, so the cost is paid regardless of log level).\n\nAction:\n1. Move `log_fetch_diagnostics` and `build_response_detail` (plus `HTTP_STATUS_WIDTH`, `MAX_BODY_SNIPPET` constants) into `src/fetcher/reddit/diagnostics.cr` or co-located `src/fetcher/reddit_diagnostics.cr`.\n2. Gate the DNS resolution in `log_fetch_diagnostics` behind `Log.level(:debug)?` or similar check so it doesn't run when debug is off.\n3. Document that these are best-effort diagnostics — never block the request.\n\nAcceptance:\n- Helpers live in a dedicated file.\n- `Log.for(\"fetcher.reddit\").debug { ... }` work isn't paid for when debug is disabled (verify via a small spec or by reading the code).\n- Specs pass.",
   "id": "fetcherc-9qn.18",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Extract diagnostics logging from reddit.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:46:36Z"
+  "updated_at": "2026-09-04T10:49:28Z"
 }
