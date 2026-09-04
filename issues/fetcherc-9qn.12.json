@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:39:51Z",
   "created": "2026-09-04T10:32:14Z",
   "description": "Two near-constant values in `rss_parser.cr` are not actually constants:\n\n1. `MAX_ENTITY_DEFINITIONS = 10` is declared **inside the `parse_xml` method body** (around line 92). Method-local consts are recreated on every call and harder to find when reading the class top-down.\n\n2. `EMPTY_FEED_METADATA = FeedMetadata.new` at the top of the file uses constant naming for what is actually a mutable `FeedMetadata` record value (record fields are, but the variable slot is not actually frozen at the language level in Crystal).\n\nActions:\n1. Move `MAX_ENTITY_DEFINITIONS` out of the method to a class constant on `RSSParser` (or on the new `BaseFeedParser` from fetcherc-9qn.11).\n2. Replace `EMPTY_FEED_METADATA` reads with `FeedMetadata::EMPTY` (which already exists on the `FeedMetadata` record at the bottom of `entry_parser.cr`). Delete the local definition in rss_parser.cr entirely. This also addresses the related cleanup idea in openspec/009 — there's a single source of truth.\n\nAcceptance: grep for `MAX_ENTITY_DEFINITIONS` and `EMPTY_FEED_METADATA` in `src/fetcher/rss_parser.cr` returns zero matches; both names refer to canonical declarations elsewhere; specs pass.",
   "id": "fetcherc-9qn.12",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Promote MAX_ENTITY_DEFINITIONS and EMPTY_FEED_METADATA to real constants",
   "type": "task",
-  "updated_at": "2026-09-04T10:39:09Z"
+  "updated_at": "2026-09-04T10:39:51Z"
 }
