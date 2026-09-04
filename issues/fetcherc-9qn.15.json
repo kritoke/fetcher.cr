@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T10:46:14Z",
   "created": "2026-09-04T10:43:32Z",
   "description": "`src/fetcher/reddit.cr:17` hardcodes the project version inside the User-Agent string:\n\n```crystal\nUSER_AGENT = \"fetcher.cr/0.9.7 (https://github.com/kritoke/fetcher.cr; 3081486+kritoke@users.noreply.github.com)\"\n```\n\nBut `shard.yml` is at `0.9.21` and the most recent commit on main is `chore: release 0.9.21`. The User-Agent will silently lie about the version on every release until someone manually edits this string.\n\nThe string is also used in `src/fetcher/reddit_oauth.cr:77` so both sites need to stay in sync.\n\nAction:\n1. Add `Fetcher::VERSION` constant (e.g. in a new `src/fetcher/version.cr`) sourced from `shard.yml` or a hardcoded constant that mirrors it. Define a single source of truth.\n2. Rewrite `USER_AGENT` to interpolate `Fetcher::VERSION` (or `Fetcher::USER_AGENT` itself uses the constant).\n3. Document in a comment that `shard.yml` and the constant must be bumped together at release time (or use a release script to grep for the old version and replace it).\n\nAcceptance: the User-Agent returned by Reddit reports the actual project version; no other behavior change; specs pass.",
   "id": "fetcherc-9qn.15",
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fix stale hardcoded USER_AGENT version in reddit.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:45:49Z"
+  "updated_at": "2026-09-04T10:46:14Z"
 }
