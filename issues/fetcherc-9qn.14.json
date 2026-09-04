@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-04T10:43:27Z",
@@ -8,8 +8,8 @@
   "labels": [],
   "parent": "fetcherc-9qn",
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Remove dead HTTP_STATUS_WIDTH constant from reddit.cr",
   "type": "task",
-  "updated_at": "2026-09-04T10:43:27Z"
+  "updated_at": "2026-09-04T10:45:39Z"
 }
