@@ -23,7 +23,7 @@ module Fetcher
       ::Log.for("fetcher.reddit").debug do
         addresses = resolve_addresses(api_url)
         "Fetching Reddit API #{api_url} from resolved addresses: #{addresses.join(", ")}; " \
-          "headers: User-Agent=#{final_headers["User-Agent"]?}, Accept=#{final_headers["Accept"]?}"
+        "headers: User-Agent=#{final_headers["User-Agent"]?}, Accept=#{final_headers["Accept"]?}"
       end
     rescue ex
       ::Log.for("fetcher.reddit").debug { "Failed to resolve/log diagnostics for #{api_url}: #{ex.message}" }
@@ -58,13 +58,13 @@ module Fetcher
     end
 
     private def self.header(response, *names : String) : String?
-      names.each { |n| return response.headers[n]? if response.headers[n]? }
+      names.each { |name| return response.headers[name]? if response.headers[name]? }
       nil
     end
 
     private def self.body_snippet(response) : String?
       body = response.body
-      return nil unless body && body.is_a?(String)
+      return unless body && body.is_a?(String)
       body[0, MAX_BODY_SNIPPET].gsub(/\s+/, " ").strip
     rescue
       nil
