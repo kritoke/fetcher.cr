@@ -1,4 +1,5 @@
 require "http/client"
+require "./fetcher/version"
 require "./fetcher/config"
 require "./fetcher/attachment"
 require "./fetcher/author"
