@@ -59,22 +59,20 @@ module Fetcher
         end
       end
 
-      # Collect results with timeout to prevent hanging everlasting
+      # Collect results with a wall-clock deadline. If no result arrives
+      # within `timeout` we return whatever we have so the call can't hang.
       deadline = Time.instant + timeout
       received = 0
-      timeout_channel = Channel(Bool).new
-
-      # Spawn timeout notifier
-      spawn do
-        sleep timeout
-        timeout_channel.send(true)
-      end
 
       loop do
         break if received >= urls.size
 
-        # Use select to check for results or timeout
-        selected = select
+        # How much time remains before the deadline?
+        remaining = deadline - Time.instant
+        break if remaining <= Time::Span.zero
+
+        # Wait for either a result or the remaining budget.
+        select
         when result = results.receive?
           if result
             index, outcome = result
@@ -82,15 +80,14 @@ module Fetcher
                                   when Result
                                     outcome
                                   when Exception
-                                    Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class}: #{outcome.message}")
+                                    Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class} - #{outcome.message}")
                                   end
             received += 1
           else
             # Channel closed - no more results
             break
           end
-        when timeout_channel.receive
-          # Timeout fired
+        when timeout remaining
           ::Log.for("fetcher").warn { "Concurrent fetch timed out after #{timeout}, returning #{received}/#{urls.size} results" }
           break
         end
