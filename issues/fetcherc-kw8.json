@@ -7,9 +7,15 @@
   "description": "When IO is non-seekable (e.g., HTTP response body), the XXE check reads 8KB for inspection but cannot rewind.\n\nProblem: The already-consumed 8KB is passed to XML::Reader, which will miss content in the first 8KB. DOCTYPE/entity could be in that range, bypassing XXE protection.\n\nFix: For non-seekable streams, buffer the first 8KB + remaining content (with size limits), or reject non-seekable IO entirely with an error.",
   "id": "fetcherc-kw8",
   "labels": [],
+  "comments": [
+    {
+      "text": "Reopening context: this was closed on 2026-05-30 but the underlying bug is still present in src/fetcher/xml_streaming_parser.cr#check_xxe_risk — non-seekable IO still triggers 'remaining = io.read' with no size cap. The actual fix is tracked at fetcherc-zr5.1.",
+      "timestamp": "2026-09-06T16:27:43Z"
+    }
+  ],
   "priority": 0,
   "status": "closed",
   "title": "XMLStreamingParser XXE check consumes stream but doesn't rewind on non-seekable IO",
   "type": "task",
-  "updated_at": "2026-05-30T19:47:33Z"
+  "updated_at": "2026-09-06T16:27:43Z"
 }
