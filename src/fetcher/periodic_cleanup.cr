@@ -5,11 +5,13 @@ module Fetcher
   module PeriodicCleanup
     @@global_cleanup_lock = Mutex.new
     @@registered_cleanups = Set(Proc(Nil)).new
-    @@global_cleanup_fiber : Fiber?
+    # The running fiber paired with its own stop channel. The channel is
+    # closure-captured by the fiber, so the global is only used to signal
+    # shutdown to the *current* fiber on restart (close the channel, the
+    # fiber's `select` unblocks, the loop exits).
+    @@global_cleanup : Tuple(Fiber, Channel(Bool))?
     @@cleanup_running : Bool = false
     @@cleanup_interval : Time::Span = 60.seconds
-    # Channel used to signal the fiber to stop. New fibers get a new channel.
-    @@stop_channel : Channel(Bool)?
 
     def self.start_periodic_cleanup(interval : Time::Span = 60.seconds, force : Bool = false, &cleanup : Proc(Nil))
       raise ArgumentError.new("start_periodic_cleanup requires a block") unless cleanup
@@ -36,16 +38,22 @@ module Fetcher
     end
 
     private def self.restart_fiber : Nil
-      # Create new stop channel to signal the old fiber
+      # Signal the previous fiber to exit by closing its stop channel.
+      # This must happen *before* we spawn the new fiber so the old one
+      # releases its reference to the (now-stale) @@registered_cleanups.
+      previous = @@global_cleanup
+      if previous
+        _old_fiber, old_stop = previous
+        old_stop.close
+      end
+
       stop = Channel(Bool).new
-      @@stop_channel = stop
       @@cleanup_running = true
 
-      old_fiber = @@global_cleanup_fiber
-      @@global_cleanup_fiber = spawn do
+      @@global_cleanup = {spawn do
         loop do
           # Wait for stop signal or interval
-          selected = select
+          select
           when stop.receive
             # Stopped by restart_fiber
             break
@@ -72,10 +80,7 @@ module Fetcher
       rescue ex
         ::Log.for("fetcher").error { "Global periodic cleanup fiber crashed: #{ex.class} - #{ex.message}" }
         @@cleanup_running = false
-      end
-
-      # Close old stop channel to signal old fiber to stop
-      # (handled by replacing @@stop_channel with new channel above)
+      end, stop}
     end
 
     def self.unregister_cleanup(&cleanup : Proc(Nil)) : Nil
