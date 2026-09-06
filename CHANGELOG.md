@@ -786,7 +786,6 @@ For detailed API documentation, field names, and code examples, see [API.md](API
 - Functional architecture
 - Removed connection pooling for simplicity
 
-[Unreleased]: https://github.com/kritoke/fetcher.cr/compare/v0.9.4..HEAD
 [0.9.4]: https://github.com/kritoke/fetcher.cr/compare/v0.9.3..v0.9.4
 [0.9.3]: https://github.com/kritoke/fetcher.cr/compare/v0.9.2..v0.9.3
 [0.9.0]: https://github.com/kritoke/fetcher.cr/compare/v0.8.3..v0.9.0
