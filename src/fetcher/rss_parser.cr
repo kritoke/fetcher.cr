@@ -151,7 +151,7 @@ module Fetcher
       pub_date = extract_rss_pub_date(child_map)
       content = strip_content ? "" : extract_rss_content(child_map)
       author = extract_from_map(child_map, "creator").try(&.text).try(&.strip).presence
-      categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat.text.try(&.strip).presence }
+      categories = (child_map["category"]? || [] of XML::Node).compact_map(&.text.try(&.strip).presence)
       attachments = extract_rss_attachments(child_map)
       comments_link = extract_from_map(child_map, "comments").try(&.text).try(&.strip).presence
       link_data = LinkResolver.resolve(node, link)
@@ -281,7 +281,7 @@ module Fetcher
       content = strip_content ? "" : extract_atom_content(child_map)
       author = extract_atom_author(child_map)
       author_url = extract_atom_author_url(child_map)
-      categories = (child_map["category"]? || [] of XML::Node).compact_map { |cat| cat["term"]?.try(&.strip).presence }
+      categories = (child_map["category"]? || [] of XML::Node).compact_map(&.["term"]?.try(&.strip).presence)
       link_data = LinkResolver.resolve(node, link)
 
       Entry.create(
@@ -301,10 +301,10 @@ module Fetcher
 
     private def extract_atom_link(child_map : Hash(String, Array(XML::Node))) : String
       links = child_map["link"]? || [] of XML::Node
-      alt_link = links.find { |l| l["rel"]? == "alternate" && (l["type"]?.nil? || l["type"].starts_with?("text/html")) }
+      alt_link = links.find { |link| link["rel"]? == "alternate" && (link["type"]?.nil? || link["type"].starts_with?("text/html")) }
       link_node = alt_link ||
-                  links.find { |l| l["rel"]? == "alternate" } ||
-                  links.find { |l| l["href"]? } ||
+                  links.find { |link| link["rel"]? == "alternate" } ||
+                  links.find { |link| link["href"]? } ||
                   links.first?
       link_node.try(&.["href"]?).try(&.strip).presence ||
         link_node.try(&.text).try(&.strip).presence || "#"
@@ -328,7 +328,7 @@ module Fetcher
       return unless author_nodes
       author_node = author_nodes.first?
       return unless author_node
-      author_node.children.find { |c| c.name == "name" }.try(&.text).try(&.strip).presence
+      author_node.children.find { |child| child.name == "name" }.try(&.text).try(&.strip).presence
     end
 
     private def extract_atom_author_url(child_map : Hash(String, Array(XML::Node))) : String?
@@ -336,7 +336,7 @@ module Fetcher
       return unless author_nodes
       author_node = author_nodes.first?
       return unless author_node
-      author_node.children.find { |c| c.name == "uri" }.try(&.text).try(&.strip).presence
+      author_node.children.find { |child| child.name == "uri" }.try(&.text).try(&.strip).presence
     end
   end
 end

@@ -152,7 +152,7 @@ module Fetcher
 
     private def self.extract_repo(url : String, domain : String) : String?
       # Safety: reject URLs that are too long to prevent potential ReDoS
-      return nil if url.bytesize > 500
+      return if url.bytesize > 500
 
       pattern = case domain
                 when "github.com"   then GITHUB_REPO_PATTERN

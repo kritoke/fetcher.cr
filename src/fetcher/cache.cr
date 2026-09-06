@@ -176,11 +176,11 @@ module Fetcher
       store.set(key, value, ttl)
     end
 
-    def self.clear : Void
+    def self.clear : Nil
       store.clear
     end
 
-    def self.clear_by_prefix(prefix : String) : Void
+    def self.clear_by_prefix(prefix : String) : Nil
       store.clear_by_prefix(prefix)
     end
 

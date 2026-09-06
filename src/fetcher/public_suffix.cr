@@ -18,7 +18,7 @@ module Fetcher
         path = File.join(File.dirname(__FILE__), "public_suffix_list.dat")
         begin
           text = File.read(path)
-        rescue ex
+        rescue
           # Fallback minimal rules if file is missing
           text = "// Minimal fallback public suffix rules\ncom\norg\nnet\nio\nco.uk\nuk\nco\nblogspot.com\n"
         end
@@ -66,7 +66,7 @@ module Fetcher
         public_suffix = labels.last
       else
         # choose longest match by label count
-        best = matches.max_by { |m| m.split('.').size }
+        best = matches.max_by(&.split('.').size)
         if best.starts_with?("!")
           rule = best[1..-1]
           parts = rule.split('.')
@@ -90,7 +90,7 @@ module Fetcher
 
     # Return the registrable domain (eTLD+1) or nil if cannot be determined
     def self.registrable_domain(domain : String) : String?
-      return nil if domain.empty?
+      return if domain.empty?
       domain = domain.downcase
       # IP addresses: return as-is. Use Socket::IPAddress for proper
       # validation instead of a hand-rolled regex that would accept

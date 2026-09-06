@@ -76,12 +76,7 @@ module Fetcher
         when result = results.receive?
           if result
             index, outcome = result
-            result_array[index] = case outcome
-                                  when Result
-                                    outcome
-                                  when Exception
-                                    Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class} - #{outcome.message}")
-                                  end
+            result_array[index] = store_outcome(outcome, urls[index])
             received += 1
           else
             # Channel closed - no more results
@@ -94,6 +89,20 @@ module Fetcher
       end
 
       result_array.compact
+    end
+
+    # Convert a single worker's outcome into a Result for the result array.
+    # Successful Results pass through; exceptions are wrapped so the caller
+    # sees a uniform Result type per slot.
+    private def self.store_outcome(outcome : Result | Exception, url : String) : Result
+      case outcome
+      when Result then outcome
+      when Exception
+        Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{url}: #{outcome.class} - #{outcome.message}")
+      else
+        # Unreachable: outcome is statically `Result | Exception`, both arms handled.
+        Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch unknown outcome for #{url}")
+      end
     end
   end
 end
