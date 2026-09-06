@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-06T16:12:47Z",
   "created": "2026-09-06T16:00:52Z",
   "description": "Tidy remaining ameba findings from the 0.9.22 review. All are stylistic and auto-fixable:\n\n**`cache.cr` lines 179, 183** — `Lint/VoidOutsideLib`\n- `def self.clear : Void` → drop the `Void` annotation (or use `: Nil`)\n- `def self.clear_by_prefix(prefix : String) : Void` → same\n\n**`software/github.cr` line 54** — `Lint/UnusedRescueVariable`\n- `rescue ex : JSON::ParseException` (where `ex` is unused) → `rescue JSON::ParseException`\n\n**`rss_parser.cr`** — `Style/VerboseBlock` x2 (lines 154, 284) and `Naming/BlockParameterName` x5 (lines 304, 306, 307, 331, 339, 373, 381)\n- Auto-fix verbose blocks: `compact_map { |cat| cat.text.try(\u0026.strip).presence }` → `compact_map(\u0026.text.try(\u0026.strip).presence)`\n- Rename block parameters: `|cat|`, `|l|`, `|c|` → `|category|`, `|link|`, `|child|` (or similar)\n\n**`software.cr` line 155** — `Style/RedundantNilInControlExpression`\n- `return nil if url.bytesize \u003e 500` → `return if url.bytesize \u003e 500`\n\n**`public_suffix.cr` lines 69, 86** — `Style/VerboseBlock`, `Lint/VoidOutsideLib`\n- `matches.max_by { |m| m.split('.').size }` → `matches.max_by(\u0026.split('.').size)`\n- One `: Void` annotation to drop\n\nApproach:\n1. Run `crystal tool format` first.\n2. Apply manual edits for the rest.\n3. Re-run ameba to confirm zero findings in changed files.\n4. Re-run full spec suite to confirm no behavior change.\n\nAcceptance: `ameba` failures drop from 21 → ≤14 (i.e., -7); full spec suite passes.",
   "id": "fetcherc-yk9.4",
   "labels": [],
   "parent": "fetcherc-yk9",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Address remaining ameba findings (Void types, unused rescue, verbose blocks)",
   "type": "task",
-  "updated_at": "2026-09-06T16:09:00Z"
+  "updated_at": "2026-09-06T16:12:47Z"
 }
