@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-06T16:00:27Z",
+  "description": "Reliability bugs and lint findings surfaced during the 0.9.22 code review (catseye_scan / ameba / manual read). Targets a 0.9.23 patch release.\n\nChildren cover:\n- periodic_cleanup.cr fiber leak (real bug)\n- concurrent_fetcher.cr dead variables (cosmetic but misleading)\n- public_suffix.cr nil check + IP regex\n- cache.cr Void return types\n- software/github.cr unused rescue var\n- ameba findings batch (verbose blocks, block param names)",
+  "id": "fetcherc-yk9",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "[EPIC] 0.9.23 reliability + lint fixes",
+  "type": "epic",
+  "updated_at": "2026-09-06T16:00:27Z"
+}
