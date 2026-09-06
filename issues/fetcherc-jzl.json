@@ -7,9 +7,15 @@
   "description": "check_xxe_risk reads only 8192 bytes. A crafted XML could place DOCTYPE/entity after the 8KB boundary to bypass detection.\n\nNote: parse_xml uses NONET which provides some protection, but streaming parser path is vulnerable.\n\nFix: Either parse full stream with safe config, or increase inspection window and document limitation.",
   "id": "fetcherc-jzl",
   "labels": [],
+  "comments": [
+    {
+      "text": "Reopening context: this was closed on 2026-05-30 but the underlying XXE check still only inspects 8192 bytes. The fix is tracked at fetcherc-zr5.1 (size cap) + fetcherc-zr5.4 (parse_entries also enforces memory limit).",
+      "timestamp": "2026-09-06T16:27:43Z"
+    }
+  ],
   "priority": 1,
   "status": "closed",
   "title": "XXE check only inspects first 8KB - bypass possible with payload after boundary",
   "type": "task",
-  "updated_at": "2026-05-30T19:51:57Z"
+  "updated_at": "2026-09-06T16:27:43Z"
 }
