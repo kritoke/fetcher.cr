@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-zr5.4"
+  ],
   "created": "2026-09-06T16:27:00Z",
   "description": "**Bug** (reopens fetcherc-kw8 which was closed without fixing the underlying issue).\n\n`src/fetcher/xml_streaming_parser.cr#check_xxe_risk` (lines 86-119):\n\n```crystal\nprivate def check_xxe_risk(io : IO) : Nil\n  prefix_bytes = Bytes.new(XXE_CHECK_BUFFER_SIZE)        # 8KB\n  bytes_read = io.read(prefix_bytes)\n  return if bytes_read == 0\n\n  prefix = String.new(prefix_bytes[0, bytes_read])\n  perform_xxe_check(prefix)\n\n  if io.responds_to?(:rewind)\n    io.rewind\n  else\n    # NON-SEEKABLE PATH — HTTP responses land here:\n    remaining = io.read                                # reads ENTIRE remaining stream\n    combined = IO::Memory.new(prefix_bytes[0, bytes_read] + remaining)\n    io.replace_with(combined) if io.responds_to?(:replace_with)\n  end\nend\n```\n\nFor HTTP response bodies (which are non-seekable), this:\n1. Reads 8KB into `prefix_bytes` for the XXE check.\n2. Calls `io.read` with NO size argument — slurps the ENTIRE remaining body.\n3. Allocates `combined` = `prefix + remaining` — another full copy.\n\nA 100MB feed ⇒ ~100MB for `remaining` + ~100MB for `combined` = ~200MB peak. This bypasses `config.streaming.max_memory` entirely.\n\n**This is the most likely cause of the FreeBSD OOM.** On FreeBSD with jemalloc + 8MB fiber stacks, a large feed that the streaming parser was *supposed* to handle bounded becomes 2x memory at the XXE check.\n\n**Fix:**\n1. Cap `io.read` by `config.streaming.max_memory - XXE_CHECK_BUFFER_SIZE` so the total combined buffer can't exceed `max_memory`.\n2. If `remaining.bytesize \u003e max_memory - XXE_CHECK_BUFFER_SIZE`, raise `MemoryLimitExceeded` instead of allocating.\n3. Pass `config` into `check_xxe_risk` (it's currently called with only `io`).\n4. Add a regression spec: feed a stream of N bytes where N \u003e max_memory, verify the call raises rather than allocating.\n\nAcceptance: spec passes on Linux + FreeBSD; `crystal spec` 0 regressions; verify RSS fixtures larger than max_memory raise `MemoryLimitExceeded`.",
   "id": "fetcherc-zr5.1",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "OOM: cap non-seekable XXE buffer in XMLStreamingParser",
   "type": "task",
-  "updated_at": "2026-09-06T16:27:00Z"
+  "updated_at": "2026-09-06T16:27:39Z"
 }

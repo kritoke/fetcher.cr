@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-zr5.1"
+  ],
   "blocks": [],
   "created": "2026-09-06T16:27:26Z",
   "description": "`src/fetcher/xml_streaming_parser.cr` has two entry points:\n- `parse_complete(io, limit, config)` — calls `check_memory_limit(io, config)` before parsing ✓\n- `parse_entries(io, limit)` — calls `check_xxe_risk(io)` directly with NO memory check ✗\n\n`parse_entries` is invoked from drivers like `software/atom_parser.cr:35`, `rss.cr` (when `streaming.enabled` but `parse_complete` is also used), etc. If a driver calls `parse_entries` directly without first checking size, the body is loaded unbounded.\n\nThis ticket also reopens the spirit of `fetcherc-jzl` (\"XXE check only inspects first 8KB — bypass possible with payload after boundary\") which was closed without the fix landing.\n\n**Fix:**\n1. Add `config : RequestConfig?` parameter to `parse_entries` (or a new overload).\n2. Call `check_memory_limit(io, config)` at the top.\n3. Move `check_xxe_risk` AFTER `check_memory_limit` so the size gate runs first.\n4. Add a regression spec that asserts `parse_entries` raises when fed an oversized stream.\n\n**Acceptance:**\n- The streaming path is fully bounded regardless of which entry point drivers call.\n- Existing 425 specs still pass.\n- `check_xxe_risk` is only reached for bodies that already passed `max_memory`.\n\nCross-reference: this is partly addressed by fetcherc-zr5.1 (which adds size enforcement inside `check_xxe_risk` itself) — but having it at the entry point too gives a clearer contract and faster failure.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "OOM: parse_entries in XMLStreamingParser must also enforce max_memory",
   "type": "task",
-  "updated_at": "2026-09-06T16:27:26Z"
+  "updated_at": "2026-09-06T16:27:39Z"
 }
