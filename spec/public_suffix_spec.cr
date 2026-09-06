@@ -88,6 +88,15 @@ describe Fetcher::PublicSuffix do
       result.should eq("192.168.1.1")
     end
 
+    it "rejects malformed IP addresses (out-of-range octets)" do
+      # The previous regex %r{^\d+\.\d+\.\d+\.\d+$} accepted any four
+      # numeric groups, including 999.999.999.999. After switching to
+      # Socket::IPAddress validation, these should be treated as hostnames,
+      # not returned verbatim as if they were valid IPs.
+      Fetcher::PublicSuffix.registrable_domain("999.999.999.999").should_not eq("999.999.999.999")
+      Fetcher::PublicSuffix.registrable_domain("256.0.0.1").should_not eq("256.0.0.1")
+    end
+
     it "handles case insensitivity" do
       result = Fetcher::PublicSuffix.registrable_domain("WWW.EXAMPLE.COM")
       result.should eq("example.com")

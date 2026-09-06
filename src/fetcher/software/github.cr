@@ -34,8 +34,8 @@ module Fetcher
 
         response = http_client.get(provider.api_url, merged)
 
-        return nil if response.status_code == 404
-        return nil unless (200..299).includes?(response.status_code)
+        return if response.status_code == 404
+        return unless (200..299).includes?(response.status_code)
 
         releases = parse_json(response.body, provider.api_url)
         stable_releases = releases.reject { |release| ReleaseHelpers.prerelease?(release) }
@@ -51,7 +51,7 @@ module Fetcher
           .site_link("#{provider.base_url}/#{provider.repo}")
           .favicon("#{provider.base_url}/favicon.ico")
           .build
-      rescue ex : JSON::ParseException
+      rescue JSON::ParseException
         Log.debug { "GitHub API JSON parse failed, trying fallback: #{provider.api_url}" }
         nil
       rescue ex : OpenSSL::SSL::Error

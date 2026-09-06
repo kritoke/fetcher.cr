@@ -59,44 +59,50 @@ module Fetcher
         end
       end
 
-      # Collect results with timeout to prevent hanging everlasting
+      # Collect results with a wall-clock deadline. If no result arrives
+      # within `timeout` we return whatever we have so the call can't hang.
       deadline = Time.instant + timeout
       received = 0
-      timeout_channel = Channel(Bool).new
-
-      # Spawn timeout notifier
-      spawn do
-        sleep timeout
-        timeout_channel.send(true)
-      end
 
       loop do
         break if received >= urls.size
 
-        # Use select to check for results or timeout
-        selected = select
+        # How much time remains before the deadline?
+        remaining = deadline - Time.instant
+        break if remaining <= Time::Span.zero
+
+        # Wait for either a result or the remaining budget.
+        select
         when result = results.receive?
           if result
             index, outcome = result
-            result_array[index] = case outcome
-                                  when Result
-                                    outcome
-                                  when Exception
-                                    Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{urls[index]}: #{outcome.class}: #{outcome.message}")
-                                  end
+            result_array[index] = store_outcome(outcome, urls[index])
             received += 1
           else
             # Channel closed - no more results
             break
           end
-        when timeout_channel.receive
-          # Timeout fired
+        when timeout remaining
           ::Log.for("fetcher").warn { "Concurrent fetch timed out after #{timeout}, returning #{received}/#{urls.size} results" }
           break
         end
       end
 
       result_array.compact
+    end
+
+    # Convert a single worker's outcome into a Result for the result array.
+    # Successful Results pass through; exceptions are wrapped so the caller
+    # sees a uniform Result type per slot.
+    private def self.store_outcome(outcome : Result | Exception, url : String) : Result
+      case outcome
+      when Result then outcome
+      when Exception
+        Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch error for #{url}: #{outcome.class} - #{outcome.message}")
+      else
+        # Unreachable: outcome is statically `Result | Exception`, both arms handled.
+        Fetcher.error_result(ErrorKind::Unknown, "Concurrent fetch unknown outcome for #{url}")
+      end
     end
   end
 end
