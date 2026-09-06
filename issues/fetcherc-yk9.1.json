@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-06T16:00:34Z",
+  "description": "**Bug:** `Fetcher::PeriodicCleanup.restart_fiber` (src/fetcher/periodic_cleanup.cr) creates a new `stop` channel and overwrites `@@stop_channel`, but the *previous* cleanup fiber still holds its own closure-captured copy of the *old* `stop` channel. Replacing the global doesn't reach the old fiber, so the old fiber keeps running forever — doing cleanup work against stale rules, leaking one fiber per `force: true` restart.\n\n```crystal\nprivate def self.restart_fiber : Nil\n  stop = Channel(Bool).new\n  @@stop_channel = stop\n  @@cleanup_running = true\n  old_fiber = @@global_cleanup_fiber  # never used\n  @@global_cleanup_fiber = spawn do\n    loop do\n      selected = select               # assignment is no-op\n      when stop.receive               # still listening on the OLD stop\n        break\n      ...\n```\n\nThe trailing comment `# (handled by replacing @@stop_channel with new channel above)` shows this was thought to work but doesn't.\n\n**Fix:**\n1. Track each fiber's own `stop` channel (e.g., a `Tuple(Fiber, Channel(Bool))` or pair them in instance variables/closures).\n2. On restart, `old_stop.send(true)` or `old_stop.close` *before* spawning the new fiber so the old one exits cleanly.\n3. Drop the `selected = select` no-op assignment.\n4. Add a regression spec: start periodic cleanup with interval A, restart with force + interval B, verify only one fiber is alive (e.g., via `Fiber.list` or by counting cleanups triggered).\n\nAcceptance: spec passes; `ameba Lint/UselessAssign` for `old_fiber` and `selected` in this file is gone.",
+  "id": "fetcherc-yk9.1",
+  "labels": [],
+  "parent": "fetcherc-yk9",
+  "priority": 1,
+  "status": "open",
+  "title": "Fix periodic_cleanup fiber leak on restart",
+  "type": "task",
+  "updated_at": "2026-09-06T16:00:34Z"
+}
