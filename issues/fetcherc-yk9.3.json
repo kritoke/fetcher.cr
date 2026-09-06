@@ -2,14 +2,15 @@
   "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-06T16:08:58Z",
   "created": "2026-09-06T16:00:44Z",
   "description": "Two issues in `src/fetcher/public_suffix.cr`:\n\n**1. Dead nil-check (line 83):**\n```crystal\ndef self.registrable_domain(domain : String) : String?\n  return nil if domain.nil? || domain.empty?   # domain can't be nil\n```\nThe parameter type is `String` (non-nilable), so `domain.nil?` is unreachable. Drop it.\n\n**2. Loose IP regex (line 86):**\n```crystal\nreturn domain if domain.match(%r{^\\d+\\.\\d+\\.\\d+\\.\\d+$})\n```\nA hand-rolled regex that accepts `999.999.999.999`. Use `Socket::IPAddress.new(domain, 0)` for proper IPv4 validation, matching the pattern used elsewhere in the codebase (see `url_validator.cr:looks_like_ip?`). Catch `Socket::Error` to return false.\n\nAcceptance: `registrable_domain(\"999.999.999.999\")` returns nil; `registrable_domain(\"192.168.1.1\")` returns \"192.168.1.1\"; full spec suite passes; `public_suffix_spec.cr` covers the change.",
   "id": "fetcherc-yk9.3",
   "labels": [],
   "parent": "fetcherc-yk9",
   "priority": 3,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Fix public_suffix dead nil-check and loose IP regex",
   "type": "task",
-  "updated_at": "2026-09-06T16:05:57Z"
+  "updated_at": "2026-09-06T16:08:58Z"
 }
