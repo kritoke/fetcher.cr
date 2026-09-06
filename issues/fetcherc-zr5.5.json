@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-06T16:27:36Z",
+  "description": "The user reported OOM specifically on FreeBSD (not on Linux). Beyond the code-level OOM sources already filed, there are likely FreeBSD-specific amplifiers worth investigating:\n\n**Suspected amplifiers:**\n\n1. **Fiber stack size**: Crystal fibers default to ~1MB on Linux; on FreeBSD the default may be larger (8MB in some configs). Each spawned fiber (in `concurrent_fetcher`, `token_bucket_rate_limiter#try_schedule_wakeup`, `cache_store`, etc.) costs that much virtual address space. 1000 spawned fibers × 8MB = 8GB virtual, which may exceed `RLIMIT_AS` on small VPS instances.\n\n2. **jemalloc mmap thrashing**: FreeBSD's default malloc is jemalloc, which uses large VM pages (typically 2MB on arm64, 4MB on amd64). A single 50MB allocation may consume 13 large pages (52MB VM). Repeated alloc/free cycles cause page thrashing that the kernel OOM-kills.\n\n3. **`RLIMIT_AS` defaults**: FreeBSD's default `RLIMIT_AS` for non-root users can be lower than Linux's, causing `mmap` calls to fail with ENOMEM even when system RAM is available.\n\n**Investigation steps:**\n1. Add a config option `RequestConfig#fiber_stack_size : Int32?` that lets callers override the stack size for spawned fibers.\n2. Document the memory model in README: assume ~1MB per spawned fiber, ~5x body size for AST parsing.\n3. Add a `Fetcher.stats` method that reports live fiber count and approximate memory usage for diagnostics.\n4. If a specific FreeBSD issue is confirmed (e.g., RLIMIT_AS), document the workaround (raise the limit via `ulimit -v`).\n\n**Acceptance:**\n- `RequestConfig#fiber_stack_size` option with reasonable default (current Crystal default).\n- Documentation update with memory expectations.\n- A `Fetcher.stats` diagnostic method (if implementable cleanly).\n- No regression on existing specs.\n\nThis ticket is investigation/discovery; the prior P0/P1 tickets (zr5.1–zr5.4) address the code-level fixes that should solve the OOM regardless of platform. The FreeBSD-specific amplifiers are about how much the OOM hurts once it happens, and how to give operators knobs to mitigate.",
+  "id": "fetcherc-zr5.5",
+  "labels": [],
+  "parent": "fetcherc-zr5",
+  "priority": 2,
+  "status": "open",
+  "title": "Investigate FreeBSD-specific memory behavior",
+  "type": "task",
+  "updated_at": "2026-09-06T16:27:36Z"
+}
