@@ -1,7 +1,9 @@
 {
   "assignee": "",
   "blocked_by": [],
-  "blocks": [],
+  "blocks": [
+    "fetcherc-zr5.3"
+  ],
   "created": "2026-09-06T16:27:10Z",
   "description": "The DOM-style parsers load the entire body into memory and build a full AST with **no size enforcement**. The streaming parser has a `max_memory` check, but the DOM fallback (and the primary path when streaming is disabled) bypasses it.\n\nAffected paths:\n- `src/fetcher/rss_parser.cr#parse_xml` — `XML.parse(data, ...)` builds full XML AST (lines 74-83). `data` is the whole response body.\n- `src/fetcher/youtube.cr#fetch_youtube` → `parse_youtube_feed(response.body, ...)` → `RSSParser.parse_entries(body, ...)` (no streaming path).\n- `src/fetcher/software/github.cr#try_api` → `parse_json(response.body, ...)` → `Array(JSON::Any).from_json(body)`.\n- `src/fetcher/software/gitlab.cr#parse_json` → `Array(JSON::Any).from_json(body)`.\n- `src/fetcher/software/codeberg.cr#parse_json_response` → `Array(JSON::Any).from_json(body)`.\n- `src/fetcher/reddit_post_parser.cr#parse` → `JSON.parse(body)`.\n- `src/fetcher/json_feed_parser.cr` → `JSON.parse(data)`.\n\n`SafeFeedProcessor.MAX_FEED_SIZE = 10MB` exists but is only invoked from `process_*_feed` (which the above paths bypass). `MAX_FEED_SIZE` is referenced in `rss.cr:14` but never applied.\n\nA malicious or unexpected large feed can blow memory here. On a small FreeBSD VPS with 512MB RAM, a 50MB JSON response ⇒ ~200-400MB AST ⇒ OOM kill.\n\n**Fix (preferred):** Wire `SafeFeedProcessor.process_*_feed` (or its size check) into every body-parsing path. This is **the same as ticket fetcherc-9qn.5** (\"Wire-SafeFeedProcessor-into-drivers\"). Resolve that ticket and add the `MAX_FEED_SIZE` enforcement at the entry point of every DOM parser.\n\n**Acceptance:**\n- All listed paths refuse bodies larger than `config.streaming.max_memory` (or `Config::MAX_FEED_SIZE` if streaming not configured).\n- Verify with a regression spec that injects a body larger than `max_memory` and asserts `MemoryLimitExceeded` (or `InvalidFormatError`).\n- Existing 425 specs still pass.\n\nPriority rationale: this is the dominant OOM source on real-world feeds (e.g., Reddit JSON responses, GitHub release feeds with long descriptions, RSS feeds with embedded media).",
   "id": "fetcherc-zr5.2",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "OOM: enforce body size in DOM parser paths",
   "type": "task",
-  "updated_at": "2026-09-06T16:27:10Z"
+  "updated_at": "2026-09-06T16:27:39Z"
 }

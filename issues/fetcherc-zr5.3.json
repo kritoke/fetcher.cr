@@ -1,6 +1,8 @@
 {
   "assignee": "",
-  "blocked_by": [],
+  "blocked_by": [
+    "fetcherc-zr5.2"
+  ],
   "blocks": [],
   "created": "2026-09-06T16:27:19Z",
   "description": "Defense in depth: even if every parser has its own size check, a 100MB response body still has to land in memory before parsing. The HTTP layer should reject oversized responses before buffering.\n\n**Where to enforce:**\n- `src/fetcher/crest_http_client.cr#perform_request` — after the request returns, before `convert_response` builds the `HTTP::Client::Response` with the full body in memory.\n\n**Mechanism:**\n1. Read `Content-Length` header from the response. If present and \u003e `config.streaming.max_memory`, raise `MemoryLimitExceeded` without reading the body.\n2. If Content-Length is missing (chunked transfer), wrap the underlying socket IO with a size-limited IO that raises after N bytes.\n\nCrystal doesn't ship a built-in size-limited IO, but the pattern is straightforward:\n\n```crystal\nclass SizeLimitedIO \u003c IO\n  def initialize(@inner : IO, @limit : Int32)\n    @read = 0\n  end\n\n  def read(slice : Bytes) : Int32\n    remaining = @limit - @read\n    return 0 if remaining \u003c= 0\n    slice = slice[0, Math.min(slice.size, remaining)]\n    n = @inner.read(slice)\n    @read += n\n    n\n  end\n\n  # delegate other methods...\nend\n```\n\n3. Apply the cap to `Crest::Response.body_io` before it gets fully buffered.\n\n**Why this matters on FreeBSD:** Even if the parser bails on a 100MB body, allocating that 100MB and then freeing it can trigger jemalloc mmap/unmap churn that shows up as OOM to the kernel (large VM pages on FreeBSD). Rejecting early avoids the alloc entirely.\n\n**Acceptance:**\n- A spec that mocks a server returning a 50MB body with `Content-Length: 52428800` and asserts the response raises without reading more than ~8KB of the body.\n- A spec that mocks chunked transfer and asserts the response raises after `max_memory` bytes.\n- Existing 425 specs still pass.\n\nNote: ticket fetcherc-9qn.5 (\"Wire SafeFeedProcessor into drivers\") covers similar ground at the driver level. This ticket is about the HTTP-layer defense that runs *before* any parser sees the body.",
@@ -11,5 +13,5 @@
   "status": "open",
   "title": "OOM: enforce body size at HTTP layer (CrestHttpClient)",
   "type": "task",
-  "updated_at": "2026-09-06T16:27:19Z"
+  "updated_at": "2026-09-06T16:27:39Z"
 }
