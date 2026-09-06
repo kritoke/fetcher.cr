@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "kritoke",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-06T16:00:44Z",
@@ -8,8 +8,8 @@
   "labels": [],
   "parent": "fetcherc-yk9",
   "priority": 3,
-  "status": "open",
+  "status": "in_progress",
   "title": "Fix public_suffix dead nil-check and loose IP regex",
   "type": "task",
-  "updated_at": "2026-09-06T16:00:44Z"
+  "updated_at": "2026-09-06T16:05:57Z"
 }
