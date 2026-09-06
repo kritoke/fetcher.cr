@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-06T16:26:51Z",
+  "description": "Investigation of an OOM crash on a FreeBSD instance using fetcher.cr identified several real memory-safety issues. This epic tracks the fixes.\n\nBackground: A user reported OOM kills on FreeBSD specifically (not seen on Linux). FreeBSD's jemalloc + larger default fiber stacks amplify issues that are latent on Linux. The crashes correlate with parsing large RSS/JSON feeds.\n\nRoot causes:\n1. `XMLStreamingParser#check_xxe_risk` reads the ENTIRE remaining stream into memory for non-seekable IO, then allocates a duplicate buffer. 2x peak memory, no size cap.\n2. DOM parsers (`RSSParser#parse_xml`, software providers' JSON parsing) build full AST with no body-size enforcement.\n3. Streaming parser's `parse_entries` skips the memory limit that `parse_complete` enforces.\n4. Two P0/P1 tickets (`fetcherc-kw8`, `fetcherc-jzl`) were closed without the underlying bugs actually being fixed. They are being reopened as part of this work.\n\nTargets a 0.9.24 patch release.",
+  "id": "fetcherc-zr5",
+  "labels": [],
+  "priority": 0,
+  "status": "open",
+  "title": "[EPIC] 0.9.24 OOM fixes for FreeBSD",
+  "type": "epic",
+  "updated_at": "2026-09-06T16:26:51Z"
+}
