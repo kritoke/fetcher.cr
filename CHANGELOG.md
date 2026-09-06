@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.23] - 2026-09-04
+
+### Fixed
+
+- **Periodic cleanup fiber leak** (P1): `Fetcher::PeriodicCleanup.restart_fiber` now signals the previous fiber to exit before spawning a new one. Previously, replacing `@@stop_channel` did not reach the old fiber (it held its own closure-captured stop channel), causing one leaked fiber per force-restart.
+- **`concurrent_fetcher` timeout machinery**: Dropped the dead `deadline` and `selected` variables and replaced the spawned-timer indirection with a wall-clock deadline. `pull_multiple` now uses `Time.instant + timeout` for the deadline and `timeout remaining` per iteration in the `select`.
+- **`public_suffix` IP validation**: Replaced the loose `%r{^\d+\.\d+\.\d+\.\d+$}` regex with `Socket::IPAddress` validation in `registrable_domain`. `999.999.999.999` and `256.0.0.1` are now treated as hostnames instead of being returned verbatim.
+- **`public_suffix` unreachable nil-check**: Dropped the unreachable `domain.nil?` branch in `registrable_domain` (parameter is non-nilable).
+
+### Refactored
+
+- **`concurrent_fetcher#pull_multiple`**: Extracted `store_outcome` helper to bring cyclomatic complexity back under the threshold (was 13/12 after the timeout refactor).
+
+### Style
+
+- **ameba: 21 → 0 failures** across `src/fetcher/`. Style/lint cleanups: `: Void` → `: Nil` (cache.cr, public_suffix.cr), drop unused rescue variables (public_suffix.cr, software/github.cr), convert verbose blocks to short notation (rss_parser.cr, public_suffix.cr), rename single-letter block parameters (`|cat|`/`|l|`/`|c|` → `|category|`/`|link|`/`|child|`), drop redundant `nil` in `return nil if/unless ...` guards (software.cr, software/github.cr, public_suffix.cr).
+
+---
+
 ## [0.9.22] - 2026-09-04
 
 ### Changed
