@@ -81,12 +81,21 @@ module Fetcher
       public_suffix
     end
 
+    private def self.ipv4_address?(domain : String) : Bool
+      Socket::IPAddress.new(domain, 0)
+      true
+    rescue Socket::Error
+      false
+    end
+
     # Return the registrable domain (eTLD+1) or nil if cannot be determined
     def self.registrable_domain(domain : String) : String?
-      return nil if domain.nil? || domain.empty?
+      return nil if domain.empty?
       domain = domain.downcase
-      # IP addresses: return as-is
-      return domain if domain.match(%r{^\d+\.\d+\.\d+\.\d+$})
+      # IP addresses: return as-is. Use Socket::IPAddress for proper
+      # validation instead of a hand-rolled regex that would accept
+      # out-of-range octets like 999.999.999.999.
+      return domain if ipv4_address?(domain)
 
       labels = domain.split('.')
       return domain if labels.size == 1
