@@ -170,12 +170,24 @@ describe Fetcher::Driver do
     it "returns a duplicate so callers can mutate without affecting the registry" do
       snapshot = Fetcher::Driver.registry
       original_size = snapshot.size
-      snapshot << Fetcher::Driver  # attempt to mutate
+      snapshot << Fetcher::Driver # attempt to mutate
       Fetcher::Driver.registry.size.should eq(original_size)
     end
 
     it "is refreshable" do
       Fetcher::Driver.refresh_registry.should be_a(Array(Fetcher::Driver.class))
+    end
+
+    it "includes the migrated drivers (RSS, JSONFeed, YouTube, Reddit)" do
+      registry = Fetcher::Driver.registry
+      registry.should contain(Fetcher::RSS)
+      registry.should contain(Fetcher::JSONFeed)
+      registry.should contain(Fetcher::YouTube)
+      registry.should contain(Fetcher::Reddit)
+    end
+
+    it "does NOT include Software (module not class, see src/fetcher/software.cr)" do
+      Fetcher::Driver.registry.should_not contain(Fetcher::Software)
     end
   end
 end
