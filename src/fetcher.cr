@@ -37,6 +37,7 @@ require "./fetcher/reddit"
 require "./fetcher/software"
 require "./fetcher/json_feed"
 require "./fetcher/youtube"
+require "./fetcher/driver"
 
 module Fetcher
   # Pre-compiled regex patterns for performance
