@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-08T10:51:08Z",
+  "description": "Four small issues surfaced in code review of the 0.9.22 reddit cleanup:\n\n1. **Missing require in reddit.cr**: `Fetcher::Reddit::USER_AGENT` interpolates `Fetcher::VERSION` (from `version.cr`), but `reddit.cr` doesn't require `./version`. A consumer who requires `fetcher/reddit` directly (instead of `fetcher`) gets an undefined constant at compile time. Add explicit `require \"./version\"`.\n\n2. **Config divergence in old.reddit fallback**: After inlining `fetch_old_reddit`, the inlined code passes the *original* `config` into `fetch_reddit_api` instead of `config.with_retry_max_retries(2)`. The original `fetch_old_reddit` passed the modified config through. This means the inner request uses the higher retry count from the parent config, defeating the cap. Fix: pass `config.with_retry_max_retries(2)` into `fetch_reddit_api` for consistency.\n\n3. **Stale doc in reddit_diagnostics.cr**: Module comment says public entry points are gated on `Log.level(:debug)?`, but the implementation uses `Log.debug do ... end` block laziness instead. The behavior is correct (DNS resolution is lazy) but the doc misleads readers about the mechanism. Update the comment.\n\n4. **Public helpers in reddit_post_parser.cr**: `extract_children`, `extract_post_data`, `build_entry`, `extract_title`, `extract_permalink`, `build_discussion_url`, `determine_effective_url`, `extract_pub_date` are all `def self.X` (public). The intended public API is just `.parse(body, limit)`. Mark helpers as `private` to avoid growing the library's public surface.\n\nAll four are local fixes, no behavior change. Spec suite must still pass at 425/425.",
+  "id": "fetcherc-zr5.6",
+  "labels": [],
+  "parent": "fetcherc-zr5",
+  "priority": 2,
+  "status": "open",
+  "title": "0.9.22 review: 4 small reddit-module issues",
+  "type": "task",
+  "updated_at": "2026-09-08T10:51:08Z"
+}
