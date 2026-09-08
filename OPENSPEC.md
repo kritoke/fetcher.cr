@@ -37,11 +37,18 @@
 
 ## 5. Separated Concerns
 - **Requirement**: Clear separation between parsing, validation, and creation
-- **Implementation**:
+- **Implementation**: 
   - `EntryParser` interface with driver-specific implementations
   - `EntryFactory` for creating validated entries
   - `ResultBuilder` for structured result construction
-- **Validation**: Zero direct calls to `Entry.create` outside factory
+  - `Fetcher::Driver` abstract class defining the driver contract
+    (`def self.pull(url, headers, limit, config) : Result`)
+  - `Fetcher::DriverRegistry` auto-populated via the `inherited` macro
+    when a driver class is loaded
+- **Validation**: Zero direct calls to `Entry.create` outside factory.
+  Every feed source module implements `Fetcher::Driver` and registers
+  itself automatically. New drivers add themselves to
+  `Fetcher::Driver.registry` without manual registration.
 
 ## 6. Comprehensive Testing
 - **Requirement**: Real integration tests with canonical feed examples
