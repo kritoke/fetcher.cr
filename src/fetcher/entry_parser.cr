@@ -9,9 +9,10 @@ module Fetcher
     feed_description : String? = nil,
     feed_language : String? = nil,
     feed_authors : Array(Author) = [] of Author do
-    # Returns true when no field carried any data. Avoids ad-hoc
+    # Returns true when no field carried any data. Replaces ad-hoc
     # `site_link.nil? && feed_title.nil?` checks that mis-classify feeds
-    # which have one populated field but not the other two.
+    # which populated a different field (description, language, authors)
+    # but happened to leave both of those two nil.
     def empty? : Bool
       site_link.nil? &&
         favicon.nil? &&

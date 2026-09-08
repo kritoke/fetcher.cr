@@ -21,33 +21,26 @@ describe Fetcher::PeriodicCleanup do
   end
 
   it "stops the previous fiber on restart so it doesn't run stale cleanups" do
-    # Register a single cleanup via the public API. With the leak bug, the
-    # old fiber would keep running after restart, so the cleanup would
-    # fire at 2x the rate. With the fix, exactly one fiber is alive and
-    # the rate matches the interval.
+    # Reuse the same Proc for both starts so the @@registered_cleanups
+    # Set doesn't grow on each restart — that would inflate the observed
+    # tick count regardless of whether the old fiber actually leaks.
     runs = Atomic.new(0)
+    cleanup = -> { runs.add(1) }
 
-    Fetcher::PeriodicCleanup.register_cleanup do
-      runs.add(1)
-    end
-
-    # Force-start so we know one fiber is alive.
-    Fetcher::PeriodicCleanup.start_periodic_cleanup(20.milliseconds, true) { runs.add(1) }
+    Fetcher::PeriodicCleanup.register_cleanup(&cleanup)
+    Fetcher::PeriodicCleanup.start_periodic_cleanup(20.milliseconds, true, &cleanup)
     ::sleep 60.milliseconds
 
     # Force-restart. Old fiber must exit; only the new one should keep running.
-    Fetcher::PeriodicCleanup.start_periodic_cleanup(20.milliseconds, true) { runs.add(1) }
+    Fetcher::PeriodicCleanup.start_periodic_cleanup(20.milliseconds, true, &cleanup)
 
-    # Reset and observe a 200ms window. Expected with one fiber: ~10 invocations.
-    # With the bug (two fibers): ~20.
+    # Reset and observe a 200ms window. Expected with one fiber ticking at
+    # 20ms: ~10 invocations. With the leak bug (two fibers): ~20.
     runs.set(0)
     ::sleep 200.milliseconds
     observed = runs.get
 
-    # Each of the two registered cleanups fires per tick, so with one
-    # fiber at 20ms for 200ms we expect ~20 invocations (10 ticks × 2 cleanups).
-    # With a leaked second fiber we'd see ~40. Bound it well below that.
     observed.should be > 0
-    observed.should be < 30
+    observed.should be < 15
   end
 end

@@ -91,10 +91,17 @@ describe Fetcher::PublicSuffix do
     it "rejects malformed IP addresses (out-of-range octets)" do
       # The previous regex %r{^\d+\.\d+\.\d+\.\d+$} accepted any four
       # numeric groups, including 999.999.999.999. After switching to
-      # Socket::IPAddress validation, these should be treated as hostnames,
-      # not returned verbatim as if they were valid IPs.
-      Fetcher::PublicSuffix.registrable_domain("999.999.999.999").should_not eq("999.999.999.999")
-      Fetcher::PublicSuffix.registrable_domain("256.0.0.1").should_not eq("256.0.0.1")
+      # Socket::IPAddress validation, these are treated as hostnames and
+      # run through the public-suffix algorithm rather than returned
+      # verbatim as if they were valid IPs.
+      #
+      # Expected algorithm output (no public-suffix match for these
+      # synthetic strings, so it falls back to label arithmetic):
+      # - "999.999.999.999" -> public_suffix = "999" (labels.last), so the
+      #   registrable label is labels[labels.size - 1 - 1 ..] = "999.999".
+      # - "256.0.0.1" -> public_suffix = "1", registrable label is "0.1".
+      Fetcher::PublicSuffix.registrable_domain("999.999.999.999").should eq("999.999")
+      Fetcher::PublicSuffix.registrable_domain("256.0.0.1").should eq("0.1")
     end
 
     it "handles case insensitivity" do

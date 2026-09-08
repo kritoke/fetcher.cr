@@ -82,19 +82,18 @@ module Fetcher
     end
 
     private def self.ipv4_address?(domain : String) : Bool
-      Socket::IPAddress.new(domain, 0)
-      true
+      addr = Socket::IPAddress.new(domain, 0)
+      addr.family == Socket::Family::INET
     rescue Socket::Error
       false
     end
 
-    # Return the registrable domain (eTLD+1) or nil if cannot be determined
+    # Return the registrable domain (eTLD+1) or nil if cannot be determined.
+    # IPv4 addresses are returned as-is; IPv6 addresses and hostnames go
+    # through the public-suffix algorithm.
     def self.registrable_domain(domain : String) : String?
       return if domain.empty?
       domain = domain.downcase
-      # IP addresses: return as-is. Use Socket::IPAddress for proper
-      # validation instead of a hand-rolled regex that would accept
-      # out-of-range octets like 999.999.999.999.
       return domain if ipv4_address?(domain)
 
       labels = domain.split('.')

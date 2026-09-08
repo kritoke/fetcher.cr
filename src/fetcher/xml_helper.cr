@@ -6,7 +6,9 @@ module Fetcher
   # (e.g. AtomParser subclasses, JSON feed XML adapters) can `include`
   # the same utilities without pulling in the full RSS parser.
   module XMLHelper
-    # Extract text content from an xpath result with optional stripping.
+    # Extract text content from an xpath result, stripped and converted
+    # to nil if blank. Returns nil if the node is missing or the text is
+    # whitespace-only.
     def xpath_text(node : XML::Node, path : String) : String?
       node.xpath_node(path).try(&.text).try(&.strip).presence
     end
@@ -31,9 +33,10 @@ module Fetcher
       end
     end
 
-    # Extract href from link node, falling back to text content.
+    # Extract href from a <link> node, falling back to its text content.
+    # Returns nil if the node is missing and has neither href nor text.
     def extract_href(node : XML::Node?) : String?
-      node.try(&.["href"]).try(&.strip).presence || node.try(&.text).try(&.strip).presence || "#"
+      node.try(&.["href"]).try(&.strip).presence || node.try(&.text).try(&.strip).presence
     end
   end
 end

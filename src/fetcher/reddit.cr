@@ -11,6 +11,7 @@ require "./header_builder"
 require "./config"
 require "./reddit_oauth"
 require "./url_validator"
+require "./version"
 require "./reddit_diagnostics"
 require "./reddit_post_parser"
 
@@ -95,8 +96,9 @@ module Fetcher
         return {result: rss_result, source: :rss} if rss_result.success?
       end
 
-      old_result = Fetcher.with_retry(config.with_retry_max_retries(2)) do
-        fetch_reddit_api(subreddit, sort, limit, headers, config, OLD_REDDIT_API_BASE)
+      old_config = config.with_retry_max_retries(2)
+      old_result = Fetcher.with_retry(old_config) do
+        fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
       end
       {result: old_result, source: old_result.success? ? :old_reddit : :failed}
     end
