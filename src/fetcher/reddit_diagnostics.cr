@@ -8,9 +8,11 @@ module Fetcher
   # fetch coordinator so it can evolve (rate-limit observation, header
   # capture, etc.) without touching request flow.
   #
-  # All public entry points are gated on `Log.level(:debug)?` so the
-  # expensive work (notably DNS resolution) is skipped when debug
-  # logging is disabled.
+  # Public entry points push their expensive work (notably DNS
+  # resolution) inside a `Log.debug do ... end` block so it is skipped
+  # entirely when debug logging is disabled. This relies on Crystal's
+  # lazy block evaluation — the block body never runs unless the log
+  # backend actually emits the record.
   module RedditDiagnostics
     # Maximum body bytes included in the non-OK response detail string.
     MAX_BODY_SNIPPET = 512

@@ -27,7 +27,7 @@ module Fetcher
 
     # Pull the `children` array out of either a single listing object
     # or an array-wrapped listing, returning nil for unrecognized shapes.
-    def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
+    private def self.extract_children(parsed : JSON::Any) : Array(JSON::Any)?
       listing = parsed.as_a?.try &.[]?(0).try &.["data"]? || parsed["data"]?
       listing.try(&.["children"]?).try(&.as_a?)
     rescue ex : KeyError | TypeCastError | IndexError
@@ -35,7 +35,7 @@ module Fetcher
       nil
     end
 
-    def self.build_entry(child : JSON::Any) : Entry?
+    private def self.build_entry(child : JSON::Any) : Entry?
       post_data = extract_post_data(child)
       return unless post_data
 
@@ -49,7 +49,7 @@ module Fetcher
       )
     end
 
-    def self.extract_post_data(child : JSON::Any) : PostData?
+    private def self.extract_post_data(child : JSON::Any) : PostData?
       post = child["data"]?
       return unless post
 
@@ -65,25 +65,25 @@ module Fetcher
       )
     end
 
-    def self.extract_title(post : JSON::Any) : String
+    private def self.extract_title(post : JSON::Any) : String
       post["title"]?.try(&.as_s) || "Untitled"
     end
 
-    def self.extract_permalink(post : JSON::Any) : String
+    private def self.extract_permalink(post : JSON::Any) : String
       post["permalink"]?.try(&.as_s) || ""
     end
 
-    def self.build_discussion_url(permalink : String) : String
+    private def self.build_discussion_url(permalink : String) : String
       "https://www.reddit.com#{permalink}"
     end
 
-    def self.determine_effective_url(post : JSON::Any, discussion_url : String) : String
+    private def self.determine_effective_url(post : JSON::Any, discussion_url : String) : String
       is_self = post["is_self"]?.try(&.as_bool) || false
       post_url = post["url"]?.try(&.as_s) || ""
       is_self || post_url.empty? ? discussion_url : post_url
     end
 
-    def self.extract_pub_date(post : JSON::Any) : Time?
+    private def self.extract_pub_date(post : JSON::Any) : Time?
       created_utc = post["created_utc"]?.try(&.as_f) || 0.0
       created_utc > 0 ? TimeParser.normalize(Time.unix(created_utc.to_i64)) : nil
     end

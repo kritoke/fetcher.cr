@@ -44,6 +44,12 @@ module Fetcher
     def parse_feed_metadata(xml : XML::Document) : FeedMetadata
       return FeedMetadata::EMPTY unless xml.root
 
+      # Try RSS first; if it produced any metadata at all, return it.
+      # Use FeedMetadata#empty? (which checks ALL fields) rather than the
+      # earlier ad-hoc `site_link.nil? && feed_title.nil?` check, which
+      # mis-classified feeds that populated only description / language /
+      # authors as empty and fell through to the Atom parser. This is an
+      # intentional behavior change documented in CHANGELOG 0.9.22.
       rss_metadata = parse_rss_metadata(xml)
       return rss_metadata unless rss_metadata.empty?
 
