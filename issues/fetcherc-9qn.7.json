@@ -5,6 +5,7 @@
     "fetcherc-9qn.3",
     "fetcherc-9qn.5"
   ],
+  "closed_at": "2026-09-08T13:31:11Z",
   "created": "2026-06-20T16:50:46Z",
   "description": "\"Architecture",
   "id": "fetcherc-9qn.7",
@@ -17,8 +18,8 @@
     }
   ],
   "priority": 2,
-  "status": "open",
+  "status": "closed",
   "title": "Extract-common-feed-driver-interface",
   "type": "task",
-  "updated_at": "2026-06-21T14:34:20Z"
+  "updated_at": "2026-09-08T13:31:11Z"
 }
