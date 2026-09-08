@@ -8,7 +8,7 @@ require "./json_feed_parser"
 require "./error_handler"
 
 module Fetcher
-  module JSONFeed
+  class JSONFeed < Fetcher::Driver
     def self.pull(url : String, headers : ::HTTP::Headers, limit : Int32 = 100, config : RequestConfig = RequestConfig.new) : Result
       Fetcher.with_retry(config) do
         fetch(url, headers, limit, config)

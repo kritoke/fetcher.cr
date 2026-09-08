@@ -10,7 +10,7 @@ require "./link_resolver"
 require "./html_utils"
 
 module Fetcher
-  module YouTube
+  class YouTube < Fetcher::Driver
     YOUTUBE_RSS_BASE = "https://www.youtube.com/feeds/videos.xml?"
 
     YOUTUBE_CACHE_TTL         = 5.minutes
