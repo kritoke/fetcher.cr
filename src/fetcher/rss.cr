@@ -9,7 +9,7 @@ require "./xml_streaming_parser"
 require "./error_handler"
 
 module Fetcher
-  module RSS
+  class RSS < Fetcher::Driver
     # Use global config for feed size limits to avoid duplication
     MAX_FEED_SIZE = Fetcher::Config::MAX_FEED_SIZE
 

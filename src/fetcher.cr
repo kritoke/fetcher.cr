@@ -32,11 +32,13 @@ require "./fetcher/xml_streaming_parser"
 require "./fetcher/xml_text_reader"
 require "./fetcher/json_streaming_parser"
 require "./fetcher/error_handler"
+require "./fetcher/driver"
 require "./fetcher/rss"
 require "./fetcher/reddit"
 require "./fetcher/software"
 require "./fetcher/json_feed"
 require "./fetcher/youtube"
+require "./fetcher/driver"
 
 module Fetcher
   # Pre-compiled regex patterns for performance

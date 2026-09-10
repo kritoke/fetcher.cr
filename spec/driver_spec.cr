@@ -147,3 +147,47 @@ describe Fetcher do
     end
   end
 end
+
+describe Fetcher::Driver do
+  it "raises NotImplementedError when pull is called on the base class" do
+    expect_raises(NotImplementedError) do
+      Fetcher::Driver.pull("https://example.com", HTTP::Headers.new, 10, Fetcher::RequestConfig.new)
+    end
+  end
+
+  describe ".registry" do
+    it "is iterable and contains Driver subclasses" do
+      Fetcher::Driver.registry.should be_a(Array(Fetcher::Driver.class))
+    end
+
+    it "returns a fresh duplicate on each call (callers can mutate)" do
+      first = Fetcher::Driver.registry
+      second = Fetcher::Driver.registry
+      # Different instances returned (each call dups).
+      first.object_id.should_not eq(second.object_id)
+    end
+
+    it "returns a duplicate so callers can mutate without affecting the registry" do
+      snapshot = Fetcher::Driver.registry
+      original_size = snapshot.size
+      snapshot << Fetcher::Driver # attempt to mutate
+      Fetcher::Driver.registry.size.should eq(original_size)
+    end
+
+    it "is refreshable" do
+      Fetcher::Driver.refresh_registry.should be_a(Array(Fetcher::Driver.class))
+    end
+
+    it "includes the migrated drivers (RSS, JSONFeed, YouTube, Reddit)" do
+      registry = Fetcher::Driver.registry
+      registry.should contain(Fetcher::RSS)
+      registry.should contain(Fetcher::JSONFeed)
+      registry.should contain(Fetcher::YouTube)
+      registry.should contain(Fetcher::Reddit)
+    end
+
+    it "does NOT include Software (module not class, see src/fetcher/software.cr)" do
+      Fetcher::Driver.registry.should_not contain(Fetcher::Software)
+    end
+  end
+end

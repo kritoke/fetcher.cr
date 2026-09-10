@@ -170,6 +170,25 @@ Fetcher::RequestConfig.new(
 
 ## Public Methods
 
+### Driver Abstraction
+
+```crystal
+# Enumerate all loaded driver classes. Drivers register themselves
+# automatically via class discovery; no manual `register` call needed.
+Fetcher::Driver.registry : Array(Fetcher::Driver.class)
+
+# Force-rebuild the registry cache (currently a no-op since registry
+# returns a fresh array on each call).
+Fetcher::Driver.refresh_registry : Array(Fetcher::Driver.class)
+
+# Each driver inherits from Fetcher::Driver and implements:
+class Fetcher::Driver
+  def self.pull(url : String, headers : HTTP::Headers, limit : Int32, config : RequestConfig) : Result
+    # must be overridden by concrete drivers
+  end
+end
+```
+
 ### Main Pull Methods
 
 ```crystal
