@@ -82,25 +82,92 @@ module Fetcher
     end
 
     private def self.fetch_fallback(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig) : NamedTuple(result: Result, source: Symbol)
-      result = Fetcher.with_retry(config) do
-        fetch_reddit_api(subreddit, sort, limit, headers, config)
-      end
-
-      return {result: result, source: :api} if result.success?
-
-      error = result.error
-      should_try_rss = error && (error.status_code == 403 || transient_error?(error.kind))
-      if should_try_rss && (err = error)
-        ::Log.for("fetcher.reddit").warn { "Reddit API returned #{err.status_code || "transient error"} for /r/#{subreddit} - trying RSS fallback" }
-        rss_result = fetch_rss(subreddit, sort, limit, headers, config)
-        return {result: rss_result, source: :rss} if rss_result.success?
-      end
-
       old_config = config.with_retry_max_retries(2)
-      old_result = Fetcher.with_retry(old_config) do
-        fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE)
+      run_strategies(
+        subreddit,
+        api: -> { attempt_with_retry(config) { fetch_reddit_api(subreddit, sort, limit, headers, config) } },
+        rss: -> { fetch_rss(subreddit, sort, limit, headers, config) },
+        old_reddit: -> { attempt_with_retry(old_config) { fetch_reddit_api(subreddit, sort, limit, headers, old_config, OLD_REDDIT_API_BASE) } },
+      )
+    end
+
+    # :nodoc:
+    # Runs API -> RSS (on 403 or transient API errors) -> old.reddit. When all
+    # fail, the error leads with the primary API failure so a blocked server
+    # is not misreported as "Subreddit not found" (old.reddit's 404).
+    def self.run_strategies(subreddit : String, api : -> Result, rss : -> Result, old_reddit : -> Result) : NamedTuple(result: Result, source: Symbol)
+      api_result = api.call
+      return {result: api_result, source: :api} if api_result.success?
+      api_error = api_result.error
+
+      rss_error = nil
+      if api_error && (api_error.status_code == 403 || transient_error?(api_error.kind))
+        ::Log.for("fetcher.reddit").warn { "Reddit API returned #{short_error(api_error)} for /r/#{subreddit} - trying RSS fallback" }
+        rss_result = rss.call
+        return {result: rss_result, source: :rss} if rss_result.success?
+        rss_error = rss_result.error
+        ::Log.for("fetcher.reddit").warn { "Reddit RSS fallback failed for /r/#{subreddit}: #{rss_error.try { |err| short_error(err) } || "unknown error"}" }
       end
-      {result: old_result, source: old_result.success? ? :old_reddit : :failed}
+
+      old_result = old_reddit.call
+      return {result: old_result, source: :old_reddit} if old_result.success?
+
+      {result: Result.error(combined_error(subreddit, api_error, rss_error, old_result.error)), source: :failed}
+    end
+
+    # :nodoc:
+    # `Fetcher.with_retry` flattens exceptions into `Error.unknown`, dropping
+    # the HTTP status the fallback decision depends on. Capture the structured
+    # error from the last attempt and return it instead.
+    def self.attempt_with_retry(config : RequestConfig, &block : -> Result) : Result
+      last_error = nil.as(Error?)
+      result = Fetcher.with_retry(config) do
+        block.call
+      rescue ex : RedditFetchError
+        last_error = structured_error(ex)
+        raise ex
+      end
+      return result if result.success?
+      if err = last_error
+        Result.error(err)
+      else
+        result
+      end
+    end
+
+    private def self.structured_error(ex : RedditFetchError) : Error
+      cause = ex.original_cause
+      if cause.is_a?(FetchError) && (original = cause.original_error)
+        original
+      elsif cause.is_a?(HTTPError) && (status = cause.status_code)
+        Error.http(status, ex.message)
+      else
+        Error.unknown(ex.message || "Reddit API failed")
+      end
+    end
+
+    private def self.short_error(err : Error) : String
+      case err.status_code
+      when 403   then "blocked request (HTTP 403)"
+      when Int32 then "HTTP #{err.status_code}"
+      else            err.message
+      end
+    end
+
+    private def self.combined_error(subreddit : String, api : Error?, rss : Error?, old : Error?) : Error
+      if api && api.status_code == 404
+        return Error.invalid_url("Subreddit '#{subreddit}' not found", api.url)
+      end
+
+      parts = ["Reddit API failed for /r/#{subreddit}: #{api.try { |err| short_error(err) } || "unknown error"}"]
+      rss.try { |err| parts << "RSS fallback: #{short_error(err)}" }
+      old.try { |err| parts << "old.reddit: #{short_error(err)}" }
+      Error.new(
+        kind: api.try(&.kind) || ErrorKind::Unknown,
+        message: parts.join("; "),
+        status_code: api.try(&.status_code),
+        url: api.try(&.url),
+      )
     end
 
     private def self.fetch_reddit_api(subreddit : String, sort : String, limit : Int32, headers : ::HTTP::Headers, config : RequestConfig, api_base : String = REDDIT_API_BASE) : Result

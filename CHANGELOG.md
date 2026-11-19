@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.24] - 2026-11-19
+
+### Fixed
+
+- **Reddit RSS fallback never ran on HTTP 403**: `Fetcher.with_retry` flattens exceptions into `Error.unknown`, dropping `status_code`, so `fetch_fallback`'s `status_code == 403` check was always false. A blocked server skipped straight to old.reddit. The API and old.reddit attempts now go through `Reddit.attempt_with_retry`, which keeps the structured error from the last attempt.
+- **Misleading "Subreddit not found"**: when every strategy failed, the result was old.reddit's 404. The final error now leads with the primary API failure (e.g. `Reddit API failed for /r/x: blocked request (HTTP 403); RSS fallback: ...; old.reddit: ...`) and keeps its status code. "Not found" is reported only when the primary API itself returned 404.
+- **Silent RSS fallback failures**: the RSS fallback's failure reason is now logged at warn.
+
+### Refactored
+
+- Extracted the API -> RSS -> old.reddit orchestration into `Reddit.run_strategies`, testable without network access.
+
 ## [0.9.23] - 2026-09-04
 
 ### Fixed
